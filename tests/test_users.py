@@ -1,6 +1,12 @@
 import pytest
 
-from app.core.users import ROLE_ADMIN, ROLE_REVIEWER, UserError, UserStore
+from app.core.users import (
+    ROLE_ADMIN,
+    ROLE_REVIEWER,
+    UserError,
+    UserStore,
+    hash_password,
+)
 
 
 @pytest.fixture
@@ -99,3 +105,40 @@ class TestAuthenticate:
     def test_setting_a_password_on_an_unknown_user_is_rejected(self, store):
         with pytest.raises(UserError, match="No such user"):
             store.set_password("ghost", "password123")
+
+
+class TestPasswordHashDiagnostic:
+    """The Docker trap: Compose eats $2b$12$SALT as a variable reference.
+
+    An unquoted hash in .env reaches the container truncated, the app starts
+    normally, and the right password is simply rejected forever. Nothing about
+    that failure points at its cause, so the app says so out loud.
+    """
+
+    def test_a_good_hash_draws_no_complaint(self, monkeypatch):
+        from app.core.config import password_hash_complaint
+
+        monkeypatch.setenv("APP_PASSWORD_HASH", hash_password("a-real-password"))
+        assert password_hash_complaint() == ""
+
+    def test_an_unset_hash_is_not_this_check_s_business(self, monkeypatch):
+        from app.core.config import password_hash_complaint
+
+        monkeypatch.setenv("APP_PASSWORD_HASH", "")
+        assert password_hash_complaint() == ""
+
+    def test_a_hash_with_its_salt_eaten_is_named_as_such(self, monkeypatch):
+        from app.core.config import password_hash_complaint
+
+        full = hash_password("a-real-password")
+        # Exactly what Compose leaves behind: "$2b$12$" + <salt> is read as a
+        # variable, so everything up to the first non-word character goes.
+        monkeypatch.setenv("APP_PASSWORD_HASH", "$2b$12" + full[29:])
+        complaint = password_hash_complaint()
+        assert "truncated" in complaint and "single quotes" in complaint
+
+    def test_something_that_is_not_a_hash_at_all(self, monkeypatch):
+        from app.core.config import password_hash_complaint
+
+        monkeypatch.setenv("APP_PASSWORD_HASH", "hunter2")
+        assert "not a bcrypt hash" in password_hash_complaint()

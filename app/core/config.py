@@ -90,3 +90,27 @@ def describe_secrets() -> dict[str, bool]:
         "AUTH_SECRET": bool(_env("AUTH_SECRET")),
         "APP_PASSWORD_HASH": bool(_env("APP_PASSWORD_HASH")),
     }
+
+
+def password_hash_complaint() -> str:
+    """Why the configured hash cannot work, or "" if it looks usable.
+
+    Worth its own check because the failure it catches is invisible otherwise:
+    Docker Compose interpolates ``$NAME`` inside an env_file, so an unquoted
+    ``$2b$12$<salt><hash>`` arrives with the salt eaten. The app then starts
+    happily and simply rejects the right password forever.
+    """
+    value = _env("APP_PASSWORD_HASH")
+    if not value:
+        return ""
+    if not value.startswith("$2"):
+        return "APP_PASSWORD_HASH is not a bcrypt hash (it should start with $2b$)."
+    if len(value) < 59:
+        return (
+            "APP_PASSWORD_HASH is truncated — it should be 60 characters, this "
+            f"one is {len(value)}. In Docker this is almost always an unquoted "
+            "hash in .env: Compose read $2b$12$SALT as a variable and dropped "
+            "the salt. Wrap the value in single quotes and recreate the "
+            "container."
+        )
+    return ""

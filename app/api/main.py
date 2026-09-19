@@ -30,7 +30,12 @@ from app.api.auth import (
     user_from_request,
 )
 from app.api.runtime import Runtime
-from app.core.config import describe_secrets, load_env_file, load_settings
+from app.core.config import (
+    describe_secrets,
+    load_env_file,
+    load_settings,
+    password_hash_complaint,
+)
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s"
@@ -46,6 +51,11 @@ async def lifespan(app: FastAPI):
 
     # Log only whether each secret exists, never its value.
     log.info("secrets present: %s", describe_secrets())
+    complaint = password_hash_complaint()
+    if complaint:
+        # Not fatal — the app is still usable by anyone in data/users.json —
+        # but silence here means a locked-out admin with nothing to go on.
+        log.warning("%s", complaint)
     settings = app.state.settings
     if not app.state.runtime.dataset.exists:
         log.warning(

@@ -16,7 +16,12 @@ services:
 
     env_file:
       # Generate it with:  python -m app.cli --init-env
-      - .env
+      #
+      # required: false so `docker compose up` still starts without it — the
+      # app then prints exactly which keys are missing, which is a far better
+      # first experience than Compose refusing to read its own file.
+      - path: .env
+        required: false
 
     # Pinned here rather than left to .env: these are the paths *inside* the
     # container, and a .env written for running without Docker would otherwise
@@ -48,7 +53,10 @@ services:
       # writing a temp file and renaming it over the original leaves the
       # container staring at the old content until it is recreated. Mounting
       # the folder has no such trap: adding, editing and replacing all show up.
-      - ./sample:/srv/src
+      #
+      # Set DATA_SOURCE in .env to point somewhere else without editing this
+      # file:  DATA_SOURCE=D:/du-lieu-han-nom
+      - ${DATA_SOURCE:-./sample}:/srv/src
 
     deploy:
       resources:

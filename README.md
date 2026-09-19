@@ -109,13 +109,13 @@ IMAGES_DIR=D:/du-lieu/images
 ```
 
 **Có Docker** — thư mục của bạn cần có `dataset.jsonl` và `images/` nằm cạnh
-nhau, rồi sửa một dòng trong `docker-compose.yml`:
+nhau. Không phải sửa YAML, chỉ thêm một dòng vào `.env`:
 
-```yaml
-volumes:
-  - ./data:/data
-  - ./du-lieu:/srv/src         # thay ./sample bằng thư mục của bạn
+```bash
+DATA_SOURCE=D:/du-lieu-han-nom
 ```
+
+Rồi `docker compose up -d --force-recreate`. Bỏ trống thì app dùng `./sample`.
 
 ---
 
@@ -258,6 +258,7 @@ dưới dạng bcrypt hash.
 | Trang trống, 0 dòng | `DATASET_PATH` trỏ sai, hoặc file rỗng. `--check` sẽ ghi `MISSING` |
 | Sửa `.env` rồi mà Docker không đổi | `env_file` chỉ đọc lúc tạo container. Chạy `docker compose up -d --force-recreate` |
 | Tải ảnh/dataset lên báo lỗi ghi file | Mount đang là `:ro`. Bỏ `:ro` trong `docker-compose.yml` rồi `docker compose up -d --force-recreate` |
+| Docker: mật khẩu đúng mà vẫn báo sai | `APP_PASSWORD_HASH` trong `.env` chưa có dấu nháy đơn. Hash bcrypt là `$2b$12$...`, Compose đọc `$...` thành tên biến và ăn mất phần salt. Bọc giá trị trong `'...'` rồi recreate container — log của app cũng tự nói ra điều này khi khởi động |
 | Tải ảnh lên mà báo "trùng tên nên bỏ qua" | Đúng như thiết kế — ảnh cùng tên không bị ghi đè. Tick "ghi đè" nếu thật sự muốn thay |
 
 Lệnh chẩn đoán đầu tiên nên chạy, luôn luôn:

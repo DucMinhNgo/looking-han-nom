@@ -61,9 +61,13 @@ def cmd_init_env(password: str, force: bool) -> int:
 # Local defaults: serves the 10-item sample over plain HTTP.
 # See .env.example for what every setting means.
 
-AUTH_SECRET={secrets.token_urlsafe(48)}
+# Single-quoted on purpose. A bcrypt hash is $2b$12$<salt><hash>, and Docker
+# Compose interpolates $NAME inside an env_file — unquoted, it would silently
+# swallow the salt and every Docker login would fail. Single quotes stop that,
+# and python-dotenv strips them, so both ways of running see the same value.
+AUTH_SECRET='{secrets.token_urlsafe(48)}'
 APP_USERNAME=admin
-APP_PASSWORD_HASH={hash_password(password)}
+APP_PASSWORD_HASH='{hash_password(password)}'
 
 # 0 for plain HTTP. Set to 1 only when served over HTTPS — a Secure cookie is
 # never sent over http, so 1 here makes login fail with no visible reason.
@@ -115,7 +119,7 @@ def _library():
 
 def cmd_check() -> int:
     from app.core import dataset, localimages, models, users  # noqa: F401
-    from app.core.config import describe_secrets
+    from app.core.config import describe_secrets, password_hash_complaint
 
     settings, data, report = _library()
     print("core modules import cleanly (no web framework)")
@@ -131,6 +135,10 @@ def cmd_check() -> int:
     print("secrets       : " + ", ".join(
         f"{k}={'set' if v else 'MISSING'}" for k, v in describe_secrets().items()
     ))
+
+    complaint = password_hash_complaint()
+    if complaint:
+        print("\n" + complaint)
 
     missing = [k for k, v in describe_secrets().items() if not v]
     if missing:

@@ -1,9 +1,14 @@
-# Lookup tool runtime deps. Read-only over a mounted dataset and image folder,
-# so there is no model, no object store, and no HTTP client in the runtime.
+# Lookup tool runtime deps. Reads a mounted dataset and image folder, and lets
+# an admin add to both — so there is no model, no object store, and no HTTP
+# client in the runtime.
 
 # Web layer
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
+
+# Multipart form parsing — every upload in routes_data.py needs it. FastAPI
+# raises at import time without it, so the app will not start.
+python-multipart==0.0.9
 
 # Auth
 bcrypt==4.2.0
