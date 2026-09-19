@@ -23,6 +23,7 @@ from fastapi.responses import FileResponse
 from app.api.auth import require_admin
 from app.core import ingest, intake
 from app.core.intake import IntakeError
+from app.core.localimages import basename
 
 log = logging.getLogger(__name__)
 
@@ -37,6 +38,22 @@ MAX_DATASET_BYTES = 256 * 1024 * 1024
 
 def _runtime(request: Request):
     return request.app.state.runtime
+
+
+def _rows_of(runtime) -> list[dict]:
+    """The dataset as plain rows, ready to be written back.
+
+    ``extra`` comes first so the canonical four always win on a key clash,
+    and so a column the app does not model — a gemini_ocr, a post_link —
+    still makes the round trip instead of being dropped on the next write.
+    """
+    return [
+        item.extra | {
+            "image": item.image, "post_id": item.post_id,
+            "caption": item.caption, "ground_truth": item.ground_truth,
+        }
+        for item in runtime.dataset.items
+    ]
 
 
 async def _read_upload(file: UploadFile, limit: int, what: str) -> bytes:
@@ -71,10 +88,7 @@ async def preview_dataset(
         )
 
     runtime = _runtime(request)
-    existing = [item.extra | {
-        "image": item.image, "post_id": item.post_id,
-        "caption": item.caption, "ground_truth": item.ground_truth,
-    } for item in runtime.dataset.items]
+    existing = _rows_of(runtime)
 
     result = ingest.merge(existing, incoming, malformed=malformed)
     payload = result.to_json()
@@ -105,10 +119,7 @@ async def merge_dataset(
         # preview and this call, and merging onto a stale copy would drop its
         # rows.
         runtime.dataset.load(force=True)
-        existing = [item.extra | {
-            "image": item.image, "post_id": item.post_id,
-            "caption": item.caption, "ground_truth": item.ground_truth,
-        } for item in runtime.dataset.items]
+        existing = _rows_of(runtime)
 
         result = ingest.merge(existing, incoming, malformed=malformed)
         saved = ingest.backup(path, runtime.settings.backups_dir)
@@ -236,10 +247,7 @@ async def add_row(
     path = runtime.settings.dataset_path
     with _write_lock:
         runtime.dataset.load(force=True)
-        existing = [item.extra | {
-            "image": item.image, "post_id": item.post_id,
-            "caption": item.caption, "ground_truth": item.ground_truth,
-        } for item in runtime.dataset.items]
+        existing = _rows_of(runtime)
 
         result = ingest.merge(existing, [row])
         ingest.backup(path, runtime.settings.backups_dir)
@@ -255,6 +263,67 @@ async def add_row(
         "updated": result.updated,
         "total": result.total,
         "images": runtime.report.to_json(),
+    }
+
+
+@router.post("/ground-truth")
+async def edit_ground_truth(
+    request: Request,
+    index: int = Form(...),
+    ground_truth: str = Form(...),
+    expect_image: str = Form(""),
+    user: dict = Depends(require_admin),
+):
+    """Correct one row's ground truth in place.
+
+    Addressed by row number, but checked against the picture the caller
+    believed was there. A merge can move rows while an editor has the page
+    open, and writing a correction over the wrong row is exactly the kind of
+    quiet damage a corpus never recovers from.
+    """
+    runtime = _runtime(request)
+    path = runtime.settings.dataset_path
+
+    with _write_lock:
+        runtime.dataset.load(force=True)
+        rows = _rows_of(runtime)
+        if not 0 <= index < len(rows):
+            raise HTTPException(
+                404, f"Row {index + 1} is no longer there — the dataset now "
+                     f"has {len(rows)} rows. Reload the page."
+            )
+
+        here = str(rows[index].get("image") or "")
+        if expect_image and basename(here).lower() != basename(expect_image).lower():
+            raise HTTPException(
+                409,
+                f"Row {index + 1} is now {here or '(no picture)'}, not "
+                f"{expect_image}. Someone changed the dataset while this page "
+                "was open. Reload and try again.",
+            )
+
+        if str(rows[index].get("ground_truth") or "") == ground_truth:
+            return {"changed": False, "index": index,
+                    "ground_truth": ground_truth, "backup": None}
+
+        rows[index]["ground_truth"] = ground_truth
+        saved = ingest.backup(path, runtime.settings.backups_dir)
+        try:
+            ingest.write_dataset(path, rows)
+        except OSError as exc:
+            raise HTTPException(
+                500,
+                f"Could not write {path}: {exc}. If this is Docker, the data "
+                "mount is probably still read-only (:ro).",
+            ) from exc
+        runtime.refresh(force=True)
+
+    log.info("row %d ground truth edited by %r", index + 1, user["username"])
+    return {
+        "changed": True,
+        "index": index,
+        "ground_truth": ground_truth,
+        "backup": saved.name if saved else None,
     }
 
 

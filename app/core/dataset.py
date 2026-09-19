@@ -36,7 +36,6 @@ _ALIASES = {
     "caption": ("caption", "fb_caption", "fb caption", "sub_caption"),
     "ground_truth": ("ground_truth", "groundtruth", "ground truth", "gt", "label"),
 }
-_KNOWN = {name for names in _ALIASES.values() for name in names}
 
 
 def _pick(row: dict[str, Any], field: str) -> str:
@@ -45,6 +44,38 @@ def _pick(row: dict[str, Any], field: str) -> str:
         if value not in (None, ""):
             return str(value).strip()
     return ""
+
+
+def _pick_url(row: dict[str, Any]) -> str:
+    """The first post column that is actually a URL.
+
+    Not the same question as "which column is the post id". An export can
+    carry an opaque base64 blob in post_id and the permalink in post_link,
+    and taking the first non-empty alias would then hand back the blob and
+    leave the row with no link at all.
+    """
+    for alias in _ALIASES["post_id"]:
+        value = str(row.get(alias) or "").strip()
+        if value.startswith(("http://", "https://")):
+            return value
+    return ""
+
+
+def _consumed(row: dict[str, Any]) -> set[str]:
+    """The exact column names the canonical fields were read from.
+
+    Everything else belongs in ``extra`` and must survive a rewrite —
+    including an alias that went unused, such as post_link sitting beside a
+    post_id. Excluding every known alias instead would silently delete that
+    column the next time the dataset is written.
+    """
+    used: set[str] = set()
+    for field in _ALIASES:
+        for alias in _ALIASES[field]:
+            if row.get(alias) not in (None, ""):
+                used.add(alias)
+                break
+    return used
 
 
 @dataclass
@@ -123,10 +154,12 @@ class Dataset:
                         post_id=_pick(row, "post_id"),
                         caption=_pick(row, "caption"),
                         ground_truth=_pick(row, "ground_truth"),
-                        # Anything the file carries beyond the four known
-                        # fields is kept rather than dropped — it costs
-                        # nothing and a future column is not lost in transit.
-                        extra={k: v for k, v in row.items() if k not in _KNOWN},
+                        post_link=_pick_url(row),
+                        # Anything the file carries that was not read into one
+                        # of the four fields is kept rather than dropped — it
+                        # costs nothing and a column is not lost in transit.
+                        extra={k: v for k, v in row.items()
+                               if k not in _consumed(row)},
                     )
                 )
 

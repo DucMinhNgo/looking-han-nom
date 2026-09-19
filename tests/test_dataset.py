@@ -173,3 +173,58 @@ class TestAddingRowsLater:
             handle.write(json.dumps(
                 row(image="s.jpg", ground_truth="獨釣寒江雪"), ensure_ascii=False) + "\n")
         assert dataset.search("獨釣寒江雪").total == 1
+
+
+class TestAPostIdThatIsNotALink:
+    """Real exports carry an opaque base64 post_id and the URL beside it.
+
+    Taking the first non-empty alias hands back the blob and leaves the row
+    with no link at all, which is how a freshly merged batch ended up with
+    no way to open the post it came from.
+    """
+
+    ROW = {
+        "image": "a.jpg",
+        "post_id": "UzpfSTEwMDAwMjI1NDQ4NjA3NjpWSzoyNTYwNzYyNjY5MjIxMjc2OQ==",
+        "post_link": "https://www.facebook.com/permalink.php?story_fbid=25607626692212769&id=100002254486076",
+        "ground_truth": "聲家振棣棠風春",
+        "gemini_ocr": "瑞氣盈門迎幸福",
+    }
+
+    def _one(self, tmp_path, row):
+        path = tmp_path / "d.jsonl"
+        path.write_text(json.dumps(row, ensure_ascii=False) + "\n", encoding="utf-8")
+        data = Dataset(path)
+        data.load(force=True)
+        return data.items[0]
+
+    def test_the_link_is_found_in_its_own_column(self, tmp_path):
+        item = self._one(tmp_path, self.ROW)
+        assert item.post_url == self.ROW["post_link"]
+        assert item.post_id == self.ROW["post_id"]
+
+    def test_the_real_story_id_is_read_from_the_url(self, tmp_path):
+        """The base64 blob has digits in it that mean nothing."""
+        item = self._one(tmp_path, self.ROW)
+        assert item.post_number == "25607626692212769"
+
+    def test_an_unused_alias_survives_a_rewrite(self, tmp_path):
+        """post_link must reach ``extra``, or the next write deletes it."""
+        item = self._one(tmp_path, self.ROW)
+        assert item.extra["post_link"] == self.ROW["post_link"]
+        assert item.extra["gemini_ocr"] == self.ROW["gemini_ocr"]
+
+    def test_the_link_is_searchable(self, tmp_path):
+        item = self._one(tmp_path, self.ROW)
+        assert "25607626692212769" in item.haystack()
+        assert "25607626692212769" in item.haystack("post")
+
+    def test_a_plain_url_in_post_id_still_works(self, tmp_path):
+        """The shipped sample spells it the other way round."""
+        item = self._one(tmp_path, {"image": "a.jpg", "post_id": "https://fb.com/x/9"})
+        assert item.post_url == "https://fb.com/x/9"
+        assert item.extra == {}
+
+    def test_a_row_with_no_url_anywhere_is_offered_no_link(self, tmp_path):
+        item = self._one(tmp_path, {"image": "a.jpg", "post_id": "UzpfSTE0NDk="})
+        assert item.post_url == ""

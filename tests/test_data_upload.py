@@ -211,3 +211,72 @@ class TestAddingOneRow:
         assert client.post(
             "/api/data/row", data={"image_name": "orphan.jpg"}
         ).status_code == 400
+
+
+class TestEditingGroundTruth:
+    def test_a_correction_is_saved_and_searchable(self, client):
+        login(client)
+        body = client.post("/api/data/ground-truth", data={
+            "index": 0, "ground_truth": "獨釣寒江雪",
+            "expect_image": "sample_00.jpg"}).json()
+
+        assert body["changed"] is True
+        found = client.get("/api/lookup", params={"q": "獨釣寒江雪"}).json()
+        assert found["total"] == 1 and found["items"][0]["index"] == 0
+        # Replaced, not appended to.
+        assert client.get("/api/lookup").json()["total"] == 10
+        assert client.get("/api/lookup", params={"q": "落又一"}).json()["total"] == 0
+
+    def test_the_previous_text_is_backed_up_first(self, client):
+        login(client)
+        client.post("/api/data/ground-truth", data={
+            "index": 0, "ground_truth": "đã sửa"})
+        backups = client.get("/api/data/backups").json()["items"]
+        assert len(backups) == 1
+        restored = client.get(f"/api/data/backups/{backups[0]['name']}")
+        assert "花開花落又一秋" in restored.text
+
+    def test_saving_the_same_text_writes_nothing(self, client):
+        login(client)
+        before = client.get("/api/lookup/0").json()["ground_truth"]
+        body = client.post("/api/data/ground-truth", data={
+            "index": 0, "ground_truth": before}).json()
+        assert body["changed"] is False
+        assert client.get("/api/data/backups").json()["items"] == []
+
+    def test_a_stale_page_cannot_overwrite_the_wrong_row(self, client):
+        """The guard that matters: a merge can move rows under an open page."""
+        login(client)
+        response = client.post("/api/data/ground-truth", data={
+            "index": 0, "ground_truth": "sai chỗ",
+            "expect_image": "sample_07.jpg"})
+        assert response.status_code == 409
+        assert "sample_07.jpg" in response.json()["detail"]
+        assert client.get("/api/lookup", params={"q": "sai chỗ"}).json()["total"] == 0
+
+    def test_a_row_number_past_the_end_is_refused(self, client):
+        login(client)
+        assert client.post("/api/data/ground-truth", data={
+            "index": 999, "ground_truth": "x"}).status_code == 404
+
+    def test_columns_the_app_does_not_model_survive_the_write(self, client):
+        """Editing one row must not strip another row's extra columns."""
+        login(client)
+        client.post("/api/data/dataset/merge", files={"file": ("new.jsonl", jsonl_bytes([
+            {"image": "extra_cols.jpg", "post_id": "UzpfSTE0NDk=",
+             "post_link": URL, "ground_truth": "原文", "gemini_ocr": "機器"},
+        ]))})
+        client.post("/api/data/ground-truth", data={
+            "index": 0, "ground_truth": "đã sửa"})
+
+        found = client.get("/api/lookup", params={"q": "原文"}).json()["items"][0]
+        assert found["extra"]["gemini_ocr"] == "機器"
+        assert found["post_url"] == URL
+
+    def test_only_an_admin_may_edit(self, client):
+        login(client)
+        client.post("/api/users", json={"username": "mai", "password": "password123"})
+        client.post("/api/auth/logout")
+        login(client, "mai", "password123")
+        assert client.post("/api/data/ground-truth", data={
+            "index": 0, "ground_truth": "x"}).status_code == 403

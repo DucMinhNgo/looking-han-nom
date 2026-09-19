@@ -37,6 +37,10 @@ class Item:
     post_id: str
     caption: str = ""
     ground_truth: str = ""
+    # The permalink, when the file keeps it in a column of its own. Some
+    # exports put an opaque base64 blob in post_id and the real URL in
+    # post_link, so the two cannot be assumed to be the same string.
+    post_link: str = ""
     # Filled in by the image library, not by the loader.
     image_name: str = ""
     has_image: bool = False
@@ -44,24 +48,31 @@ class Item:
 
     @property
     def post_url(self) -> str:
-        """``post_id`` is already a Facebook URL in this dataset.
+        """The first of the two that is actually a URL, or "".
 
         Anything that is not a URL is still shown, but is not offered as a
-        link — a button that goes nowhere is worse than no button.
+        link — a link that goes nowhere is worse than no link.
         """
-        value = (self.post_id or "").strip()
-        return value if value.startswith(("http://", "https://")) else ""
+        for value in (self.post_link, self.post_id):
+            value = (value or "").strip()
+            if value.startswith(("http://", "https://")):
+                return value
+        return ""
 
     @property
     def post_number(self) -> str:
-        """The longest run of digits in the post id, for display and search."""
-        matches = _DIGITS.findall(self.post_id or "")
+        """The longest run of digits in the post, for display and search.
+
+        Read from the URL as well as the id: a base64 post_id has digits in
+        it that mean nothing, while the permalink carries the real story id.
+        """
+        matches = _DIGITS.findall(f"{self.post_url} {self.post_id}")
         return max(matches, key=len) if matches else ""
 
     def haystack(self, field_name: str = "") -> str:
         """The text a query is matched against, normalized once per search."""
         if field_name == "post":
-            parts = [self.post_id, self.post_number]
+            parts = [self.post_id, self.post_url, self.post_number]
         elif field_name == "caption":
             parts = [self.caption]
         elif field_name == "ground_truth":
@@ -70,7 +81,7 @@ class Item:
             parts = [self.image, self.image_name]
         else:
             parts = [
-                self.post_id, self.post_number, self.caption,
+                self.post_id, self.post_url, self.post_number, self.caption,
                 self.ground_truth, self.image, self.image_name,
             ]
         # Joined with a separator no query will contain, so a search cannot

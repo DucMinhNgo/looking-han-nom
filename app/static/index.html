@@ -176,6 +176,14 @@
   .result .warn { color: var(--warning); font-weight: 600; }
   .result ul { margin: 0.3rem 0 0 1.1rem; }
   .result code { font-family: ui-monospace, monospace; font-size: 0.74rem; }
+  a.postlink { color: var(--series-1); text-decoration: none; font-weight: 600;
+               font-size: 0.78rem; white-space: nowrap; overflow: hidden;
+               text-overflow: ellipsis; max-width: 100%; }
+  a.postlink:hover { text-decoration: underline; }
+  .lb-side a.postlink { font-weight: 400; word-break: break-all;
+                        white-space: normal; }
+  textarea.block-edit { width: 100%; box-sizing: border-box; resize: vertical;
+                        line-height: 1.7; }
 </style>
 </head>
 <body>
@@ -342,6 +350,7 @@
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
+const isAdmin = () => !!state.me && state.me.role === "admin";
 
 const state = {
   me: null, query: "", field: "all", offset: 0, limit: 24,
@@ -423,6 +432,9 @@ async function search() {
     grid.querySelectorAll("[data-open]").forEach((el) => {
       el.onclick = () => openDetail(+el.dataset.open);
     });
+    grid.querySelectorAll("[data-edit]").forEach((el) => {
+      el.onclick = () => openDetail(+el.dataset.edit, true);
+    });
   }
 
   $("c-results").textContent = fmt(data.total);
@@ -456,16 +468,19 @@ function card(item, i) {
           <span>#${item.index + 1}</span>
           <span class="spacer"></span>
           ${item.post_url
-            ? `<a href="${esc(item.post_url)}" target="_blank" rel="noopener">
-                 <button class="primary">Mở bài post</button></a>`
+            ? `<a class="postlink" href="${esc(item.post_url)}" target="_blank"
+                  rel="noopener" title="${esc(item.post_url)}">Bài post ↗</a>`
             : `<span class="pill">không có link</span>`}
+          ${isAdmin()
+            ? `<button class="primary" data-edit="${i}">Chỉnh ground truth</button>`
+            : ""}
         </div>
       </div>
     </div>`;
 }
 
 /* ---------------- detail ---------------- */
-function openDetail(i) {
+function openDetail(i, editing = false) {
   const item = state.items[i];
   if (!item) return;
   state.current = { item, index: i };
@@ -480,7 +495,16 @@ function openDetail(i) {
     <div class="lb-side">
       <div style="margin-bottom:0.8rem">
         <label class="field">Ground truth</label>
-        <div class="block gt">${highlight(item.ground_truth || "(trống)", state.query)}</div>
+        ${editing
+          ? `<textarea id="gt-edit" class="cjk block-edit" rows="8">${
+               esc(item.ground_truth || "")}</textarea>
+             <div class="row" style="margin-top:0.4rem">
+               <button class="primary" id="gt-save">Lưu</button>
+               <button id="gt-cancel">Huỷ</button>
+               <span class="muted" id="gt-status"></span>
+             </div>`
+          : `<div class="block gt">${
+               highlight(item.ground_truth || "(trống)", state.query)}</div>`}
       </div>
       <div style="margin-bottom:0.8rem">
         <label class="field">Caption</label>
@@ -492,11 +516,14 @@ function openDetail(i) {
           item.has_image && item.image_name !== item.image
             ? ` <span class="pill">khớp với ${esc(item.image_name)}</span>` : ""}</dd>
         <dt>Post ID</dt><dd>${esc(item.post_id || "—")}</dd>
+        <dt>Link bài post</dt><dd>${item.post_url
+          ? `<a class="postlink" href="${esc(item.post_url)}" target="_blank"
+                rel="noopener">${esc(item.post_url)}</a>`
+          : "—"}</dd>
       </dl>
       <div class="row" style="margin-top:1rem">
-        ${item.post_url
-          ? `<a href="${esc(item.post_url)}" target="_blank" rel="noopener">
-               <button class="primary">Mở bài post</button></a>` : ""}
+        ${!editing && isAdmin()
+          ? `<button class="primary" id="gt-open">Chỉnh ground truth</button>` : ""}
         <button id="lb-copy">Chép ground truth</button>
       </div>
       <p class="muted" style="font-size:0.72rem; margin-top:0.7rem">← → chuyển ảnh · Esc đóng</p>
@@ -509,6 +536,49 @@ function openDetail(i) {
     catch { copy.textContent = "Không chép được"; }
     setTimeout(() => { copy.textContent = "Chép ground truth"; }, 1500);
   };
+
+  const open = $("gt-open");
+  if (open) open.onclick = () => openDetail(i, true);
+  const cancel = $("gt-cancel");
+  if (cancel) cancel.onclick = () => openDetail(i, false);
+
+  const box = $("gt-edit");
+  if (box) {
+    box.focus();
+    box.setSelectionRange(box.value.length, box.value.length);
+    // Ctrl/Cmd+Enter saves, so a long correction does not need the mouse.
+    box.onkeydown = (e) => {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save(); }
+      // The lightbox uses the arrows to change picture; inside a textarea
+      // they have to move the caret instead. Escape still closes.
+      if (e.key !== "Escape") e.stopPropagation();
+    };
+  }
+
+  const save = async () => {
+    const form = new FormData();
+    form.append("index", String(item.index));
+    form.append("ground_truth", $("gt-edit").value);
+    // What this page believed was on that row. The server refuses the write
+    // if a merge moved things underneath us.
+    form.append("expect_image", item.image || "");
+
+    $("gt-save").disabled = true;
+    $("gt-status").textContent = "Đang lưu…";
+    try {
+      const body = await api("/api/data/ground-truth", { method: "POST", body: form });
+      item.ground_truth = body.ground_truth;
+      await Promise.all([search(), loadStats(), loadBackups()]);
+      // search() rebuilds state.items, so re-resolve this row before redrawing.
+      const again = state.items.findIndex((x) => x.index === item.index);
+      openDetail(again >= 0 ? again : i, false);
+    } catch (e) {
+      $("gt-status").textContent = e.message;
+      $("gt-save").disabled = false;
+    }
+  };
+  const saveButton = $("gt-save");
+  if (saveButton) saveButton.onclick = save;
 }
 
 function closeDetail() { $("lb").classList.remove("show"); state.current = null; }
