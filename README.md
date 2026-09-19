@@ -22,7 +22,6 @@ Repo đã kèm sẵn bộ mẫu 10 item, nên **không cần chuẩn bị dữ l
 ### Cách A — không cần Docker
 
 ```bash
-cd hannom-app
 python -m venv .venv
 ```
 
@@ -55,7 +54,6 @@ Mở **http://127.0.0.1:8000**, đăng nhập bằng `admin` và mật khẩu b�
 ### Cách B — Docker
 
 ```bash
-cd hannom-app
 python -m app.cli --init-env
 docker compose up -d --build
 ```
