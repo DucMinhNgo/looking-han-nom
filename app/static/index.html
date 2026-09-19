@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tra cứu Hán-Nôm</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface: #fcfcfb; --plane: #f9f9f7;
+    --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --border: rgba(11,11,11,0.10);
+    --series-1: #2a78d6; --series-2: #eb6834;
+    --good: #0ca30c; --warning: #fab219; --critical: #d03b3b;
+    --good-text: #006300;
+    --shadow: 0 1px 2px rgba(11,11,11,0.06), 0 4px 12px rgba(11,11,11,0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface: #1a1a19; --plane: #0d0d0d;
+      --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --border: rgba(255,255,255,0.10);
+      --series-1: #3987e5; --series-2: #d95926;
+      --good-text: #0ca30c;
+      --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface: #1a1a19; --plane: #0d0d0d;
+    --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --border: rgba(255,255,255,0.10);
+    --series-1: #3987e5; --series-2: #d95926;
+    --good-text: #0ca30c;
+    --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.3);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--plane); color: var(--ink);
+    font-size: 14px; line-height: 1.45; padding: 1rem;
+  }
+  .wrap { max-width: 1560px; margin: 0 auto; }
+
+  header { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  header h1 { font-size: 1.05rem; font-weight: 700; }
+  .spacer { flex: 1; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1rem 1.15rem; margin-bottom: 1rem;
+  }
+
+  button {
+    font-family: inherit; font-size: 0.83rem; font-weight: 600;
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.4rem 0.8rem; cursor: pointer;
+    background: var(--surface); color: var(--ink);
+  }
+  button:hover:not(:disabled) { filter: brightness(0.95); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  button.primary { background: var(--series-1); color: #fff; border-color: transparent; }
+
+  input, select, textarea {
+    font-family: inherit; font-size: 0.9rem; padding: 0.5rem 0.7rem;
+    border: 1px solid var(--border); border-radius: 6px;
+    background: var(--plane); color: var(--ink); max-width: 100%;
+  }
+  input:focus, select:focus { outline: 2px solid var(--series-1); outline-offset: 1px; }
+  #q { flex: 1; min-width: 220px; font-size: 1rem; }
+
+  .muted { color: var(--muted); }
+  .row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+
+  /* ---- mismatch counters: the headline of the page ---- */
+  .counts { display: flex; gap: 1.6rem; flex-wrap: wrap; align-items: flex-start; }
+  .count .k {
+    font-size: 0.68rem; font-weight: 600; letter-spacing: 0.05em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .count .v { font-size: 1.3rem; font-weight: 700; line-height: 1.2; }
+  .count.warn .v { color: var(--warning); }
+  .count.bad .v { color: var(--critical); }
+  .count button { margin-top: 0.15rem; padding: 0.15rem 0.45rem; font-size: 0.7rem; }
+
+  /* ---- results ---- */
+  .grid {
+    display: grid; gap: 0.9rem;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+  .item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden;
+    display: flex; flex-direction: column; transition: box-shadow .15s ease;
+  }
+  .item:hover { box-shadow: var(--shadow); }
+  .item.noimg { border-style: dashed; border-color: var(--warning); }
+  .thumb {
+    width: 100%; aspect-ratio: 3 / 4; background: var(--plane);
+    display: block; object-fit: contain; cursor: zoom-in;
+  }
+  .thumb-missing {
+    width: 100%; aspect-ratio: 3 / 4; display: grid; place-items: center;
+    background: repeating-linear-gradient(45deg, var(--grid), var(--grid) 7px,
+                                          var(--plane) 7px, var(--plane) 14px);
+    color: var(--ink-2); font-size: 0.8rem; text-align: center; padding: 1rem;
+  }
+  .meta { padding: 0.65rem 0.75rem; display: flex; flex-direction: column; gap: 0.45rem; }
+  .gt {
+    font-size: 1rem; line-height: 1.85; white-space: pre-wrap;
+    font-family: "Noto Serif CJK TC", "Source Han Serif", "MS Mincho", serif;
+    max-height: 9rem; overflow-y: auto;
+  }
+  .cap { font-size: 0.82rem; color: var(--ink-2); line-height: 1.5; }
+  .foot { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;
+          font-size: 0.7rem; color: var(--muted); }
+  .pill {
+    font-size: 0.65rem; font-weight: 700; padding: 0.05rem 0.4rem;
+    border-radius: 3px; border: 1px solid var(--border); color: var(--muted);
+    white-space: nowrap;
+  }
+  .pill.miss { color: var(--warning); border-color: var(--warning); }
+  mark { background: color-mix(in srgb, var(--series-2) 35%, transparent); color: inherit; }
+
+  /* ---- lightbox ---- */
+  .lb { display: none; position: fixed; inset: 0; z-index: 50;
+        background: rgba(0,0,0,0.75); padding: 1.2rem;
+        align-items: center; justify-content: center; }
+  .lb.show { display: flex; }
+  .lb-inner { background: var(--surface); border-radius: 12px; overflow: hidden;
+              max-width: 1500px; width: 100%; max-height: 94vh;
+              display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(340px, 1fr); }
+  @media (max-width: 900px) { .lb-inner { grid-template-columns: 1fr; } }
+  .lb-img { background: #000; display: flex; align-items: center; justify-content: center;
+            min-height: 240px; max-height: 94vh; overflow: auto; }
+  .lb-img img { max-width: 100%; max-height: 94vh; object-fit: contain; display: block; }
+  .lb-side { padding: 1.1rem 1.25rem; overflow-y: auto; max-height: 94vh; }
+  .lb-close { position: absolute; top: 1.2rem; right: 1.2rem; }
+  .kv { display: grid; grid-template-columns: 96px 1fr; gap: 0.3rem 0.7rem; font-size: 0.78rem; }
+  .kv dt { color: var(--muted); }
+  .kv dd { word-break: break-all; }
+  label.field { display: block; font-size: 0.68rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted);
+    margin-bottom: 0.3rem; }
+  .block { border: 1px solid var(--border); border-radius: 6px; padding: 0.55rem 0.7rem;
+           background: var(--plane); white-space: pre-wrap; }
+
+  details.card > summary {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.07em;
+    text-transform: uppercase; color: var(--muted); cursor: pointer; list-style: none;
+  }
+  details.card > summary::-webkit-details-marker { display: none; }
+  details.card > summary::before { content: "▸ "; }
+  details.card[open] > summary::before { content: "▾ "; }
+  details.card[open] > summary { margin-bottom: 0.85rem; }
+
+  .banner { display: none; padding: 0.75rem 0.95rem; border-radius: 8px;
+            margin-bottom: 1rem; border: 1px solid var(--warning); font-size: 0.85rem; }
+  .banner.show { display: block; }
+  .banner.crit { border-color: var(--critical); }
+  .banner b { display: block; margin-bottom: 0.2rem; }
+  .empty { text-align: center; padding: 2.5rem 1rem; color: var(--muted); font-size: 0.9rem; }
+  .filelist { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+              gap: 0.3rem; font-family: ui-monospace, monospace; font-size: 0.75rem; }
+  .hide { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Tra cứu Hán-Nôm</h1>
+    <span class="muted" id="whoami">…</span>
+    <div class="spacer"></div>
+    <span class="muted" id="corpus-line"></span>
+    <button id="btn-logout">Đăng xuất</button>
+  </header>
+
+  <div class="banner" id="banner" role="alert">
+    <b id="banner-title"></b><span id="banner-body"></span>
+  </div>
+
+  <!-- ============ search ============ -->
+  <div class="card">
+    <div class="row">
+      <input type="search" id="q" placeholder="Dán link Facebook, post id, caption hoặc chữ trong ground truth…"
+             autocomplete="off" autofocus />
+      <select id="field" aria-label="Tìm trong trường">
+        <option value="all">Tất cả</option>
+        <option value="post">Link / Post ID</option>
+        <option value="caption">Caption</option>
+        <option value="ground_truth">Ground truth</option>
+        <option value="image">Tên file ảnh</option>
+      </select>
+      <button id="btn-clear">Xoá</button>
+    </div>
+
+    <div class="counts" style="margin-top:1rem">
+      <div class="count">
+        <div class="k">Kết quả</div>
+        <div class="v" id="c-results">—</div>
+      </div>
+      <div class="count">
+        <div class="k">Tổng số dòng</div>
+        <div class="v" id="c-rows">—</div>
+      </div>
+      <div class="count">
+        <div class="k">Khớp ảnh</div>
+        <div class="v" id="c-matched">—</div>
+      </div>
+      <div class="count warn">
+        <div class="k">Dòng thiếu ảnh</div>
+        <div class="v" id="c-missing">—</div>
+        <button id="btn-missing" class="hide">Chỉ xem nhóm này</button>
+      </div>
+      <div class="count bad">
+        <div class="k">Ảnh thừa</div>
+        <div class="v" id="c-orphans">—</div>
+        <button id="btn-orphans" class="hide">Xem danh sách</button>
+      </div>
+      <div class="spacer"></div>
+      <div class="row">
+        <button id="btn-rescan">Quét lại ảnh</button>
+        <span class="muted" id="rescan-status" style="font-size:0.78rem"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ results ============ -->
+  <div class="card">
+    <div class="row" style="margin-bottom:0.85rem">
+      <span class="muted" id="page-info"></span>
+      <span class="spacer"></span>
+      <button id="btn-prev" disabled>Trước</button>
+      <button id="btn-next" disabled>Sau</button>
+    </div>
+    <div class="grid" id="results"></div>
+    <div class="empty" id="results-empty" style="display:none"></div>
+  </div>
+
+  <details class="card" id="orphan-card">
+    <summary>Ảnh không có dòng dữ liệu nào</summary>
+    <p class="muted" style="font-size:0.78rem; margin-bottom:0.7rem">
+      Các file nằm trong thư mục ảnh nhưng không dòng nào trong dataset trỏ tới.
+      Thường là ảnh thừa, hoặc tên file trong dataset bị lệch.
+    </p>
+    <div class="filelist" id="orphan-list"></div>
+    <div class="row" style="margin-top:0.7rem">
+      <button id="btn-orphan-more" class="hide">Xem thêm</button>
+      <span class="muted" id="orphan-info" style="font-size:0.78rem"></span>
+    </div>
+  </details>
+
+  <details class="card" id="admin-card">
+    <summary>Quản trị — tài khoản</summary>
+    <div class="row" style="margin-bottom:0.6rem">
+      <input id="u-name" placeholder="tên đăng nhập" autocomplete="off" style="width:150px" />
+      <input id="u-display" placeholder="tên hiển thị" autocomplete="off" style="width:160px" />
+      <input id="u-pass" type="password" placeholder="mật khẩu (8+ ký tự)" autocomplete="new-password" style="width:190px" />
+      <select id="u-role"><option value="reviewer">Người dùng</option><option value="admin">Quản trị</option></select>
+      <button class="primary" id="btn-adduser">Thêm tài khoản</button>
+      <span class="muted" id="user-status"></span>
+    </div>
+    <div id="users"></div>
+  </details>
+</div>
+
+<div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Chi tiết">
+  <button class="lb-close" id="lb-close">Đóng</button>
+  <div class="lb-inner" id="lb-inner"></div>
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+
+const state = {
+  me: null, query: "", field: "all", offset: 0, limit: 24,
+  items: [], total: 0, hasMore: false, missingOnly: false,
+  current: null, orphanOffset: 0,
+};
+
+const fmt = (n) => (n === null || n === undefined) ? "—" : Number(n).toLocaleString("vi-VN");
+const esc = (s) => { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; };
+
+function errorText(body, res) {
+  const d = body.detail;
+  if (typeof d === "string" && d) return d;
+  if (Array.isArray(d) && d.length) {
+    return d.map((e) => {
+      const f = Array.isArray(e.loc) ? e.loc[e.loc.length - 1] : "";
+      return f ? `${f}: ${e.msg}` : e.msg;
+    }).join("; ");
+  }
+  return `${res.status} ${res.statusText}`;
+}
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  if (res.status === 401) { window.location.reload(); throw new Error("chưa đăng nhập"); }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(errorText(body, res));
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+function banner(title, body, critical) {
+  $("banner-title").textContent = title;
+  $("banner-body").textContent = body;
+  $("banner").classList.toggle("crit", !!critical);
+  $("banner").classList.add("show");
+}
+function clearBanner() { $("banner").classList.remove("show"); }
+
+/* Highlight the query inside a rendered field, so a hit in a long poem is
+   findable by eye rather than by re-reading it. */
+function highlight(text, needle) {
+  const safe = esc(text);
+  if (!needle) return safe;
+  const escaped = esc(needle).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  try {
+    return safe.replace(new RegExp(escaped, "gi"), (m) => `<mark>${m}</mark>`);
+  } catch { return safe; }
+}
+
+/* ---------------- search ---------------- */
+async function search() {
+  const params = new URLSearchParams({
+    q: state.query, field: state.field,
+    offset: state.offset, limit: state.limit,
+  });
+  if (state.missingOnly) params.set("missing_only", "true");
+
+  let data;
+  try { data = await api(`/api/lookup?${params}`); } catch { return; }
+
+  state.items = data.items;
+  state.total = data.total;
+  state.hasMore = data.has_more;
+
+  const grid = $("results"), empty = $("results-empty");
+  if (!data.items.length) {
+    grid.innerHTML = "";
+    empty.style.display = "block";
+    empty.textContent = state.query
+      ? `Không tìm thấy kết quả nào cho “${state.query}”.`
+      : state.missingOnly
+        ? "Không có dòng nào thiếu ảnh."
+        : "Dataset đang trống. Hãy mount file dataset.jsonl vào container.";
+  } else {
+    empty.style.display = "none";
+    grid.innerHTML = data.items.map((item, i) => card(item, i)).join("");
+    grid.querySelectorAll("[data-open]").forEach((el) => {
+      el.onclick = () => openDetail(+el.dataset.open);
+    });
+  }
+
+  $("c-results").textContent = fmt(data.total);
+  const from = data.total ? state.offset + 1 : 0;
+  $("page-info").textContent =
+    `${fmt(from)}–${fmt(state.offset + data.items.length)} trên ${fmt(data.total)}` +
+    (state.missingOnly ? " · chỉ dòng thiếu ảnh" : "");
+  $("btn-prev").disabled = state.offset <= 0;
+  $("btn-next").disabled = !data.has_more;
+}
+
+function card(item, i) {
+  const q = state.query;
+  const gt = item.ground_truth
+    ? `<div class="gt">${highlight(item.ground_truth, q)}</div>` : "";
+  const cap = item.caption
+    ? `<div class="cap">${highlight(item.caption, q)}</div>` : "";
+  const thumb = item.has_image
+    ? `<img class="thumb" loading="lazy" data-open="${i}"
+            src="/img/${encodeURIComponent(item.image_name)}" alt="" />`
+    : `<div class="thumb-missing" data-open="${i}">Không tìm thấy file ảnh<br>
+         <code style="font-size:0.72rem">${esc(item.image || "(trống)")}</code></div>`;
+
+  return `
+    <div class="item ${item.has_image ? "" : "noimg"}">
+      ${thumb}
+      <div class="meta">
+        ${gt}${cap}
+        <div class="foot">
+          ${item.has_image ? "" : `<span class="pill miss">thiếu ảnh</span>`}
+          <span>#${item.index + 1}</span>
+          <span class="spacer"></span>
+          ${item.post_url
+            ? `<a href="${esc(item.post_url)}" target="_blank" rel="noopener">
+                 <button class="primary">Mở bài post</button></a>`
+            : `<span class="pill">không có link</span>`}
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ---------------- detail ---------------- */
+function openDetail(i) {
+  const item = state.items[i];
+  if (!item) return;
+  state.current = { item, index: i };
+
+  $("lb-inner").innerHTML = `
+    <div class="lb-img">
+      ${item.has_image
+        ? `<img src="/img/${encodeURIComponent(item.image_name)}" alt="" />`
+        : `<div class="empty" style="color:#ccc">Không tìm thấy file ảnh<br>
+             <code>${esc(item.image || "(trống)")}</code></div>`}
+    </div>
+    <div class="lb-side">
+      <div style="margin-bottom:0.8rem">
+        <label class="field">Ground truth</label>
+        <div class="block gt">${highlight(item.ground_truth || "(trống)", state.query)}</div>
+      </div>
+      <div style="margin-bottom:0.8rem">
+        <label class="field">Caption</label>
+        <div class="block">${highlight(item.caption || "(trống)", state.query)}</div>
+      </div>
+      <dl class="kv">
+        <dt>Dòng số</dt><dd>${item.index + 1}</dd>
+        <dt>File ảnh</dt><dd>${esc(item.image || "—")}${
+          item.has_image && item.image_name !== item.image
+            ? ` <span class="pill">khớp với ${esc(item.image_name)}</span>` : ""}</dd>
+        <dt>Post ID</dt><dd>${esc(item.post_id || "—")}</dd>
+      </dl>
+      <div class="row" style="margin-top:1rem">
+        ${item.post_url
+          ? `<a href="${esc(item.post_url)}" target="_blank" rel="noopener">
+               <button class="primary">Mở bài post</button></a>` : ""}
+        <button id="lb-copy">Chép ground truth</button>
+      </div>
+      <p class="muted" style="font-size:0.72rem; margin-top:0.7rem">← → chuyển ảnh · Esc đóng</p>
+    </div>`;
+
+  $("lb").classList.add("show");
+  const copy = $("lb-copy");
+  if (copy) copy.onclick = async () => {
+    try { await navigator.clipboard.writeText(item.ground_truth || ""); copy.textContent = "Đã chép"; }
+    catch { copy.textContent = "Không chép được"; }
+    setTimeout(() => { copy.textContent = "Chép ground truth"; }, 1500);
+  };
+}
+
+function closeDetail() { $("lb").classList.remove("show"); state.current = null; }
+$("lb-close").onclick = closeDetail;
+$("lb").onclick = (e) => { if (e.target === $("lb")) closeDetail(); };
+document.addEventListener("keydown", (e) => {
+  if (!state.current) return;
+  if (e.key === "Escape") { closeDetail(); return; }
+  if (e.key === "ArrowRight" && state.current.index + 1 < state.items.length)
+    openDetail(state.current.index + 1);
+  if (e.key === "ArrowLeft" && state.current.index > 0)
+    openDetail(state.current.index - 1);
+});
+
+/* ---------------- stats & mismatch ---------------- */
+async function loadStats() {
+  let s;
+  try { s = await api("/api/lookup/stats"); } catch { return; }
+
+  const d = s.dataset, im = s.images;
+  $("c-rows").textContent = fmt(d.rows);
+  $("c-matched").textContent = fmt(im.matched);
+  $("c-missing").textContent = fmt(im.rows_without_image);
+  $("c-orphans").textContent = fmt(im.orphan_images);
+  $("btn-missing").classList.toggle("hide", !im.rows_without_image);
+  $("btn-orphans").classList.toggle("hide", !im.orphan_images);
+  $("orphan-card").classList.toggle("hide", !im.orphan_images);
+  $("corpus-line").textContent = `${fmt(d.rows)} dòng · ${fmt(im.files)} ảnh`;
+
+  if (!d.exists) {
+    banner("Chưa có dataset",
+      `Không tìm thấy ${d.path}. Mount file dataset.jsonl vào đường dẫn đó rồi tải lại trang.`, true);
+  } else if (!im.exists) {
+    banner("Chưa có thư mục ảnh",
+      `Không tìm thấy ${im.directory}. Mọi dòng sẽ báo thiếu ảnh cho tới khi mount thư mục ảnh.`, true);
+  } else if (d.malformed_lines) {
+    banner("Có dòng hỏng trong dataset",
+      `${d.malformed_lines} dòng không đọc được đã bị bỏ qua. Các dòng còn lại vẫn dùng bình thường.`, false);
+  } else if (im.rows_without_image || im.orphan_images) {
+    banner("Dữ liệu và ảnh lệch nhau",
+      `${im.rows_without_image} dòng không tìm thấy ảnh, ${im.orphan_images} ảnh không có dòng nào. ` +
+      `Vẫn tra cứu bình thường — hai con số này để bạn biết còn thiếu gì.`, false);
+  } else {
+    clearBanner();
+  }
+}
+
+let orphansLoading = false;
+
+async function loadOrphans(reset) {
+  // The list appends, so two overlapping loads would duplicate every row.
+  // Opening the <details> and pressing the button can both ask at once.
+  if (orphansLoading) return;
+  orphansLoading = true;
+  try {
+    if (reset) { state.orphanOffset = 0; $("orphan-list").innerHTML = ""; }
+    const data = await api(
+      `/api/lookup/orphans?offset=${state.orphanOffset}&limit=60`);
+    $("orphan-list").insertAdjacentHTML("beforeend",
+      data.items.map((n) => `<div>${esc(n)}</div>`).join(""));
+    state.orphanOffset += data.items.length;
+    $("orphan-info").textContent = `${fmt(state.orphanOffset)} / ${fmt(data.total)}`;
+    $("btn-orphan-more").classList.toggle("hide", !data.has_more);
+  } catch {
+    /* the banner already reports a broken connection */
+  } finally {
+    orphansLoading = false;
+  }
+}
+
+/* ---------------- users ---------------- */
+async function loadUsers() {
+  if (!state.me || state.me.role !== "admin") {
+    $("admin-card").classList.add("hide");
+    return;
+  }
+  try {
+    const u = await api("/api/users");
+    $("users").innerHTML = u.users.map((row) => `
+      <div class="row" style="font-size:0.82rem; padding:0.15rem 0">
+        <b>${esc(row.username)}</b>
+        <span class="muted">${esc(row.display_name || "")}</span>
+        <span class="pill">${esc(row.role)}</span>
+        ${row.active ? "" : `<span class="pill">đã khoá</span>`}
+      </div>`).join("");
+  } catch {}
+}
+
+$("btn-adduser").onclick = async () => {
+  $("user-status").textContent = "";
+  try {
+    await api("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: $("u-name").value.trim(),
+        password: $("u-pass").value,
+        display_name: $("u-display").value.trim(),
+        role: $("u-role").value,
+      }),
+    });
+    $("user-status").textContent = `Đã thêm ${$("u-name").value.trim()}.`;
+    $("u-name").value = $("u-pass").value = $("u-display").value = "";
+    loadUsers();
+  } catch (e) { $("user-status").textContent = e.message; }
+};
+
+/* ---------------- controls ---------------- */
+let timer;
+$("q").oninput = (e) => {
+  clearTimeout(timer);
+  timer = setTimeout(() => {
+    state.query = e.target.value.trim();
+    state.offset = 0;
+    search();
+  }, 200);
+};
+$("field").onchange = (e) => { state.field = e.target.value; state.offset = 0; search(); };
+$("btn-clear").onclick = () => {
+  $("q").value = ""; state.query = ""; state.offset = 0;
+  state.missingOnly = false; $("btn-missing").textContent = "Chỉ xem nhóm này";
+  search(); $("q").focus();
+};
+$("btn-prev").onclick = () => { state.offset = Math.max(0, state.offset - state.limit); search(); };
+$("btn-next").onclick = () => { state.offset += state.limit; search(); };
+
+$("btn-missing").onclick = () => {
+  state.missingOnly = !state.missingOnly;
+  state.offset = 0;
+  $("btn-missing").textContent = state.missingOnly ? "Bỏ lọc" : "Chỉ xem nhóm này";
+  search();
+};
+$("btn-orphans").onclick = () => {
+  const card = $("orphan-card");
+  const wasOpen = card.open;
+  card.open = true;
+  card.scrollIntoView({ behavior: "smooth", block: "start" });
+  // Opening it fires the toggle listener below, which loads. Only load here
+  // when it was already open, so the two paths never both fire.
+  if (wasOpen) loadOrphans(true);
+};
+$("btn-orphan-more").onclick = () => loadOrphans(false);
+$("orphan-card").addEventListener("toggle", () => {
+  if ($("orphan-card").open && !state.orphanOffset) loadOrphans(true);
+});
+
+$("btn-rescan").onclick = async () => {
+  $("btn-rescan").disabled = true;
+  $("rescan-status").textContent = "Đang quét…";
+  try {
+    const r = await api("/api/lookup/rescan", { method: "POST" });
+    await Promise.all([loadStats(), search()]);
+    // Set after the refresh: loadStats() owns the banner and would overwrite
+    // this the moment it lands.
+    $("rescan-status").textContent =
+      `${fmt(r.images.files)} ảnh · khớp ${fmt(r.images.matched)}`;
+  } catch (e) { $("rescan-status").textContent = e.message; }
+  $("btn-rescan").disabled = false;
+};
+
+$("btn-logout").onclick = async () => {
+  await fetch("/api/auth/logout", { method: "POST" });
+  window.location.reload();
+};
+
+/* ---------------- boot ---------------- */
+(async function boot() {
+  try { state.me = await api("/api/auth/me"); }
+  catch { window.location.reload(); return; }
+
+  $("whoami").textContent = `${state.me.username} · ${state.me.role}`;
+  if (state.me.role !== "admin") $("admin-card").classList.add("hide");
+  await Promise.all([loadStats(), search(), loadUsers()]);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+# Lookup tool runtime deps. Read-only over a mounted dataset and image folder,
+# so there is no model, no object store, and no HTTP client in the runtime.
+
+# Web layer
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+
+# Auth
+bcrypt==4.2.0
+PyJWT==2.9.0
