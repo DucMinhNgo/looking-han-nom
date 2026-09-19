@@ -18,7 +18,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from app.api import routes_images, routes_lookup, routes_users
+from app.api import routes_data, routes_images, routes_lookup, routes_users
 from app.api.auth import (
     COOKIE_NAME,
     AuthConfig,
@@ -95,6 +95,7 @@ def create_app() -> FastAPI:
 
     app.include_router(routes_images.router)
     app.include_router(routes_lookup.router)
+    app.include_router(routes_data.router)
     app.include_router(routes_users.router)
 
     if STATIC_DIR.exists():

@@ -4,8 +4,8 @@ Công cụ tra cứu trên một bộ dataset ground truth đã hoàn thiện. M
 dán link Facebook, post id, một đoạn caption, hay vài chữ bạn nhớ mang máng —
 nhận lại ảnh, caption, phần phiên âm, và nút mở đúng bài post đó.
 
-Chỉ đọc. Dataset và thư mục ảnh được mount từ máy host; app không bao giờ ghi
-vào chúng.
+Dataset và thư mục ảnh được mount từ máy host. Người dùng thường chỉ tra cứu;
+admin thêm được ảnh và dữ liệu ngay trên giao diện.
 
 ```
 dataset.jsonl  ─┐
@@ -18,6 +18,16 @@ thư mục ảnh/   ─┘
 ## Chạy thử trong 2 phút
 
 Repo đã kèm sẵn bộ mẫu 10 item, nên **không cần chuẩn bị dữ liệu gì cả**.
+
+Lấy mã nguồn về, rồi đứng trong thư mục vừa clone cho mọi lệnh bên dưới:
+
+```bash
+git clone <url-cua-repo> tra-cuu-han-nom
+```
+
+```bash
+cd tra-cuu-han-nom
+```
 
 ### Cách A — không cần Docker
 
@@ -104,7 +114,7 @@ nhau, rồi sửa một dòng trong `docker-compose.yml`:
 ```yaml
 volumes:
   - ./data:/data
-  - ./du-lieu:/srv/src:ro      # thay ./sample bằng thư mục của bạn
+  - ./du-lieu:/srv/src         # thay ./sample bằng thư mục của bạn
 ```
 
 ---
@@ -137,13 +147,45 @@ Chi phí, đo trên thư mục 9.000 ảnh: mỗi request tốn ~15 ms để ki�
 Điều dễ chịu nhất: thêm ảnh còn thiếu thì **dòng "thiếu ảnh" tự chuyển thành
 "khớp"** — không phải làm gì thêm, ba con số ở đầu trang tự cập nhật.
 
+### Thêm ngay trên giao diện (không cần vào máy chủ)
+
+Nếu người thêm dữ liệu không có quyền SSH, mục **Thêm dữ liệu** trong app làm
+được cả ba việc. Chỉ tài khoản **admin** thấy mục này.
+
+**1 · Tải lên ảnh** — chọn nhiều file, hoặc một file `.zip`. Thư mục bên trong
+zip được làm phẳng để ảnh hiện ra ngay. Ảnh **trùng tên sẽ bị từ chối chứ không
+ghi đè**, vì thay nhầm ảnh thì cả dòng đổi nghĩa mà không ai biết — muốn thay
+thật thì tick ô "ghi đè".
+
+**2 · Gộp thêm dataset** — tải lên một `.jsonl` mới. Nó **gộp vào**, không thay
+thế:
+
+- Dòng có tên ảnh trùng → cập nhật **tại chỗ**, không nhân đôi, không xáo trộn
+  thứ tự trang
+- Dòng mới → thêm vào cuối
+- Dòng cũ không liên quan → giữ nguyên
+
+Bấm **Xem trước** để biết trước sẽ thêm/sửa bao nhiêu — chưa ghi gì cả. Nút
+**Gộp vào** chỉ hiện ra sau khi bạn đã thấy hậu quả.
+
+**3 · Thêm một dòng** — form cho trường hợp lẻ: tải ảnh lên kèm, hoặc gõ tên
+một ảnh đã có.
+
+**Sao lưu tự động.** Mỗi lần ghi dataset đều tạo một bản của phiên bản trước,
+tải về được từ chính mục đó. Giữ 10 bản gần nhất. Gộp nhầm thì vẫn lấy lại
+được.
+
+> Tính năng này cần mount **cho ghi**, nên `docker-compose.yml` không đặt `:ro`.
+> Nếu bạn muốn khoá dữ liệu lại, thêm `:ro` vào dòng mount — app vẫn tra cứu
+> bình thường, chỉ là các nút tải lên sẽ báo lỗi nói rõ nguyên nhân.
+
 ### Một cái bẫy của Docker đã được tránh sẵn
 
 `docker-compose.yml` mount **cả thư mục**, không mount từng file:
 
 ```yaml
-- ./sample:/srv/src:ro          # đúng
-# - ./sample/dataset.jsonl:/srv/src/dataset.jsonl:ro    # SAI
+- ./sample:/srv/src             # đúng
+# - ./sample/dataset.jsonl:/srv/src/dataset.jsonl    # SAI
 ```
 
 Bind-mount một file đơn lẻ sẽ ghim inode của nó. Hầu hết trình soạn thảo lưu
@@ -215,6 +257,8 @@ dưới dạng bcrypt hash.
 | Copy ảnh mới vào mà không thấy | Nếu ảnh nằm trong thư mục con: đợi 30 giây hoặc bấm **Quét lại ảnh**. Nếu chạy Docker và mount từng file: xem mục bẫy Docker ở trên |
 | Trang trống, 0 dòng | `DATASET_PATH` trỏ sai, hoặc file rỗng. `--check` sẽ ghi `MISSING` |
 | Sửa `.env` rồi mà Docker không đổi | `env_file` chỉ đọc lúc tạo container. Chạy `docker compose up -d --force-recreate` |
+| Tải ảnh/dataset lên báo lỗi ghi file | Mount đang là `:ro`. Bỏ `:ro` trong `docker-compose.yml` rồi `docker compose up -d --force-recreate` |
+| Tải ảnh lên mà báo "trùng tên nên bỏ qua" | Đúng như thiết kế — ảnh cùng tên không bị ghi đè. Tick "ghi đè" nếu thật sự muốn thay |
 
 Lệnh chẩn đoán đầu tiên nên chạy, luôn luôn:
 
@@ -250,6 +294,8 @@ python -m app.cli --hash-password      # chỉ in hash, không ghi file
 app/core/            tuyệt đối không có web framework — app/cli.py chứng minh
   dataset.py           nạp JSONL, tìm kiếm
   localimages.py       ghép dòng với file; ba nhóm lệch
+  ingest.py            gộp dataset, sao lưu, ghi nguyên tử
+  intake.py            nhận ảnh tải lên, giải nén zip an toàn
   models.py            một dòng dữ liệu, và phần text dùng để so khớp
   users.py             tài khoản
 app/api/             lớp FastAPI bọc bên ngoài
@@ -265,4 +311,4 @@ pip install -r requirements.txt -r requirements-dev.txt
 python -m pytest
 ```
 
-89 test, không cần Docker, không cần dữ liệu thật.
+161 test, không cần Docker, không cần dữ liệu thật.

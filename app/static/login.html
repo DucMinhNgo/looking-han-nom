@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Sign in — OCR Review</title>
+<title>Đăng nhập — Tra cứu Hán-Nôm</title>
 <style>
   :root {
     color-scheme: light;
@@ -56,16 +56,16 @@
 </head>
 <body>
   <form class="card" id="form">
-    <h1>OCR Review</h1>
-    <p class="sub">Sign in to review the upstream transcriptions.</p>
+    <h1>Tra cứu Hán-Nôm</h1>
+    <p class="sub">Đăng nhập để tra cứu.</p>
 
-    <label for="u">Username</label>
+    <label for="u">Tên đăng nhập</label>
     <input id="u" name="username" autocomplete="username" required autofocus />
 
-    <label for="p">Password</label>
+    <label for="p">Mật khẩu</label>
     <input id="p" name="password" type="password" autocomplete="current-password" required />
 
-    <button type="submit" id="btn">Sign in</button>
+    <button type="submit" id="btn">Đăng nhập</button>
     <p class="error" id="err" role="alert"></p>
   </form>
 
@@ -76,7 +76,7 @@ const err  = document.getElementById("err");
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
-  btn.disabled = true; btn.textContent = "Signing in…";
+  btn.disabled = true; btn.textContent = "Đang đăng nhập…";
   err.classList.remove("show");
   try {
     const res = await fetch("/api/auth/login", {
@@ -89,13 +89,13 @@ form.addEventListener("submit", async (e) => {
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      throw new Error(body.detail || `Sign-in failed (${res.status})`);
+      throw new Error(body.detail || `Đăng nhập thất bại (${res.status})`);
     }
     window.location.href = "/";
   } catch (e) {
     err.textContent = e.message;
     err.classList.add("show");
-    btn.disabled = false; btn.textContent = "Sign in";
+    btn.disabled = false; btn.textContent = "Đăng nhập";
   }
 });
 </script>

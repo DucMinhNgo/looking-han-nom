@@ -35,16 +35,20 @@ services:
       # Accounts live here and must survive a container replacement.
       - ./data:/data
 
-      # The dataset and the pictures, read-only — this app never writes them.
-      # Point this at your own folder; it needs a dataset.jsonl and an images/
-      # beside it.
+      # The dataset and the pictures. Point this at your own folder; it needs
+      # a dataset.jsonl and an images/ beside it.
+      #
+      # NOT read-only: admins can add rows and pictures through the web, which
+      # rewrites dataset.jsonl and writes into images/. Add `:ro` back if you
+      # want a strictly read-only deployment — the upload buttons will then
+      # fail with a message saying exactly that.
       #
       # A DIRECTORY on purpose, never `- ./sample/dataset.jsonl:/srv/src/...`.
       # Bind-mounting a single file pins its inode, so an editor that saves by
       # writing a temp file and renaming it over the original leaves the
       # container staring at the old content until it is recreated. Mounting
       # the folder has no such trap: adding, editing and replacing all show up.
-      - ./sample:/srv/src:ro
+      - ./sample:/srv/src
 
     deploy:
       resources:

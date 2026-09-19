@@ -165,6 +165,17 @@
   .filelist { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
               gap: 0.3rem; font-family: ui-monospace, monospace; font-size: 0.75rem; }
   .hide { display: none !important; }
+  h3.sub { font-size: 0.8rem; font-weight: 700; margin: 1.1rem 0 0.3rem; }
+  h3.sub:first-of-type { margin-top: 0.2rem; }
+  p.hint { font-size: 0.76rem; margin-bottom: 0.6rem; line-height: 1.5; }
+  label.inline { font-size: 0.8rem; color: var(--ink-2); display: flex;
+                 align-items: center; gap: 0.3rem; }
+  .rowform { display: grid; gap: 0.5rem; max-width: 620px; }
+  .result { font-size: 0.8rem; margin-top: 0.5rem; line-height: 1.6; }
+  .result .ok { color: var(--good-text); font-weight: 600; }
+  .result .warn { color: var(--warning); font-weight: 600; }
+  .result ul { margin: 0.3rem 0 0 1.1rem; }
+  .result code { font-family: ui-monospace, monospace; font-size: 0.74rem; }
 </style>
 </head>
 <body>
@@ -251,6 +262,62 @@
       <button id="btn-orphan-more" class="hide">Xem thêm</button>
       <span class="muted" id="orphan-info" style="font-size:0.78rem"></span>
     </div>
+  </details>
+
+  <details class="card" id="data-card">
+    <summary>Thêm dữ liệu</summary>
+
+    <h3 class="sub">1 · Tải lên ảnh</h3>
+    <p class="muted hint">
+      Chọn nhiều ảnh, hoặc một file .zip. Ảnh trùng tên với ảnh đã có sẽ được
+      báo lại chứ không ghi đè — thay nhầm ảnh thì cả dòng đổi nghĩa mà không ai
+      biết.
+    </p>
+    <div class="row">
+      <input type="file" id="img-files" multiple accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff,.zip" />
+      <label class="inline"><input type="checkbox" id="img-overwrite" /> ghi đè ảnh trùng tên</label>
+      <button class="primary" id="btn-upload-img">Tải ảnh lên</button>
+      <span class="muted" id="img-status"></span>
+    </div>
+    <div id="img-result" class="result"></div>
+
+    <h3 class="sub">2 · Gộp thêm dataset</h3>
+    <p class="muted hint">
+      File .jsonl mới sẽ được <b>gộp vào</b> dữ liệu hiện có, không thay thế.
+      Dòng nào trùng tên ảnh thì được cập nhật tại chỗ; còn lại giữ nguyên.
+      Bản cũ luôn được sao lưu trước khi ghi.
+    </p>
+    <div class="row">
+      <input type="file" id="ds-file" accept=".jsonl,.json,.ndjson" />
+      <button id="btn-ds-preview">Xem trước</button>
+      <button class="primary hide" id="btn-ds-merge">Gộp vào</button>
+      <span class="muted" id="ds-status"></span>
+    </div>
+    <div id="ds-result" class="result"></div>
+
+    <h3 class="sub">3 · Thêm một dòng</h3>
+    <p class="muted hint">
+      Cho trường hợp lẻ. Có thể tải ảnh lên kèm, hoặc gõ tên một ảnh đã có sẵn
+      trong thư mục.
+    </p>
+    <div class="rowform">
+      <input id="r-image-name" placeholder="tên ảnh đã có (nếu không tải lên)" />
+      <input type="file" id="r-file" accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff" />
+      <input id="r-post" placeholder="link Facebook" />
+      <input id="r-caption" placeholder="caption" />
+      <textarea id="r-gt" rows="3" class="cjk" placeholder="ground truth"></textarea>
+      <div class="row">
+        <button class="primary" id="btn-add-row">Thêm dòng</button>
+        <span class="muted" id="row-status"></span>
+      </div>
+    </div>
+
+    <h3 class="sub">Bản sao lưu</h3>
+    <p class="muted hint">
+      Mỗi lần ghi dataset đều tạo một bản trước đó. Tải về để khôi phục thủ công
+      nếu gộp nhầm.
+    </p>
+    <div id="backups" class="filelist"></div>
   </details>
 
   <details class="card" id="admin-card">
@@ -530,6 +597,124 @@ async function loadUsers() {
   } catch {}
 }
 
+/* ---------------- adding data ---------------- */
+const plural = (n, one, many) => `${fmt(n)} ${n === 1 ? one : many}`;
+
+function renderIntake(target, body) {
+  const bits = [`<span class="ok">Đã lưu ${plural(body.saved, "ảnh", "ảnh")}.</span>`];
+  if (body.skipped_conflict) {
+    bits.push(`<span class="warn">${plural(body.skipped_conflict, "ảnh", "ảnh")} ` +
+      `trùng tên nên bỏ qua</span> — tick "ghi đè" nếu muốn thay.` +
+      `<ul>${(body.conflict_sample || []).slice(0, 8)
+        .map((n) => `<li><code>${esc(n)}</code></li>`).join("")}</ul>`);
+  }
+  if (body.skipped_not_image) {
+    bits.push(`${plural(body.skipped_not_image, "file", "file")} không phải ảnh, đã bỏ qua.`);
+  }
+  if (body.skipped_unsafe) {
+    bits.push(`<span class="warn">${body.skipped_unsafe} file có tên không an toàn, đã từ chối.</span>`);
+  }
+  $(target).innerHTML = bits.join("<br>");
+}
+
+$("btn-upload-img").onclick = async () => {
+  const input = $("img-files");
+  if (!input.files.length) { $("img-status").textContent = "Chọn file đã."; return; }
+
+  const form = new FormData();
+  for (const file of input.files) form.append("files", file);
+  form.append("overwrite", $("img-overwrite").checked ? "true" : "false");
+
+  $("btn-upload-img").disabled = true;
+  $("img-status").textContent = "Đang tải lên…";
+  try {
+    const body = await api("/api/data/images", { method: "POST", body: form });
+    await Promise.all([loadStats(), search()]);
+    $("img-status").textContent = "";
+    renderIntake("img-result", body);
+    input.value = "";
+  } catch (e) { $("img-status").textContent = e.message; }
+  $("btn-upload-img").disabled = false;
+};
+
+async function sendDataset(path) {
+  const input = $("ds-file");
+  if (!input.files.length) { $("ds-status").textContent = "Chọn file .jsonl đã."; return null; }
+  const form = new FormData();
+  form.append("file", input.files[0]);
+  return api(path, { method: "POST", body: form });
+}
+
+$("btn-ds-preview").onclick = async () => {
+  $("ds-status").textContent = "Đang đọc…";
+  $("ds-result").innerHTML = "";
+  $("btn-ds-merge").classList.add("hide");
+  try {
+    const body = await sendDataset("/api/data/dataset/preview");
+    if (!body) { $("ds-status").textContent = ""; return; }
+    $("ds-status").textContent = "";
+    $("ds-result").innerHTML =
+      `Nếu gộp: <span class="ok">thêm ${fmt(body.added)}</span>, ` +
+      `cập nhật ${fmt(body.updated)}, giữ nguyên ${fmt(body.unchanged)}. ` +
+      `Tổng ${fmt(body.current_rows)} → <b>${fmt(body.total)}</b> dòng.` +
+      (body.malformed
+        ? `<br><span class="warn">${body.malformed} dòng hỏng sẽ bị bỏ qua.</span>` : "") +
+      (body.changed ? "" : "<br>Không có gì thay đổi.");
+    // Only offer the irreversible half once its consequences are on screen.
+    $("btn-ds-merge").classList.toggle("hide", !body.changed);
+  } catch (e) { $("ds-status").textContent = e.message; }
+};
+
+$("btn-ds-merge").onclick = async () => {
+  $("ds-status").textContent = "Đang gộp…";
+  try {
+    const body = await sendDataset("/api/data/dataset/merge");
+    if (!body) return;
+    await Promise.all([loadStats(), search(), loadBackups()]);
+    $("ds-status").textContent = "";
+    $("ds-result").innerHTML =
+      `<span class="ok">Xong.</span> Thêm ${fmt(body.added)}, ` +
+      `cập nhật ${fmt(body.updated)}. Giờ có <b>${fmt(body.total)}</b> dòng.` +
+      (body.backup ? `<br>Bản cũ đã lưu: <code>${esc(body.backup)}</code>` : "");
+    $("ds-file").value = "";
+    $("btn-ds-merge").classList.add("hide");
+  } catch (e) { $("ds-status").textContent = e.message; }
+};
+
+$("btn-add-row").onclick = async () => {
+  const form = new FormData();
+  form.append("image_name", $("r-image-name").value.trim());
+  form.append("post_id", $("r-post").value.trim());
+  form.append("caption", $("r-caption").value.trim());
+  form.append("ground_truth", $("r-gt").value);
+  if ($("r-file").files.length) form.append("file", $("r-file").files[0]);
+
+  $("btn-add-row").disabled = true;
+  $("row-status").textContent = "Đang lưu…";
+  try {
+    const body = await api("/api/data/row", { method: "POST", body: form });
+    await Promise.all([loadStats(), search(), loadBackups()]);
+    $("row-status").textContent = body.added
+      ? `Đã thêm. Tổng ${fmt(body.total)} dòng.`
+      : `Đã cập nhật dòng sẵn có.`;
+    for (const id of ["r-image-name", "r-post", "r-caption", "r-gt"]) $(id).value = "";
+    $("r-file").value = "";
+  } catch (e) { $("row-status").textContent = e.message; }
+  $("btn-add-row").disabled = false;
+};
+
+async function loadBackups() {
+  if (!state.me || state.me.role !== "admin") return;
+  try {
+    const body = await api("/api/data/backups");
+    $("backups").innerHTML = body.items.length
+      ? body.items.map((b) =>
+          `<div><a href="/api/data/backups/${encodeURIComponent(b.name)}" download>` +
+          `${esc(b.name)}</a> <span class="muted">${b.mb} MB</span></div>`).join("")
+      : `<div class="muted">Chưa có bản nào.</div>`;
+  } catch {}
+}
+
 $("btn-adduser").onclick = async () => {
   $("user-status").textContent = "";
   try {
@@ -613,8 +798,11 @@ $("btn-logout").onclick = async () => {
   catch { window.location.reload(); return; }
 
   $("whoami").textContent = `${state.me.username} · ${state.me.role}`;
-  if (state.me.role !== "admin") $("admin-card").classList.add("hide");
-  await Promise.all([loadStats(), search(), loadUsers()]);
+  if (state.me.role !== "admin") {
+    $("admin-card").classList.add("hide");
+    $("data-card").classList.add("hide");
+  }
+  await Promise.all([loadStats(), search(), loadUsers(), loadBackups()]);
 })();
 </script>
 </body>

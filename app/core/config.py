@@ -63,6 +63,15 @@ class Settings:
     def users_path(self) -> Path:
         return self.data_dir / "users.json"
 
+    @property
+    def backups_dir(self) -> Path:
+        """Previous versions of the dataset.
+
+        Under DATA_DIR rather than beside the dataset: the source folder may be
+        mounted read-only, and a backup that cannot be written is not a backup.
+        """
+        return self.data_dir / "backups"
+
 
 def load_settings() -> Settings:
     """Build settings from the environment. Never logs secret values."""
