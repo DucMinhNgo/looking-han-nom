@@ -351,6 +351,11 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 const isAdmin = () => !!state.me && state.me.role === "admin";
+// Encode per segment: a picture filed as "<post id>/1.jpg" must stay two path
+// segments, and encodeURIComponent on the whole string would turn the slash
+// into %2F.
+const imgSrc = (name) =>
+  "/img/" + String(name || "").split("/").map(encodeURIComponent).join("/");
 
 const state = {
   me: null, query: "", field: "all", offset: 0, limit: 24,
@@ -454,7 +459,7 @@ function card(item, i) {
     ? `<div class="cap">${highlight(item.caption, q)}</div>` : "";
   const thumb = item.has_image
     ? `<img class="thumb" loading="lazy" data-open="${i}"
-            src="/img/${encodeURIComponent(item.image_name)}" alt="" />`
+            src="${imgSrc(item.image_name)}" alt="" />`
     : `<div class="thumb-missing" data-open="${i}">Không tìm thấy file ảnh<br>
          <code style="font-size:0.72rem">${esc(item.image || "(trống)")}</code></div>`;
 
@@ -488,7 +493,7 @@ function openDetail(i, editing = false) {
   $("lb-inner").innerHTML = `
     <div class="lb-img">
       ${item.has_image
-        ? `<img src="/img/${encodeURIComponent(item.image_name)}" alt="" />`
+        ? `<img src="${imgSrc(item.image_name)}" alt="" />`
         : `<div class="empty" style="color:#ccc">Không tìm thấy file ảnh<br>
              <code>${esc(item.image || "(trống)")}</code></div>`}
     </div>

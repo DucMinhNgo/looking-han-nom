@@ -58,32 +58,49 @@ class IntakeResult:
         }
 
 
-def safe_target(images_dir: Path, name: str) -> Path | None:
+def safe_target(
+    images_dir: Path, name: str, *, keep_folders: bool = False
+) -> Path | None:
     """Where this name may be written, or None if it may not be.
 
     The check is on the resolved path against the resolved root, not on the
     string: that is what actually stops ``../`` and an absolute path, and it
     costs nothing to do per entry.
+
+    ``keep_folders`` is for zips. A dataset that files pictures one folder per
+    post depends on those folders — flattening it would collapse every post's
+    ``1.jpg`` into a single name, so nine of ten would be reported as
+    conflicts and the tenth would be attached to whichever row asked first.
+    Individual file uploads still flatten: a browser hands over a bare
+    filename anyway, and a path in one would only have come from the string.
     """
     cleaned = str(name or "").strip().replace("\\", "/").lstrip("/")
     if not cleaned or cleaned.endswith("/"):
         return None
-    # Flatten: a zip's internal folders are not meaningful here, and keeping
-    # them would scatter pictures into sub-folders the scan only notices on a
-    # delay.
-    leaf = cleaned.rsplit("/", 1)[-1]
-    if not leaf or leaf in (".", ".."):
+
+    parts = [p for p in cleaned.split("/") if p not in ("", ".", "..")]
+    if not parts:
         return None
+    relative = "/".join(parts) if keep_folders else parts[-1]
 
     try:
         root = images_dir.resolve()
-        target = (images_dir / leaf).resolve()
+        target = (images_dir / relative).resolve()
     except OSError:
         return None
     if not target.is_relative_to(root):
         log.warning("rejected unsafe upload name %r", name)
         return None
     return target
+
+
+def _relative(target: Path, images_dir: Path) -> str:
+    """The name the rest of the app knows this file by: relative, forward
+    slashes — the same spelling ``ImageLibrary.scan`` indexes."""
+    try:
+        return target.resolve().relative_to(images_dir.resolve()).as_posix()
+    except (OSError, ValueError):
+        return target.name
 
 
 def _write(target: Path, data: bytes) -> None:
@@ -175,17 +192,22 @@ def extract_zip(
                 result.skipped_not_image.append(leaf or "(no name)")
                 continue
 
-            target = safe_target(images_dir, info.filename)
+            # Folders are kept: see safe_target. The zip-slip guard is the
+            # resolved containment check there, not the flattening.
+            target = safe_target(images_dir, info.filename, keep_folders=True)
             if target is None:
                 result.skipped_unsafe.append(info.filename)
                 continue
+            # Report the path, not the leaf, or ten posts' worth of "1.jpg"
+            # all read as the same conflict.
+            shown = _relative(target, images_dir)
             if target.exists() and not overwrite:
-                result.skipped_conflict.append(target.name)
+                result.skipped_conflict.append(shown)
                 continue
 
             with archive.open(info) as handle:
                 _write(target, handle.read())
-            result.saved.append(target.name)
+            result.saved.append(shown)
             result.bytes_written += info.file_size
 
     log.info("zip intake: %d saved, %d conflicts, %d skipped",

@@ -8,12 +8,19 @@ So nothing here silently drops anything. Every row is resolved to a file or
 explicitly marked as missing one, every unclaimed file is reported as an
 orphan, and the three counts are what the page leads with.
 
-Matching is deliberately tolerant, in four descending steps: the exact string,
-then the basename only, then case-insensitively, then ignoring the extension.
-Those four cover where mismatches genuinely come from — a path prefix that was
-stripped, a ``.JPG`` that became ``.jpg``, a ``.jpeg`` that became ``.jpg``.
-Anything looser would start matching the wrong picture to the wrong text, which
-is far worse than reporting a miss.
+Matching is deliberately tolerant, in descending steps: the exact path, then
+the longest trailing part of it, then the basename alone, case-insensitively,
+then ignoring the extension. Those cover where mismatches genuinely come from —
+a path prefix that was stripped, a ``.JPG`` that became ``.jpg``, a ``.jpeg``
+that became ``.jpg``.
+
+The trailing-path step is what makes a folder per post work. When pictures are
+filed as ``<post id>/1.jpg`` the basenames stop being unique — nine posts each
+have a ``1.jpg`` — so a row naming ``/images/10003.../1.jpg`` has to be matched
+on ``10003.../1.jpg``, not on ``1.jpg``. For the same reason a basename shared
+by two folders is treated as **ambiguous and refused**: showing one post's
+picture beside another post's text is a quiet, convincing kind of wrong, and
+far worse than reporting a miss.
 """
 
 from __future__ import annotations
@@ -88,9 +95,13 @@ class ImageLibrary:
     def __init__(self, images_dir: Path, ttl_s: float = DEFAULT_TTL_S) -> None:
         self.images_dir = Path(images_dir)
         self.ttl_s = ttl_s
+        self._by_path: dict[str, str] = {}
         self._by_name: dict[str, str] = {}
         self._by_lower: dict[str, str] = {}
         self._by_stem: dict[str, str] = {}
+        # Basenames that more than one folder claims. Looking one up returns
+        # nothing rather than whichever was walked first.
+        self._ambiguous: set[str] = set()
         self._signature: tuple[float, int, int] | None = None
         self._scanned_at: float = 0.0
         self._files: list[str] = []
@@ -137,9 +148,11 @@ class ImageLibrary:
             return self._files
 
         names: list[str] = []
+        by_path: dict[str, str] = {}
         by_name: dict[str, str] = {}
         by_lower: dict[str, str] = {}
         by_stem: dict[str, str] = {}
+        ambiguous: set[str] = set()
 
         if self.images_dir.is_dir():
             root = str(self.images_dir)
@@ -155,19 +168,34 @@ class ImageLibrary:
                         continue
                     name = prefix + filename
                     names.append(name)
-                    # First writer wins at every level, so a nested duplicate
-                    # never displaces the file whose name matched exactly.
-                    by_name.setdefault(name, name)
-                    by_name.setdefault(filename, name)
-                    by_lower.setdefault(filename.lower(), name)
-                    by_stem.setdefault(os.path.splitext(filename)[0].lower(), name)
+                    # Full paths are unique by construction, so they index
+                    # without any ambiguity question.
+                    by_path.setdefault(name, name)
+                    by_path.setdefault(name.lower(), name)
+                    # Basenames are not. Record the clash instead of letting
+                    # whichever directory os.walk reached first win.
+                    stem = os.path.splitext(filename)[0].lower()
+                    for key, index in (
+                        (filename, by_name),
+                        (filename.lower(), by_lower),
+                        (stem, by_stem),
+                    ):
+                        if index.setdefault(key, name) != name:
+                            ambiguous.add(key)
 
         names.sort()
         self._files = names
+        self._by_path = by_path
         self._by_name, self._by_lower, self._by_stem = by_name, by_lower, by_stem
+        self._ambiguous = ambiguous
         self._signature = signature
         self._scanned_at = time.monotonic()
-        log.info("image folder: %d files in %s", len(names), self.images_dir)
+        log.info(
+            "image folder: %d files in %s%s",
+            len(names), self.images_dir,
+            f" ({len(ambiguous)} names shared by more than one folder — "
+            "those rows must spell the folder too)" if ambiguous else "",
+        )
         return names
 
     @property
@@ -177,22 +205,50 @@ class ImageLibrary:
     # --- matching --------------------------------------------------------
 
     def resolve(self, image: str) -> str | None:
-        """The file this dataset value refers to, or None. Four steps, in order."""
-        raw = str(image or "").strip().replace("\\", "/")
+        """The file this dataset value refers to, or None. Steps, in order."""
+        raw = str(image or "").strip().replace("\\", "/").lstrip("/")
         if not raw:
             return None
         self.scan()
 
-        name = basename(raw)
-        for candidate in (
-            self._by_name.get(raw),
-            self._by_name.get(name),
-            self._by_lower.get(name.lower()),
-            self._by_stem.get(Path(name).stem.lower()),
+        # Longest trailing path first, dropping one leading segment at a time:
+        # "/images/10003.../1.jpg" tries "images/10003.../1.jpg", then
+        # "10003.../1.jpg" — which is the file — before ever considering the
+        # bare "1.jpg". That ordering is what keeps a folder-per-post dataset
+        # attached to the right pictures.
+        parts = raw.split("/")
+        for start in range(len(parts)):
+            tail = "/".join(parts[start:])
+            hit = self._by_path.get(tail) or self._by_path.get(tail.lower())
+            if hit:
+                return hit
+
+        # Then the basename on its own, but only when exactly one file has it.
+        name = parts[-1]
+        stem = Path(name).stem.lower()
+        for key, index in (
+            (name, self._by_name),
+            (name.lower(), self._by_lower),
+            (stem, self._by_stem),
         ):
-            if candidate:
-                return candidate
+            if key in self._ambiguous:
+                continue
+            hit = index.get(key)
+            if hit:
+                return hit
         return None
+
+    def is_ambiguous(self, image: str) -> bool:
+        """Whether this row missed only because its filename is not unique."""
+        name = basename(image)
+        if not name:
+            return False
+        self.scan()
+        return (
+            name in self._ambiguous
+            or name.lower() in self._ambiguous
+            or Path(name).stem.lower() in self._ambiguous
+        )
 
     def path_for(self, name: str) -> Path | None:
         """The file on disk for a name this library returned.

@@ -202,18 +202,32 @@ def make_zip(entries):
     return buffer.getvalue()
 
 
+JPEG = bytes.fromhex("ffd8")
+
+
 class TestZipIntake:
     def test_unpacks_the_pictures(self, tmp_path):
         data = make_zip([("a.jpg", b"\xff\xd8one"), ("b.png", b"\x89PNGtwo")])
         result = intake.extract_zip(data, tmp_path / "images")
         assert sorted(result.saved) == ["a.jpg", "b.png"]
 
-    def test_folders_inside_the_zip_are_flattened(self, tmp_path):
-        """Nested pictures would only be noticed on the scan's delay."""
-        data = make_zip([("batch/2026/a.jpg", b"\xff\xd8")])
+    def test_folders_inside_the_zip_are_kept(self, tmp_path):
+        """A folder per post is how the pictures are filed; it must survive."""
+        data = make_zip([("batch/2026/a.jpg", JPEG)])
         result = intake.extract_zip(data, tmp_path / "images")
-        assert result.saved == ["a.jpg"]
-        assert (tmp_path / "images" / "a.jpg").is_file()
+        assert result.saved == ["batch/2026/a.jpg"]
+        assert (tmp_path / "images" / "batch" / "2026" / "a.jpg").is_file()
+
+    def test_one_picture_per_post_folder_does_not_collide(self, tmp_path):
+        """Flattening this would leave one file and nine "conflicts"."""
+        data = make_zip([(f"{100 + n}/1.jpg", JPEG + bytes([n])) for n in range(10)])
+        result = intake.extract_zip(data, tmp_path / "images")
+
+        assert len(result.saved) == 10 and result.skipped_conflict == []
+        assert sorted(result.saved)[0] == "100/1.jpg"
+        # Ten distinct files, each still carrying its own bytes.
+        assert (tmp_path / "images" / "100" / "1.jpg").read_bytes()[-1] == 0
+        assert (tmp_path / "images" / "109" / "1.jpg").read_bytes()[-1] == 9
 
     def test_zip_slip_is_refused(self, tmp_path):
         """A zip entry may name ../../ and a naive extract would obey it."""

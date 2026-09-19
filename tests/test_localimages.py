@@ -3,6 +3,8 @@ import pytest
 from app.core.localimages import ImageLibrary, basename, is_image
 from app.core.models import Item
 
+JPEG = bytes.fromhex("ffd8")
+
 
 def make_images(root, names):
     root.mkdir(parents=True, exist_ok=True)
@@ -194,3 +196,84 @@ class TestAddingDataLater:
         (root / "b.jpg").write_bytes(b"\xff\xd8x")
         report = library.attach(rows)
         assert report.rows_without_image == 0 and report.matched == 2
+
+
+class TestOneFolderPerPost:
+    """Pictures filed as <post id>/1.jpg, which is how the crawl stores them.
+
+    The basenames stop being unique the moment there is more than one post, so
+    everything here is about not attaching one post's picture to another
+    post's text.
+    """
+
+    POSTS = ["10003340783103883", "10006428582795103", "10007271009377527"]
+
+    @pytest.fixture
+    def library(self, tmp_path):
+        images = tmp_path / "images"
+        for n, post in enumerate(self.POSTS):
+            (images / post).mkdir(parents=True)
+            (images / post / "1.jpg").write_bytes(JPEG + bytes([n]))
+        # One post with several pictures, numbered from something other than 1.
+        (images / "10014375832000378").mkdir(parents=True)
+        (images / "10014375832000378" / "4.jpg").write_bytes(JPEG)
+        (images / "10014375832000378" / "5.jpg").write_bytes(JPEG)
+        return ImageLibrary(images)
+
+    def test_every_row_finds_its_own_folder(self, library):
+        """The whole point: nine rows saying 1.jpg are nine different files."""
+        for post in self.POSTS:
+            assert library.resolve(f"/images/{post}/1.jpg") == f"{post}/1.jpg"
+
+    def test_a_stripped_prefix_of_any_depth_still_matches(self, library):
+        post = self.POSTS[0]
+        for spelled in (
+            f"/images/{post}/1.jpg",
+            f"images/{post}/1.jpg",
+            f"{post}/1.jpg",
+            f"./data/exports/images/{post}/1.jpg",
+        ):
+            assert library.resolve(spelled) == f"{post}/1.jpg", spelled
+
+    def test_a_bare_shared_basename_is_refused_not_guessed(self, library):
+        """Three folders have a 1.jpg. Returning one of them would be wrong."""
+        assert library.resolve("1.jpg") is None
+        assert library.is_ambiguous("1.jpg") is True
+
+    def test_a_bare_unique_basename_still_matches(self, library):
+        """Only one folder has a 5.jpg, so the old tolerance still applies."""
+        assert library.resolve("5.jpg") == "10014375832000378/5.jpg"
+        assert library.is_ambiguous("5.jpg") is False
+
+    def test_backslashes_and_case_survive(self, library):
+        post = self.POSTS[1]
+        back = chr(92)  # a Windows-style path, written without escapes
+        assert library.resolve(f"images{back}{post}{back}1.jpg") == f"{post}/1.jpg"
+        assert library.resolve(f"/IMAGES/{post}/1.JPG") == f"{post}/1.jpg"
+
+    def test_the_right_bytes_are_served(self, library):
+        """Resolving to the right name is only half of it."""
+        for n, post in enumerate(self.POSTS):
+            path = library.path_for(library.resolve(f"/images/{post}/1.jpg"))
+            assert path.read_bytes()[-1] == n
+
+    def test_a_picture_no_row_claims_is_an_orphan(self, library):
+        rows = [Item(index=i, image=f"/images/{p}/1.jpg", post_id="")
+                for i, p in enumerate(self.POSTS)]
+        rows.append(Item(index=3, image="/images/10014375832000378/4.jpg", post_id=""))
+        report = library.attach(rows)
+
+        assert report.matched == 4 and report.rows_without_image == 0
+        assert report.orphan_images == ["10014375832000378/5.jpg"]
+
+    def test_a_row_naming_a_folder_that_was_never_copied(self, library):
+        rows = [Item(index=0, image="/images/99999999999/1.jpg", post_id="")]
+        report = library.attach(rows)
+        assert report.rows_without_image == 1 and rows[0].has_image is False
+        # Not attached to some other post's 1.jpg, which is the failure that
+        # would have looked like success.
+        assert rows[0].image_name == ""
+
+    def test_a_path_cannot_escape_the_folder(self, library):
+        assert library.path_for("../../../etc/passwd") is None
+        assert library.path_for("10003340783103883/../../secret.jpg") is None
