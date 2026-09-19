@@ -257,14 +257,48 @@ class TestOneFolderPerPost:
             path = library.path_for(library.resolve(f"/images/{post}/1.jpg"))
             assert path.read_bytes()[-1] == n
 
-    def test_a_picture_no_row_claims_is_an_orphan(self, library):
+    def test_the_rest_of_a_post_folder_comes_with_the_row(self, library):
+        """A post holds 4.jpg and 5.jpg; only 4.jpg has a row of its own."""
         rows = [Item(index=i, image=f"/images/{p}/1.jpg", post_id="")
                 for i, p in enumerate(self.POSTS)]
         rows.append(Item(index=3, image="/images/10014375832000378/4.jpg", post_id=""))
         report = library.attach(rows)
 
         assert report.matched == 4 and report.rows_without_image == 0
-        assert report.orphan_images == ["10014375832000378/5.jpg"]
+        assert rows[3].siblings == ["10014375832000378/5.jpg"]
+        # Reachable through its post, so not an orphan — but counted, because
+        # it still has no ground truth.
+        assert report.orphan_images == [] and report.sibling_images == 1
+
+    def test_a_post_with_one_picture_has_no_siblings(self, library):
+        rows = [Item(index=0, image=f"/images/{self.POSTS[0]}/1.jpg", post_id="")]
+        library.attach(rows)
+        assert rows[0].siblings == []
+
+    def test_a_row_another_row_describes_is_not_a_companion(self, library):
+        """Both pictures of the post have their own text; neither is spare."""
+        rows = [
+            Item(index=0, image="/images/10014375832000378/4.jpg", post_id=""),
+            Item(index=1, image="/images/10014375832000378/5.jpg", post_id=""),
+        ]
+        report = library.attach(rows)
+        assert report.matched == 2 and report.sibling_images == 0
+        # Each still lists the other, so either row can show the whole post.
+        assert rows[0].siblings == ["10014375832000378/5.jpg"]
+        assert rows[1].siblings == ["10014375832000378/4.jpg"]
+
+    def test_a_picture_in_a_folder_no_row_mentions_is_still_an_orphan(self, library):
+        (library.images_dir / "900999").mkdir()
+        (library.images_dir / "900999" / "1.jpg").write_bytes(JPEG)
+        rows = [Item(index=0, image=f"/images/{self.POSTS[0]}/1.jpg", post_id="")]
+        report = library.attach(rows)
+        assert "900999/1.jpg" in report.orphan_images
+
+    def test_a_picture_at_the_top_level_has_no_siblings(self, library):
+        """At the root the folder is the whole library, not a post."""
+        (library.images_dir / "loose.jpg").write_bytes(JPEG)
+        library.scan(force=True)
+        assert library.siblings("loose.jpg") == []
 
     def test_a_row_naming_a_folder_that_was_never_copied(self, library):
         rows = [Item(index=0, image="/images/99999999999/1.jpg", post_id="")]

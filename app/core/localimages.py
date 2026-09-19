@@ -55,6 +55,7 @@ class MatchReport:
     scanned: int = 0
     matched: int = 0
     rows_without_image: int = 0
+    sibling_images: int = 0
     orphan_images: list[str] = field(default_factory=list)
     scanned_at: float = 0.0
     directory: str = ""
@@ -71,6 +72,7 @@ class MatchReport:
             "files": self.scanned,
             "matched": self.matched,
             "rows_without_image": self.rows_without_image,
+            "sibling_images": self.sibling_images,
             "orphan_images": self.orphans,
             # Capped: a folder can hold thousands of orphans and the page only
             # needs enough of them to make the problem concrete.
@@ -102,6 +104,8 @@ class ImageLibrary:
         # Basenames that more than one folder claims. Looking one up returns
         # nothing rather than whichever was walked first.
         self._ambiguous: set[str] = set()
+        # Folder -> the pictures in it, for posts filed one folder each.
+        self._by_folder: dict[str, list[str]] = {}
         self._signature: tuple[float, int, int] | None = None
         self._scanned_at: float = 0.0
         self._files: list[str] = []
@@ -153,6 +157,7 @@ class ImageLibrary:
         by_lower: dict[str, str] = {}
         by_stem: dict[str, str] = {}
         ambiguous: set[str] = set()
+        by_folder: dict[str, list[str]] = {}
 
         if self.images_dir.is_dir():
             root = str(self.images_dir)
@@ -172,6 +177,11 @@ class ImageLibrary:
                     # without any ambiguity question.
                     by_path.setdefault(name, name)
                     by_path.setdefault(name.lower(), name)
+                    # Only sub-folders are grouped. At the root the "folder"
+                    # would be the whole library, and every row would claim to
+                    # have nine thousand companions.
+                    if prefix:
+                        by_folder.setdefault(prefix.rstrip("/"), []).append(name)
                     # Basenames are not. Record the clash instead of letting
                     # whichever directory os.walk reached first win.
                     stem = os.path.splitext(filename)[0].lower()
@@ -188,6 +198,7 @@ class ImageLibrary:
         self._by_path = by_path
         self._by_name, self._by_lower, self._by_stem = by_name, by_lower, by_stem
         self._ambiguous = ambiguous
+        self._by_folder = by_folder
         self._signature = signature
         self._scanned_at = time.monotonic()
         log.info(
@@ -238,6 +249,23 @@ class ImageLibrary:
                 return hit
         return None
 
+    def siblings(self, name: str) -> list[str]:
+        """The other pictures in this one's folder.
+
+        A post is filed as one folder holding 1.jpg, 2.jpg, 3.jpg, while the
+        dataset has a row per picture — so a row knows about one of them and
+        the rest would only ever surface as orphans. Returning them lets the
+        row show the whole post.
+
+        Empty for a picture sitting at the top level: there the folder is the
+        entire library and "the rest of this folder" means nothing.
+        """
+        if not name or "/" not in name:
+            return []
+        self.scan()
+        folder = name.rsplit("/", 1)[0]
+        return [other for other in self._by_folder.get(folder, ()) if other != name]
+
     def is_ambiguous(self, image: str) -> bool:
         """Whether this row missed only because its filename is not unique."""
         name = basename(image)
@@ -284,21 +312,36 @@ class ImageLibrary:
         claimed: set[str] = set()
         matched = missing = 0
 
+        companions: set[str] = set()
         for item in items:
             resolved = self.resolve(item.image)
             item.image_name = resolved or ""
             item.has_image = resolved is not None
+            item.siblings = self.siblings(resolved) if resolved else []
             if resolved:
                 claimed.add(resolved)
+                # A picture another row already describes is that row's, not a
+                # companion of this one: the count below is of pictures with no
+                # text of their own.
+                companions.update(item.siblings)
                 matched += 1
             else:
                 missing += 1
+
+        companions -= claimed
 
         return MatchReport(
             scanned=len(files),
             matched=matched,
             rows_without_image=missing,
-            orphan_images=[name for name in files if name not in claimed],
+            # A companion is reachable — it shows inside its post — so it is
+            # not an orphan. It still has no ground truth of its own, which is
+            # why it is counted rather than quietly absorbed.
+            sibling_images=len(companions),
+            orphan_images=[
+                name for name in files
+                if name not in claimed and name not in companions
+            ],
             scanned_at=time.time(),
             directory=str(self.images_dir),
             exists=self.images_dir.is_dir(),

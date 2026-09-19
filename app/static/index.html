@@ -184,6 +184,20 @@
                         white-space: normal; }
   textarea.block-edit { width: 100%; box-sizing: border-box; resize: vertical;
                         line-height: 1.7; }
+  .pill.more { cursor: pointer; background: var(--plane); color: var(--ink-2);
+               border: 1px solid var(--border); }
+  .pill.more:hover { border-color: var(--series-1); color: var(--series-1); }
+  .pill.warn-pill { display: block; margin: 0 0 0.7rem; padding: 0.35rem 0.6rem;
+                    background: var(--plane); border: 1px solid var(--border);
+                    border-radius: 6px; font-size: 0.72rem; line-height: 1.5;
+                    color: var(--ink-2); }
+  .strip { display: flex; gap: 0.4rem; margin-top: 0.5rem; overflow-x: auto;
+           padding-bottom: 0.2rem; }
+  .strip-thumb { height: 56px; width: auto; flex: none; cursor: pointer;
+                 border-radius: 4px; opacity: 0.55;
+                 border: 2px solid transparent; background: var(--plane); }
+  .strip-thumb:hover { opacity: 0.85; }
+  .strip-thumb.on { opacity: 1; border-color: var(--series-1); }
 </style>
 </head>
 <body>
@@ -470,6 +484,10 @@ function card(item, i) {
         ${gt}${cap}
         <div class="foot">
           ${item.has_image ? "" : `<span class="pill miss">thiếu ảnh</span>`}
+          ${item.siblings && item.siblings.length
+            ? `<span class="pill more" data-open="${i}"
+                     title="Post này còn ${item.siblings.length} ảnh nữa">+${
+                       item.siblings.length} ảnh</span>` : ""}
           <span>#${item.index + 1}</span>
           <span class="spacer"></span>
           ${item.post_url
@@ -485,19 +503,37 @@ function card(item, i) {
 }
 
 /* ---------------- detail ---------------- */
-function openDetail(i, editing = false) {
+// Natural order, so 10.jpg follows 9.jpg instead of 1.jpg.
+const byNumber = (a, b) => a.localeCompare(b, undefined, { numeric: true });
+
+function openDetail(i, editing = false, showing = null) {
   const item = state.items[i];
   if (!item) return;
+  // Every picture in this post's folder, the row's own one included. The row
+  // describes only its own; the rest are shown, not captioned.
+  const gallery = item.has_image
+    ? [item.image_name, ...(item.siblings || [])].sort(byNumber) : [];
+  const shown = gallery.includes(showing) ? showing : item.image_name;
   state.current = { item, index: i };
 
   $("lb-inner").innerHTML = `
     <div class="lb-img">
       ${item.has_image
-        ? `<img src="${imgSrc(item.image_name)}" alt="" />`
+        ? `<img src="${imgSrc(shown)}" alt="" />`
         : `<div class="empty" style="color:#ccc">Không tìm thấy file ảnh<br>
              <code>${esc(item.image || "(trống)")}</code></div>`}
+      ${gallery.length > 1
+        ? `<div class="strip">${gallery.map((name) => `
+             <img class="strip-thumb ${name === shown ? "on" : ""}"
+                  data-show="${esc(name)}" loading="lazy"
+                  title="${esc(name)}" src="${imgSrc(name)}" alt="" />`).join("")}
+           </div>` : ""}
     </div>
     <div class="lb-side">
+      ${gallery.length > 1 && shown !== item.image_name
+        ? `<p class="pill warn-pill">Đang xem ${esc(shown.split("/").pop())} —
+             ground truth bên dưới là của ${esc(item.image_name.split("/").pop())}</p>`
+        : ""}
       <div style="margin-bottom:0.8rem">
         <label class="field">Ground truth</label>
         ${editing
@@ -517,6 +553,9 @@ function openDetail(i, editing = false) {
       </div>
       <dl class="kv">
         <dt>Dòng số</dt><dd>${item.index + 1}</dd>
+        ${gallery.length > 1
+          ? `<dt>Ảnh của post</dt><dd>${gallery.length} tấm: ${
+               gallery.map((n) => esc(n.split("/").pop())).join(", ")}</dd>` : ""}
         <dt>File ảnh</dt><dd>${esc(item.image || "—")}${
           item.has_image && item.image_name !== item.image
             ? ` <span class="pill">khớp với ${esc(item.image_name)}</span>` : ""}</dd>
@@ -542,10 +581,14 @@ function openDetail(i, editing = false) {
     setTimeout(() => { copy.textContent = "Chép ground truth"; }, 1500);
   };
 
+  $("lb-inner").querySelectorAll("[data-show]").forEach((el) => {
+    el.onclick = () => openDetail(i, editing, el.dataset.show);
+  });
+
   const open = $("gt-open");
   if (open) open.onclick = () => openDetail(i, true);
   const cancel = $("gt-cancel");
-  if (cancel) cancel.onclick = () => openDetail(i, false);
+  if (cancel) cancel.onclick = () => openDetail(i, false, shown);
 
   const box = $("gt-edit");
   if (box) {
@@ -576,7 +619,7 @@ function openDetail(i, editing = false) {
       await Promise.all([search(), loadStats(), loadBackups()]);
       // search() rebuilds state.items, so re-resolve this row before redrawing.
       const again = state.items.findIndex((x) => x.index === item.index);
-      openDetail(again >= 0 ? again : i, false);
+      openDetail(again >= 0 ? again : i, false, shown);
     } catch (e) {
       $("gt-status").textContent = e.message;
       $("gt-save").disabled = false;
@@ -611,7 +654,11 @@ async function loadStats() {
   $("btn-missing").classList.toggle("hide", !im.rows_without_image);
   $("btn-orphans").classList.toggle("hide", !im.orphan_images);
   $("orphan-card").classList.toggle("hide", !im.orphan_images);
-  $("corpus-line").textContent = `${fmt(d.rows)} dòng · ${fmt(im.files)} ảnh`;
+  $("corpus-line").textContent =
+    `${fmt(d.rows)} dòng · ${fmt(im.files)} ảnh` +
+    // Pictures that sit in a post's folder without a row of their own. Not
+    // orphans — they show inside their post — but they have no ground truth.
+    (im.sibling_images ? ` · ${fmt(im.sibling_images)} ảnh kèm theo` : "");
 
   if (!d.exists) {
     banner("Chưa có dataset",

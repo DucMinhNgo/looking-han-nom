@@ -44,6 +44,8 @@ class Item:
     # Filled in by the image library, not by the loader.
     image_name: str = ""
     has_image: bool = False
+    # The other pictures in this one's folder, filled in by the image library.
+    siblings: list[str] = field(default_factory=list)
     extra: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -94,6 +96,7 @@ class Item:
             "image": self.image,
             "image_name": self.image_name,
             "has_image": self.has_image,
+            "siblings": self.siblings,
             "post_id": self.post_id,
             "post_url": self.post_url,
             "post_number": self.post_number,

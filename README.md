@@ -246,6 +246,80 @@ dưới dạng bcrypt hash.
 
 ---
 
+## Cập nhật app đang chạy trên server (Docker)
+
+Ba lệnh, chạy trong thư mục repo trên server:
+
+```bash
+git pull
+```
+
+```bash
+docker compose up -d --build
+```
+
+```bash
+docker compose logs -f lookup
+```
+
+`up -d --build` dựng lại image từ code mới rồi thay container cũ. Container cũ
+bị xoá, **dữ liệu thì không**: cả `./data` lẫn thư mục dataset/ảnh đều là bind
+mount nằm ngoài container. Tài khoản, bản sao lưu, ảnh đã tải lên — còn nguyên.
+
+Downtime khoảng vài giây, đúng lúc container được thay.
+
+### Khi nào cần thêm `--force-recreate`
+
+```bash
+docker compose up -d --build --force-recreate
+```
+
+Compose chỉ đọc `.env` **lúc tạo container**. Nếu bạn vừa sửa `.env` mà code
+không đổi, Compose thấy "không có gì mới" và giữ nguyên container cũ với giá trị
+cũ — trông như sửa mà không ăn. `--force-recreate` buộc thay container.
+
+### Kiểm tra sau khi cập nhật
+
+```bash
+docker compose ps
+```
+
+Cột `STATUS` phải là `Up`. Nếu nó `Restarting`, xem log — app in ra ngay dòng
+đầu tiên nó không hài lòng, ví dụ thiếu `AUTH_SECRET` hay hash mật khẩu bị cắt.
+
+```bash
+docker compose exec lookup python -m app.cli --check
+```
+
+Lệnh này in ra đường dẫn dataset, số dòng, số ảnh, ba con số lệch, và key nào
+còn thiếu — chạy **bên trong** container nên nó thấy đúng những gì app thấy,
+không phải những gì bạn tưởng.
+
+### Dọn image cũ
+
+Mỗi lần build để lại image không tên. Sau vài lần cập nhật:
+
+```bash
+docker image prune -f
+```
+
+An toàn: chỉ xoá image không container nào dùng.
+
+### Quay lại bản cũ
+
+```bash
+git log --oneline -5
+```
+
+```bash
+git checkout <commit-cũ> && docker compose up -d --build
+```
+
+Dataset **không** tự quay về theo — nó nằm ngoài git. Muốn lùi cả dữ liệu thì
+tải bản sao lưu trong mục **Thêm dữ liệu** rồi đặt đè lên `dataset.jsonl`.
+
+---
+
 ## Gặp trục trặc
 
 | Hiện tượng | Nguyên nhân |
@@ -258,6 +332,7 @@ dưới dạng bcrypt hash.
 | Trang trống, 0 dòng | `DATASET_PATH` trỏ sai, hoặc file rỗng. `--check` sẽ ghi `MISSING` |
 | Sửa `.env` rồi mà Docker không đổi | `env_file` chỉ đọc lúc tạo container. Chạy `docker compose up -d --force-recreate` |
 | Tải ảnh/dataset lên báo lỗi ghi file | Mount đang là `:ro`. Bỏ `:ro` trong `docker-compose.yml` rồi `docker compose up -d --force-recreate` |
+| Sửa code rồi mà Docker chạy bản cũ | Thiếu `--build`. Chạy `docker compose up -d --build` |
 | Docker: mật khẩu đúng mà vẫn báo sai | `APP_PASSWORD_HASH` trong `.env` chưa có dấu nháy đơn. Hash bcrypt là `$2b$12$...`, Compose đọc `$...` thành tên biến và ăn mất phần salt. Bọc giá trị trong `'...'` rồi recreate container — log của app cũng tự nói ra điều này khi khởi động |
 | Tải ảnh lên mà báo "trùng tên nên bỏ qua" | Đúng như thiết kế — ảnh cùng tên không bị ghi đè. Tick "ghi đè" nếu thật sự muốn thay |
 
