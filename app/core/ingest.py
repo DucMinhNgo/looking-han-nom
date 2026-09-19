@@ -5,9 +5,11 @@ are conservative and explicit:
 
 * **Merge, never replace.** A batch adds to what is there. A row whose picture
   is already described replaces that description; everything else is left alone.
-* **Identity is the picture's filename**, compared the same tolerant way the
-  image library resolves it — lowercased basename. Two batches naming the same
-  picture are the same row, however the path was spelled.
+* **Identity is the picture's path**, compared the same tolerant way the image
+  library resolves it: the longest trailing part that names exactly one row,
+  never a part that names several. Two batches naming the same picture are the
+  same row however the path was spelled, but ten posts that each file a
+  ``1.jpg`` stay ten rows rather than collapsing into one.
 * **A row with no picture cannot be identified**, so it is appended rather than
   matched. Deduplicating those on caption text would silently merge two
   genuinely different entries.
@@ -29,7 +31,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-from app.core.localimages import basename
+
 
 log = logging.getLogger(__name__)
 
@@ -37,8 +39,13 @@ log = logging.getLogger(__name__)
 BACKUP_KEEP = 10
 
 
-def row_key(row: dict[str, Any]) -> str:
-    """The identity of a row: its picture, spelled comparably.
+def row_keys(row: dict[str, Any]) -> list[str]:
+    """Every way this row's picture could be spelled, longest first.
+
+    ``/images/900001/1.jpg`` yields ``images/900001/1.jpg``, ``900001/1.jpg``
+    and ``1.jpg``. Matching walks these in order and stops at the first that
+    identifies exactly one row, which is what lets a path prefix be stripped
+    without letting a shared basename merge two different posts.
 
     Empty when the row names no picture — such a row is always treated as new,
     because there is nothing reliable to match it against.
@@ -46,7 +53,17 @@ def row_key(row: dict[str, Any]) -> str:
     from app.core.dataset import _pick
 
     image = _pick(row, "image")
-    return basename(image).lower() if image else ""
+    cleaned = str(image or "").strip().replace("\\", "/").strip("/").lower()
+    if not cleaned:
+        return []
+    parts = [part for part in cleaned.split("/") if part not in ("", ".", "..")]
+    return ["/".join(parts[start:]) for start in range(len(parts))]
+
+
+def row_key(row: dict[str, Any]) -> str:
+    """The most specific spelling of this row's picture, or ""."""
+    keys = row_keys(row)
+    return keys[0] if keys else ""
 
 
 @dataclass
@@ -109,6 +126,37 @@ def parse_jsonl(data: bytes | str) -> tuple[list[dict[str, Any]], int]:
     return rows, malformed
 
 
+def _is_tail_of(short: str, long: str) -> bool:
+    """Whether ``short`` is ``long`` with whole leading segments removed."""
+    return long == short or long.endswith("/" + short)
+
+
+def _ambiguous(every_rows_keys: Iterable[list[str]]) -> set[str]:
+    """Spellings that name more than one picture, and so must never match.
+
+    A spelling is fine when every row producing it is the same picture spelled
+    at different depths — ``images/900001/1.jpg`` and ``900001/1.jpg`` are one
+    row. It is ambiguous when two genuinely different pictures produce it, as
+    ``1.jpg`` does the moment there are two post folders.
+    """
+    owners: dict[str, set[str]] = {}
+    for keys in every_rows_keys:
+        if not keys:
+            continue
+        full = keys[0]
+        for spelling in keys:
+            owners.setdefault(spelling, set()).add(full)
+
+    ambiguous: set[str] = set()
+    for spelling, fulls in owners.items():
+        if len(fulls) == 1:
+            continue
+        longest = max(fulls, key=len)
+        if any(not _is_tail_of(full, longest) for full in fulls):
+            ambiguous.add(spelling)
+    return ambiguous
+
+
 def merge(
     existing: Iterable[dict[str, Any]],
     incoming: Iterable[dict[str, Any]],
@@ -119,25 +167,41 @@ def merge(
     result = MergeResult(malformed=malformed)
     rows = list(existing)
 
+    # Which spellings are safe to match on has to be settled across the whole
+    # corpus before any matching happens. Discovering it as we go would let the
+    # first row claim "1.jpg" and every later post merge into it.
+    incoming = list(incoming)
+    ambiguous = _ambiguous([row_keys(r) for r in rows + incoming])
+
     # Where each identifiable row currently sits, so an update lands in place
     # rather than at the end.
     positions: dict[str, int] = {}
-    for index, row in enumerate(rows):
-        key = row_key(row)
-        if key:
-            positions.setdefault(key, index)
+
+    def index_row(keys: list[str], at: int) -> None:
+        for key in keys:
+            if key not in ambiguous:
+                positions.setdefault(key, at)
+
+    def find(keys: list[str]) -> int | None:
+        for key in keys:
+            if key not in ambiguous and key in positions:
+                return positions[key]
+        return None
+
+    for position, row in enumerate(rows):
+        index_row(row_keys(row), position)
 
     for row in incoming:
-        key = row_key(row)
-        if not key:
+        keys = row_keys(row)
+        if not keys:
             rows.append(row)
             result.added += 1
             result.appended_without_image += 1
             continue
 
-        index = positions.get(key)
+        index = find(keys)
         if index is None:
-            positions[key] = len(rows)
+            index_row(keys, len(rows))
             rows.append(row)
             result.added += 1
         elif rows[index] == row:

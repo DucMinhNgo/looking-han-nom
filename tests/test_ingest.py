@@ -78,6 +78,39 @@ class TestMerge:
         )
         assert result.updated == 1 and result.total == 1
 
+    def test_one_folder_per_post_stays_ten_rows(self):
+        """Every row's basename is 1.jpg. Keying on that folds them into one."""
+        batch = [row(f"/images/90000{n}/1.jpg", ground_truth=f"bai {n}")
+                 for n in range(10)]
+        result = ingest.merge([], batch)
+
+        assert result.added == 10 and result.total == 10
+        assert [r["ground_truth"] for r in result.rows] == [f"bai {n}" for n in range(10)]
+
+    def test_a_later_batch_updates_the_right_post(self):
+        existing = [row(f"/images/90000{n}/1.jpg", ground_truth=f"cu {n}")
+                    for n in range(10)]
+        result = ingest.merge(existing, [row("900007/1.jpg", ground_truth="da sua")])
+
+        assert result.updated == 1 and result.added == 0 and result.total == 10
+        assert result.rows[7]["ground_truth"] == "da sua"
+        # Nobody else moved or changed.
+        assert result.rows[6]["ground_truth"] == "cu 6"
+        assert result.rows[8]["ground_truth"] == "cu 8"
+
+    def test_a_shared_basename_never_matches_on_its_own(self):
+        """1.jpg alone cannot say which post it means, so it is a new row."""
+        existing = [row(f"/images/90000{n}/1.jpg") for n in range(3)]
+        result = ingest.merge(existing, [row("1.jpg", ground_truth="mo ho")])
+        assert result.added == 1 and result.total == 4
+
+    def test_a_unique_basename_still_matches_across_a_prefix(self):
+        """The old tolerance survives where it is not ambiguous."""
+        result = ingest.merge(
+            [row("/images/900001/7.jpg")], [row("7.jpg", ground_truth="mới")]
+        )
+        assert result.updated == 1 and result.total == 1
+
     def test_a_row_without_a_picture_is_always_appended(self):
         """There is nothing reliable to match it on, and guessing from caption
         text would silently merge two different entries."""
