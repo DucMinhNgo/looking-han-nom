@@ -41,6 +41,7 @@ async def lookup(
     limit: int = Query(0, ge=0, le=200),
     missing_only: bool = Query(False),
     group: str = Query(""),
+    verified: str = Query(""),
     user: dict = Depends(current_user),
 ):
     """Search by Facebook link, post id, caption, ground truth or filename."""
@@ -56,6 +57,10 @@ async def lookup(
     rows = everything.items
     if missing_only:
         rows = [item for item in rows if not item.has_image]
+    if verified == "verified":
+        rows = [item for item in rows if item.extra.get("verified") is True]
+    elif verified == "unverified":
+        rows = [item for item in rows if item.extra.get("verified") is not True]
     if group:
         rows = [
             item for item in rows

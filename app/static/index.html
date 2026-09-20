@@ -297,6 +297,11 @@
         <option value="group2">group2</option>
         <option value="other">other</option>
       </select>
+      <select id="verify-filter" aria-label="Lọc theo trạng thái verify">
+        <option value="">Tất cả trạng thái</option>
+        <option value="verified">Đã verify</option>
+        <option value="unverified">Chưa verify</option>
+      </select>
       <button id="btn-clear">Xoá</button>
     </div>
 
@@ -312,6 +317,10 @@
       <div class="count">
         <div class="k">Khớp ảnh</div>
         <div class="v" id="c-matched">—</div>
+      </div>
+      <div class="count">
+        <div class="k">Đã verify</div>
+        <div class="v" id="c-verified">—</div>
       </div>
       <div class="count warn">
         <div class="k">Dòng thiếu ảnh</div>
@@ -457,7 +466,7 @@ const imgSrc = (name) =>
   "/img/" + String(name || "").split("/").map(encodeURIComponent).join("/");
 
 const state = {
-  me: null, query: "", field: "all", group: "", offset: 0, limit: 20,
+  me: null, query: "", field: "all", group: "", verifyFilter: "", offset: 0, limit: 20,
   mode: "scroll", page: 1, loading: false,
   groupTags: {},
   items: [], total: 0, hasMore: false, missingOnly: false,
@@ -466,14 +475,15 @@ const state = {
 
 try {
   const savedView = JSON.parse(localStorage.getItem("hannom.view") || "{}");
-  for (const key of ["query", "field", "group", "mode", "limit", "page", "offset"])
+  for (const key of ["query", "field", "group", "verifyFilter", "missingOnly", "mode", "limit", "page", "offset"])
     if (savedView[key] !== undefined) state[key] = savedView[key];
 } catch {}
 
 function persistView() {
   try {
     localStorage.setItem("hannom.view", JSON.stringify({
-      query: state.query, field: state.field, group: state.group,
+      query: state.query, field: state.field, group: state.group, verifyFilter: state.verifyFilter,
+      missingOnly: state.missingOnly,
       mode: state.mode, limit: state.limit, page: state.page, offset: state.offset,
     }));
   } catch {}
@@ -577,7 +587,7 @@ async function search() {
   const requestOffset = state.mode === "pages"
     ? (state.page - 1) * state.limit : state.offset;
   const params = new URLSearchParams({
-    q: state.query, field: state.field, group: state.group,
+    q: state.query, field: state.field, group: state.group, verified: state.verifyFilter,
     offset: requestOffset, limit: state.limit,
   });
   if (state.missingOnly) params.set("missing_only", "true");
@@ -762,6 +772,11 @@ function openDetail(i, editing = false, showing = null) {
     ? [item.image_name, ...(item.siblings || [])].sort(byNumber) : [];
   const shown = gallery.includes(showing) ? showing : item.image_name;
   state.current = { item, index: i };
+  try {
+    localStorage.setItem("hannom.popup", JSON.stringify({
+      open: true, itemIndex: item.index, editing, showing,
+    }));
+  } catch {}
 
   $("lb-inner").innerHTML = `
     <div class="lb-img">
@@ -1003,7 +1018,11 @@ function openDetail(i, editing = false, showing = null) {
   if (saveButton) saveButton.onclick = save;
 }
 
-function closeDetail() { $("lb").classList.remove("show"); state.current = null; }
+function closeDetail() {
+  $("lb").classList.remove("show");
+  state.current = null;
+  try { localStorage.setItem("hannom.popup", JSON.stringify({ open: false })); } catch {}
+}
 $("lb-close").onclick = closeDetail;
 $("lb").onclick = (e) => { if (e.target === $("lb")) closeDetail(); };
 document.addEventListener("keydown", (e) => {
@@ -1023,6 +1042,7 @@ async function loadStats() {
   const d = s.dataset, im = s.images;
   $("c-rows").textContent = fmt(d.rows);
   $("c-matched").textContent = fmt(im.matched);
+  $("c-verified").textContent = fmt(d.verified);
   $("c-missing").textContent = fmt(im.rows_without_image);
   $("c-orphans").textContent = fmt(im.orphan_images);
   $("btn-missing").classList.toggle("hide", !im.rows_without_image);
@@ -1281,6 +1301,7 @@ $("q").oninput = (e) => {
 };
 $("field").onchange = (e) => { state.field = e.target.value; persistView(); resetResults(); };
 $("group-filter").onchange = (e) => { state.group = e.target.value; persistView(); resetResults(); };
+$("verify-filter").onchange = (e) => { state.verifyFilter = e.target.value; persistView(); resetResults(); };
 $("btn-clear").onclick = () => {
   $("q").value = ""; state.query = "";
   state.missingOnly = false; $("btn-missing").textContent = "Chỉ xem nhóm này";
@@ -1304,6 +1325,7 @@ $("btn-go-page").onclick = () => goToPage(Number($("page-number").value) || 1);
 
 $("btn-missing").onclick = () => {
   state.missingOnly = !state.missingOnly;
+  persistView();
   $("btn-missing").textContent = state.missingOnly ? "Bỏ lọc" : "Chỉ xem nhóm này";
   resetResults();
 };
@@ -1359,6 +1381,9 @@ async function watchUiVersion() {
   $("whoami").textContent = `${state.me.username} · ${state.me.role}`;
   $("q").value = state.query;
   $("field").value = state.field;
+  $("group-filter").value = state.group;
+  $("verify-filter").value = state.verifyFilter;
+  $("btn-missing").textContent = state.missingOnly ? "Bỏ lọc" : "Chỉ xem nhóm này";
   $("load-mode").value = state.mode;
   $("page-size").value = String(state.limit);
   $("page-number").value = state.page;
@@ -1370,6 +1395,18 @@ async function watchUiVersion() {
     $("data-card").classList.add("hide");
   }
   await search();
+  try {
+    const popup = JSON.parse(localStorage.getItem("hannom.popup") || "{}");
+    if (popup.open) {
+      let index = state.items.findIndex((item) => item.index === popup.itemIndex);
+      if (index < 0 && Number.isInteger(popup.itemIndex)) {
+        const restored = await api(`/api/lookup/${popup.itemIndex}`);
+        state.items.push(restored);
+        index = state.items.length - 1;
+      }
+      if (index >= 0) openDetail(index, !!popup.editing, popup.showing || null);
+    }
+  } catch {}
   void Promise.all([loadStats(), loadUsers(), loadBackups()]);
   await watchUiVersion();
   setInterval(watchUiVersion, 5000);

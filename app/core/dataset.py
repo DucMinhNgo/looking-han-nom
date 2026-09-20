@@ -222,6 +222,7 @@ class Dataset:
             "malformed_lines": self._malformed,
             "with_caption": sum(1 for i in items if i.caption),
             "with_ground_truth": sum(1 for i in items if i.ground_truth),
+            "verified": sum(1 for i in items if i.extra.get("verified") is True),
             "with_post_url": sum(1 for i in items if i.post_url),
             "posts": len({i.post_id for i in items if i.post_id}),
         }
