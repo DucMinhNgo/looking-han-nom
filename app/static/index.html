@@ -1070,12 +1070,6 @@ $("btn-logout").onclick = async () => {
   window.location.reload();
 };
 
-const loadObserver = new IntersectionObserver((entries) => {
-  if (entries[0].isIntersecting && state.mode === "scroll" && state.hasMore)
-    loadMoreItems();
-}, { rootMargin: "420px 0px" });
-loadObserver.observe($("load-sentinel"));
-
 /* ---------------- boot ---------------- */
 (async function boot() {
   try { state.me = await api("/api/auth/me"); }

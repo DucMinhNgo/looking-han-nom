@@ -74,12 +74,13 @@ class Settings:
     data_dir: Path = Path("/data")
     dataset_path: Path = Path("/data/dataset.jsonl")
     images_dir: Path = Path("/data/images")
+    users_file: Path | None = None
     page_size: int = 24
     group_tags: dict[str, str] = field(default_factory=dict)
 
     @property
     def users_path(self) -> Path:
-        return self.data_dir / "users.json"
+        return self.users_file or self.data_dir / "users.json"
 
     @property
     def backups_dir(self) -> Path:
@@ -98,6 +99,7 @@ def load_settings() -> Settings:
         data_dir=data_dir,
         dataset_path=Path(_env("DATASET_PATH", str(data_dir / "dataset.jsonl"))),
         images_dir=Path(_env("IMAGES_DIR", str(data_dir / "images"))),
+        users_file=Path(_env("USERS_PATH")) if _env("USERS_PATH") else None,
         page_size=_env_int("PAGE_SIZE", 24),
         group_tags=_env_json_map("GROUP_TAGS_JSON", {
             "group1": "549457308456387",
