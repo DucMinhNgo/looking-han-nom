@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
@@ -323,6 +324,44 @@ async def edit_ground_truth(
         "changed": True,
         "index": index,
         "ground_truth": ground_truth,
+        "backup": saved.name if saved else None,
+    }
+
+
+@router.post("/verify")
+async def verify_row(
+    request: Request,
+    index: int = Form(...),
+    expect_image: str = Form(""),
+    verified: bool = Form(True),
+    user: dict = Depends(require_admin),
+):
+    """Mark a row as verified without changing its text."""
+    runtime = _runtime(request)
+    path = runtime.settings.dataset_path
+    with _write_lock:
+        runtime.dataset.load(force=True)
+        rows = _rows_of(runtime)
+        if not 0 <= index < len(rows):
+            raise HTTPException(404, "Row is no longer in the dataset. Reload the page.")
+        here = str(rows[index].get("image") or "")
+        if expect_image and basename(here).lower() != basename(expect_image).lower():
+            raise HTTPException(409, "Dataset changed underneath this page. Reload and try again.")
+        rows[index]["verified"] = bool(verified)
+        rows[index]["verified_by"] = user["username"] if verified else ""
+        rows[index]["verified_at"] = (
+            datetime.now(timezone.utc).isoformat(timespec="seconds") if verified else ""
+        )
+        saved = ingest.backup(path, runtime.settings.backups_dir)
+        try:
+            ingest.write_dataset(path, rows)
+        except OSError as exc:
+            raise HTTPException(500, f"Could not write {path}: {exc}") from exc
+        runtime.refresh(force=True)
+    return {
+        "changed": True, "index": index, "verified": bool(verified),
+        "verified_by": rows[index]["verified_by"],
+        "verified_at": rows[index]["verified_at"],
         "backup": saved.name if saved else None,
     }
 

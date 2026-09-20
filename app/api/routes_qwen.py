@@ -31,7 +31,7 @@ def _json_answer(text: str) -> list[dict]:
     return data if isinstance(data, list) else []
 
 
-def _web_search(query: str, limit: int = 3) -> list[dict[str, str]]:
+def _web_search(query: str, limit: int = 10) -> list[dict[str, str]]:
     """Small no-key reference search; Qwen remains the vision/selection layer."""
     request = UrlRequest(
         "https://html.duckduckgo.com/html/?q=" + quote_plus(query),
@@ -51,6 +51,36 @@ def _web_search(query: str, limit: int = 3) -> list[dict[str, str]]:
         if len(found) >= limit:
             break
     return found
+
+
+def _reference_search(text: str, item, limit: int = 20) -> list[dict[str, str]]:
+    """Search exact text and Facebook-specific variants, keeping every hit."""
+    queries = [f'"{text}"', text, f'site:facebook.com "{text}"']
+    if item.caption and item.caption != text:
+        queries.append(f'site:facebook.com "{item.caption[:180]}"')
+    results: list[dict[str, str]] = []
+    seen: set[str] = set()
+    if item.post_url:
+        results.append({"title": "Bài viết trong dataset", "url": item.post_url})
+        seen.add(item.post_url)
+    for query in queries:
+        for result in _web_search(query):
+            if result["url"] not in seen:
+                result["query"] = query
+                results.append(result)
+                seen.add(result["url"])
+            if len(results) >= limit:
+                return results
+    fallback_links = [
+        ("Tìm trên Google", "https://www.google.com/search?q=" + quote_plus(text)),
+        ("Tìm trên Bing", "https://www.bing.com/search?q=" + quote_plus(text)),
+        ("Tìm trên DuckDuckGo", "https://duckduckgo.com/?q=" + quote_plus(text)),
+        ("Tìm trên Facebook", "https://www.facebook.com/search/posts/?q=" + quote_plus(text)),
+    ]
+    for title, url in fallback_links:
+        if url not in seen:
+            results.append({"title": title, "url": url})
+    return results
 
 
 @router.get("/status")
@@ -97,7 +127,7 @@ async def analyze(request: Request, user: dict = Depends(current_user)):
         lines = _json_answer(response.choices[0].message.content or "{}")
         for line in lines:
             text = str(line.get("text", "")).strip()
-            line["sources"] = _web_search(text) if text else []
+            line["sources"] = _reference_search(text, item) if text else []
         return {"enabled": True, "lines": lines, "image": str(resolved)}
     except Exception as exc:
         raise HTTPException(502, f"Qwen/search failed: {exc}") from exc

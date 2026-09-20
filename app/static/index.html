@@ -206,6 +206,7 @@
   .qwen-source { display: block; margin-top: 0.2rem; color: var(--series-1);
                  font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis;
                  white-space: nowrap; }
+  .verified-tag { color: var(--good-text); border-color: var(--good-text); }
   textarea.block-edit { width: 100%; box-sizing: border-box; resize: vertical;
                         line-height: 1.7; }
   .pill.more { cursor: pointer; background: var(--plane); color: var(--ink-2);
@@ -638,6 +639,7 @@ function card(item, i) {
         ${gt}${cap}
         <div class="foot">
           ${item.has_image ? "" : `<span class="pill miss">thiếu ảnh</span>`}
+          ${item.verified ? `<span class="pill verified-tag">Đã verify</span>` : ""}
           ${item.siblings && item.siblings.length
             ? `<span class="pill more" data-open="${i}"
                      title="Post này còn ${item.siblings.length} ảnh nữa">+${
@@ -724,6 +726,9 @@ function openDetail(i, editing = false, showing = null) {
         ${!editing && isAdmin()
           ? `<button class="primary" id="gt-open">Chỉnh ground truth</button>` : ""}
         <button id="lb-copy">Chép ground truth</button>
+        ${isAdmin()
+          ? `<button id="verify-row" class="${item.verified ? "verified-tag" : ""}">
+               ${item.verified ? "Bỏ verify" : "Verify"}</button>` : ""}
       </div>
       <div class="qwen-box">
         <button id="qwen-analyze">Dò bằng Qwen</button>
@@ -754,8 +759,11 @@ function openDetail(i, editing = false, showing = null) {
         $("qwen-status").textContent = result.message;
       } else {
         $("qwen-status").textContent = `${result.lines.length} dòng được nhận diện`;
+        const qwenText = result.lines.map((line) => line.text || "").filter(Boolean).join("\n");
         $("qwen-results").innerHTML = result.lines.length
-          ? result.lines.map((line) => `
+          ? `<div class="row" style="margin:0.5rem 0">
+               ${isAdmin() ? `<button id="qwen-apply" class="primary">Áp dụng tất cả vào Ground truth</button>` : ""}
+             </div>` + result.lines.map((line) => `
               <div class="qwen-line">
                 <div class="gt">${esc(line.text || "")}</div>
                 <span class="muted">Vị trí: ${esc(JSON.stringify(line.bounding_box || []))}</span>
@@ -765,9 +773,37 @@ function openDetail(i, editing = false, showing = null) {
                 ).join("") || `<span class="muted">Không tìm thấy nguồn tham khảo.</span>`}
               </div>`).join("")
           : `<span class="muted">Qwen không nhận diện được dòng chữ.</span>`;
+        const apply = $("qwen-apply");
+        if (apply) apply.onclick = async () => {
+          const form = new FormData();
+          form.append("index", String(item.index));
+          form.append("ground_truth", qwenText);
+          form.append("expect_image", item.image || "");
+          try {
+            await api("/api/data/ground-truth", { method: "POST", body: form });
+            await loadStats();
+            item.ground_truth = qwenText;
+            apply.textContent = "Đã áp dụng";
+          } catch (error) { $("qwen-status").textContent = error.message; }
+        };
       }
     } catch (error) { $("qwen-status").textContent = error.message; }
     button.disabled = false;
+  };
+
+  const verify = $("verify-row");
+  if (verify) verify.onclick = async () => {
+    const form = new FormData();
+    form.append("index", String(item.index));
+    form.append("expect_image", item.image || "");
+    form.append("verified", item.verified ? "false" : "true");
+    verify.disabled = true;
+    try {
+      const result = await api("/api/data/verify", { method: "POST", body: form });
+      item.verified = result.verified;
+      await loadStats();
+      openDetail(i, editing, shown);
+    } catch (error) { verify.disabled = false; verify.textContent = error.message; }
   };
 
   $("lb-inner").querySelectorAll("[data-show]").forEach((el) => {

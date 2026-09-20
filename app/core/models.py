@@ -103,4 +103,7 @@ class Item:
             "caption": self.caption,
             "ground_truth": self.ground_truth,
             "extra": self.extra,
+            "verified": bool(self.extra.get("verified", False)),
+            "verified_by": self.extra.get("verified_by", ""),
+            "verified_at": self.extra.get("verified_at", ""),
         }
