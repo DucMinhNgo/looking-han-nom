@@ -13,6 +13,9 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    depends_on:
+      cache:
+        condition: service_healthy
 
     env_file: .env
     # env_file:
@@ -39,6 +42,7 @@ services:
       QWEN_MODEL: ${QWEN_MODEL:-qwen-vl-max}
       # Optional extra focused domains; general web search always runs.
       QWEN_SEARCH_SITES_JSON: '${QWEN_SEARCH_SITES_JSON:-[]}'
+      REDIS_URL: ${REDIS_URL:-redis://cache:6379/0}
 
     # Bound to loopback: a reverse proxy terminates TLS for the public domain
     # and forwards here.
@@ -79,3 +83,13 @@ services:
       options:
         max-size: "10m"
         max-file: "5"
+
+  cache:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save "" --appendonly no --maxmemory 512mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10

@@ -17,6 +17,27 @@ from app.api.auth import current_user
 router = APIRouter(prefix="/api/qwen")
 IMAGE_TYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
                ".webp": "image/webp", ".gif": "image/gif", ".bmp": "image/bmp"}
+_redis = None
+
+
+async def _qwen_cache(request: Request, key: str, value: dict | None = None):
+    """Best-effort cache; JSONL remains the source of truth if Redis is down."""
+    global _redis
+    url = request.app.state.settings.redis_url
+    if not url:
+        return None
+    try:
+        if _redis is None:
+            from redis.asyncio import Redis
+            _redis = Redis.from_url(url, decode_responses=True)
+        cache_key = "qwen:v1:" + key
+        if value is None:
+            cached = await _redis.get(cache_key)
+            return json.loads(cached) if cached else None
+        await _redis.set(cache_key, json.dumps(value, ensure_ascii=False), ex=86400)
+    except Exception:
+        return None
+    return None
 
 
 def _mime(path: Path) -> str:
@@ -120,6 +141,11 @@ async def analyze(request: Request, user: dict = Depends(current_user)):
     path = request.app.state.runtime.images.path_for(resolved or "")
     if path is None:
         raise HTTPException(404, "image not found")
+    cache_key = f"{resolved}:{path.stat().st_mtime_ns}:{settings.qwen_model}"
+    cached = await _qwen_cache(request, cache_key)
+    if cached:
+        cached["cached"] = True
+        return cached
 
     try:
         from openai import OpenAI
@@ -147,6 +173,8 @@ async def analyze(request: Request, user: dict = Depends(current_user)):
             line["sources"] = _reference_search(
                 text, item, settings.qwen_search_sites
             ) if text else []
-        return {"enabled": True, "lines": lines, "image": str(resolved)}
+        result = {"enabled": True, "lines": lines, "image": str(resolved)}
+        await _qwen_cache(request, cache_key, result)
+        return result
     except Exception as exc:
         raise HTTPException(502, f"Qwen/search failed: {exc}") from exc

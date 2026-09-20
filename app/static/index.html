@@ -258,6 +258,18 @@
                                  border-radius: 50%; animation: spin .7s linear infinite; }
   .load-status.end { padding-top: 1rem; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .load-modal { display: none; position: fixed; inset: 0; z-index: 80;
+                background: rgba(0,0,0,0.28); align-items: center;
+                justify-content: center; }
+  .load-modal.show { display: flex; }
+  .load-modal-card { min-width: 230px; padding: 1.2rem 1.4rem;
+                     border: 1px solid var(--border); border-radius: 10px;
+                     background: var(--surface); box-shadow: var(--shadow);
+                     text-align: center; }
+  .load-spinner { width: 1.5rem; height: 1.5rem; margin: 0 auto 0.7rem;
+                  border: 3px solid var(--grid); border-top-color: var(--series-1);
+                  border-radius: 50%; animation: spin .7s linear infinite; }
+  .load-modal-detail { margin-top: 0.25rem; color: var(--muted); font-size: 0.76rem; }
   @media (max-width: 620px) {
     body { padding: 0.65rem; }
     .card { padding: 0.8rem; }
@@ -458,6 +470,13 @@
   <button class="lb-close" id="lb-close">Đóng</button>
   <div class="lb-inner" id="lb-inner"></div>
 </div>
+<div class="load-modal" id="load-modal" role="status" aria-live="polite">
+  <div class="load-modal-card">
+    <div class="load-spinner"></div>
+    <b id="load-modal-title">Đang tải dữ liệu…</b>
+    <div class="load-modal-detail" id="load-modal-detail">Đang chuẩn bị danh sách</div>
+  </div>
+</div>
 
 <script>
 "use strict";
@@ -535,6 +554,12 @@ function pageCacheKey(offset) {
     verified: state.verifyFilter, missing: state.missingOnly,
     offset, limit: state.limit,
   });
+}
+
+function setLoadModal(show, title = "Đang tải dữ liệu…", detail = "Đang chuẩn bị danh sách") {
+  $("load-modal").classList.toggle("show", show);
+  $("load-modal-title").textContent = title;
+  $("load-modal-detail").textContent = detail;
 }
 
 function renderComparison(groundTruth, qwenText) {
@@ -698,6 +723,7 @@ async function search() {
     ? (state.page - 1) * state.limit : state.offset;
   const cacheKey = pageCacheKey(requestOffset);
   const cached = await pageCache.get(cacheKey);
+  if (!cached) setLoadModal(true, "Đang tải dữ liệu…", "Đang lấy danh sách ảnh");
   if (cached) {
     renderLookupData(cached, append, requestOffset);
     state.loading = false;
@@ -710,9 +736,10 @@ async function search() {
 
   let data;
   try { data = await api(`/api/lookup?${params}`); }
-  catch { state.loading = false; return; }
+  catch { setLoadModal(false); state.loading = false; return; }
   await pageCache.set(cacheKey, data);
   renderLookupData(data, append, requestOffset);
+  setLoadModal(false);
   state.loading = false;
 }
 

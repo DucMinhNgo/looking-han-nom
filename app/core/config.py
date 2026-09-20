@@ -94,6 +94,7 @@ class Settings:
     qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     qwen_model: str = "qwen-vl-max"
     qwen_search_sites: list[str] = field(default_factory=list)
+    redis_url: str = ""
 
     @property
     def users_path(self) -> Path:
@@ -132,6 +133,7 @@ def load_settings() -> Settings:
         qwen_search_sites=_env_json_list("QWEN_SEARCH_SITES_JSON", [
             "kaggle.com", "facebook.com", "github.com", "archive.org",
         ]),
+        redis_url=_env("REDIS_URL"),
     )
 
 
