@@ -1,7 +1,7 @@
 """Reviewer accounts, managed by an admin.
 
-Accounts are disabled rather than deleted: every review references its reviewer
-by name, and removing the account would orphan that attribution in the export.
+Accounts can be disabled or deleted by an admin. Deleting an account does not
+alter historical review attribution stored elsewhere.
 """
 
 from __future__ import annotations
@@ -59,6 +59,26 @@ class PasswordRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
 
 
+class RenameRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=64)
+
+
+@router.post("/{username}/username")
+async def rename_user(
+    request: Request,
+    username: str,
+    body: RenameRequest,
+    user: dict = Depends(require_admin),
+):
+    if username.strip().lower() == user["username"].strip().lower():
+        raise HTTPException(400, "Không đổi username của tài khoản đang đăng nhập.")
+    try:
+        renamed = request.app.state.users.rename(username, body.username)
+    except UserError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return renamed.to_json()
+
+
 @router.post("/{username}/password")
 async def set_password(
     request: Request,
@@ -89,3 +109,16 @@ async def set_active(
     except UserError as exc:
         raise HTTPException(400, str(exc)) from exc
     return {"ok": True, "username": username.lower(), "active": body.active}
+
+
+@router.delete("/{username}")
+async def delete_user(
+    request: Request,
+    username: str,
+    user: dict = Depends(require_admin),
+):
+    try:
+        request.app.state.users.delete(username)
+    except UserError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"ok": True, "username": username.lower()}

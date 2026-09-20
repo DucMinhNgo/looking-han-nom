@@ -24,7 +24,10 @@ from app.core.jsonlog import read_json, write_json
 
 log = logging.getLogger(__name__)
 
-USERNAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{2,31}$")
+USERNAME_RE = re.compile(
+    r"^[a-z0-9][a-z0-9._-]{2,31}$|"
+    r"^[a-z0-9][a-z0-9._-]{0,30}@[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$"
+)
 MIN_PASSWORD_LEN = 8
 
 ROLE_ADMIN = "admin"
@@ -167,8 +170,9 @@ class UserStore:
         name = (username or "").strip().lower()
         if not USERNAME_RE.match(name):
             raise UserError(
-                "Username must be 3-32 characters: lowercase letters, digits, "
-                "dot, dash or underscore, starting with a letter or digit."
+                "Username must be 3-32 characters, or a valid email such as "
+                "ddien@fit.hcmus.edu.vn. Use lowercase letters, digits, dot, "
+                "dash or underscore."
             )
         if role not in ROLES:
             raise UserError(f"Role must be one of: {', '.join(ROLES)}")
@@ -204,6 +208,41 @@ class UserStore:
             data[name]["password_hash"] = hash_password(password)
             self._write(data)
         log.info("password changed for %r", name)
+
+    def rename(self, username: str, new_username: str) -> User:
+        old_name = (username or "").strip().lower()
+        new_name = (new_username or "").strip().lower()
+        if old_name == self.super_admin:
+            raise UserError("The super admin username is set in the environment.")
+        if not USERNAME_RE.match(new_name):
+            raise UserError(
+                "Username must be 3-32 characters, or a valid email such as "
+                "ddien@fit.hcmus.edu.vn."
+            )
+        if new_name == self.super_admin:
+            raise UserError("That username is reserved for the super admin.")
+        with self._lock:
+            data = self._read()
+            if old_name not in data:
+                raise UserError(f"No such user: {old_name!r}")
+            if new_name != old_name and new_name in data:
+                raise UserError(f"User {new_name!r} already exists.")
+            data[new_name] = data.pop(old_name)
+            self._write(data)
+        log.info("renamed user %r to %r", old_name, new_name)
+        return self.get(new_name)  # type: ignore[return-value]
+
+    def delete(self, username: str) -> None:
+        name = (username or "").strip().lower()
+        if name == self.super_admin:
+            raise UserError("The super admin cannot be deleted.")
+        with self._lock:
+            data = self._read()
+            if name not in data:
+                raise UserError(f"No such user: {name!r}")
+            del data[name]
+            self._write(data)
+        log.info("deleted user %r", name)
 
     def set_active(self, username: str, active: bool) -> None:
         """Disable rather than delete: reviews reference the reviewer by name,

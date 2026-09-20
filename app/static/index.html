@@ -133,6 +133,9 @@
     white-space: nowrap;
   }
   .pill.miss { color: var(--warning); border-color: var(--warning); }
+  .user-row { justify-content: flex-start; }
+  .user-row .user-name { min-width: 13rem; overflow: hidden; text-overflow: ellipsis; }
+  .danger-user { color: var(--critical); border-color: var(--critical); }
   .group-tag { flex: none; max-width: 11rem; overflow: hidden; text-overflow: ellipsis;
                white-space: nowrap; color: var(--series-1); text-decoration: none;
                font-weight: 700; }
@@ -856,12 +859,51 @@ async function loadUsers() {
   try {
     const u = await api("/api/users");
     $("users").innerHTML = u.users.map((row) => `
-      <div class="row" style="font-size:0.82rem; padding:0.15rem 0">
-        <b>${esc(row.username)}</b>
+      <div class="row user-row" style="font-size:0.82rem; padding:0.15rem 0">
+        <b class="user-name" title="${esc(row.username)}">${esc(row.username)}</b>
         <span class="muted">${esc(row.display_name || "")}</span>
         <span class="pill">${esc(row.role)}</span>
         ${row.active ? "" : `<span class="pill">đã khoá</span>`}
+        ${row.username === state.me.username
+          ? `<span class="muted">tài khoản hiện tại</span>`
+          : `<button data-edit-user="${esc(row.username)}">Sửa</button>
+             <button class="danger-user" data-delete-user="${esc(row.username)}">Xoá</button>`}
       </div>`).join("");
+    $("users").querySelectorAll("[data-edit-user]").forEach((button) => {
+      button.onclick = async () => {
+        const username = button.dataset.editUser;
+        const newUsername = prompt("Username mới:", username);
+        if (newUsername === null) return;
+        const newPassword = prompt("Mật khẩu mới (bỏ trống nếu không đổi):", "");
+        try {
+          if (newUsername.trim().toLowerCase() !== username.toLowerCase()) {
+            await api(`/api/users/${encodeURIComponent(username)}/username`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ username: newUsername.trim() }),
+            });
+          }
+          if (newPassword) {
+            await api(`/api/users/${encodeURIComponent(newUsername.trim() || username)}/password`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ password: newPassword }),
+            });
+          }
+          await loadUsers();
+        } catch (e) { alert(e.message); }
+      };
+    });
+    $("users").querySelectorAll("[data-delete-user]").forEach((button) => {
+      button.onclick = async () => {
+        const username = button.dataset.deleteUser;
+        if (!confirm(`Xoá tài khoản ${username}?`)) return;
+        try {
+          await api(`/api/users/${encodeURIComponent(username)}`, { method: "DELETE" });
+          await loadUsers();
+        } catch (e) { alert(e.message); }
+      };
+    });
   } catch {}
 }
 
