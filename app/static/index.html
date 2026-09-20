@@ -486,8 +486,24 @@ const isAdmin = () => !!state.me && state.me.role === "admin";
 // Encode per segment: a picture filed as "<post id>/1.jpg" must stay two path
 // segments, and encodeURIComponent on the whole string would turn the slash
 // into %2F.
-const imgSrc = (name) =>
-  "/img/" + String(name || "").split("/").map(encodeURIComponent).join("/");
+// Special case: dataset rows that carry absolute filesystem paths from the
+// crawler (e.g. "/media/khtn/hdd/crawling/data1/xxx.jpg") are served by the
+// external web server at https://kimhannom.clc.hcmus.edu.vn — map those paths
+// directly to that public URL so the browser can load them without proxying
+// through the app. Adjust `PUBLIC_FS_PREFIX` / `PUBLIC_URL_BASE` if your setup
+// differs.
+const PUBLIC_FS_PREFIX = "/media/khtn/hdd/crawling";
+const PUBLIC_URL_BASE = "https://kimhannom.clc.hcmus.edu.vn";
+const imgSrc = (name) => {
+  const s = String(name || "").replaceAll('\\\\', '/');
+  if (!s) return "/img/";
+  if (s.startsWith(PUBLIC_FS_PREFIX)) {
+    const tail = s.substring(PUBLIC_FS_PREFIX.length);
+    // encode each segment to preserve slashes
+    return PUBLIC_URL_BASE + tail.split('/').map(encodeURIComponent).join('/');
+  }
+  return "/img/" + s.split("/").map(encodeURIComponent).join("/");
+};
 
 const state = {
   me: null, query: "", field: "all", group: "", verifyFilter: "", offset: 0, limit: 20,
