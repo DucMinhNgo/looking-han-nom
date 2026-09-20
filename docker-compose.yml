@@ -76,7 +76,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2g
+          memory: 5g
 
     logging:
       driver: json-file
