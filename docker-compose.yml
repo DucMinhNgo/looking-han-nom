@@ -60,6 +60,30 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Lightweight DB admin (Adminer) — points to the same Postgres service
+  adminer:
+    image: adminer:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # point Adminer to the postgres service defined above
+      ADMINER_DEFAULT_SERVER: postgres
+    # ports:
+    #   - "127.0.0.1:8081:8080"
+    deploy:
+      resources:
+        limits:
+          memory: '1G'
+        reservations:
+          memory: '512M'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   # ── Redis cache ─────────────────────────────────────────────────────────────
   cache:
     image: redis:7-alpine
