@@ -60,7 +60,6 @@ services:
       # Set DATA_SOURCE in .env to point somewhere else without editing this
       # file:  DATA_SOURCE=D:/du-lieu-han-nom
       # - ${DATA_SOURCE:-./sample}:/srv/src
-      - DATA_SOURCE=/media/khtn/hdd/crawling
 
     deploy:
       resources:
