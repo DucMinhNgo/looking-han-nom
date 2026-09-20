@@ -181,7 +181,10 @@ def _register_core_routes(app: FastAPI, auth: AuthConfig) -> None:
             version = index_file.stat().st_mtime_ns
         except OSError:
             version = 0
-        return {"version": version}
+        return JSONResponse(
+            {"version": version},
+            headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+        )
 
     @app.get("/sw.js")
     async def service_worker():

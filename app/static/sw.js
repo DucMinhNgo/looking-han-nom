@@ -7,17 +7,38 @@ const retryPage = `<!doctype html>
 <script>setInterval(async()=>{try{const r=await fetch(location.href,{cache:"no-store"});if(r.ok)location.reload()}catch{}} ,2000)</script>`;
 
 const IMAGE_CACHE = "hannom-images-v1";
+const IMAGE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+function cacheResponse(response) {
+  const headers = new Headers(response.headers);
+  headers.set("x-hannom-cached-at", String(Date.now()));
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
 
 self.addEventListener("fetch", (event) => {
   if (new URL(event.request.url).pathname.startsWith("/img/")) {
     event.respondWith(
       caches.open(IMAGE_CACHE).then(async (cache) => {
         const cached = await cache.match(event.request);
+        const cachedAt = Number(cached?.headers.get("x-hannom-cached-at") || 0);
+        const valid = cached && cachedAt && Date.now() - cachedAt < IMAGE_MAX_AGE_MS;
         const fresh = fetch(event.request).then((response) => {
-          if (response.ok) cache.put(event.request, response.clone());
+          if (response.ok) cache.put(event.request, cacheResponse(response.clone()));
           return response;
         }).catch(() => cached);
-        return cached || fresh;
+        return valid ? cached : fresh;
       })
     );
     return;

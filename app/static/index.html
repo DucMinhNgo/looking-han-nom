@@ -213,6 +213,7 @@
   .unverified-tag { color: var(--warning); border-color: var(--warning); }
   .click-tag { cursor: pointer; }
   .click-tag:hover { filter: brightness(0.9); }
+  #results [data-open] { cursor: pointer; }
   .verify-history { margin-top: 0.45rem; max-height: 8rem; overflow-y: auto;
                     font-size: 0.74rem; color: var(--ink-2); }
   .verify-history div { padding: 0.2rem 0; border-top: 1px solid var(--border); }
@@ -754,8 +755,15 @@ function updateGroupFilter() {
 }
 
 function bindCards(grid) {
+  grid.onclick = (event) => {
+    const target = event.target.closest("[data-open]");
+    if (!target || target.closest("a")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    openDetail(Number(target.dataset.open));
+  };
   grid.querySelectorAll("[data-open]").forEach((el) => {
-    el.onclick = () => openDetail(+el.dataset.open);
+    el.onclick = null;
   });
   grid.querySelectorAll("[data-edit]").forEach((el) => {
     el.onclick = () => openDetail(+el.dataset.edit, true);
@@ -1477,15 +1485,24 @@ $("btn-logout").onclick = async () => {
 let uiVersion = null;
 async function watchUiVersion() {
   try {
-    const body = await api("/api/ui-version");
+    const body = await api(`/api/ui-version?ts=${Date.now()}`);
     if (uiVersion === null) uiVersion = body.version;
     else if (body.version !== uiVersion) window.location.reload();
   } catch { /* a restarting container is checked on the next interval */ }
 }
 
 (async function boot() {
-  if ("serviceWorker" in navigator)
-    navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).catch(() => {});
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!window.__reloadingForWorker) {
+        window.__reloadingForWorker = true;
+        window.location.reload();
+      }
+    });
+    navigator.serviceWorker.register(`/sw.js?v=${Date.now()}`, {
+      updateViaCache: "none",
+    }).then((registration) => registration.update()).catch(() => {});
+  }
   try { state.me = await api("/api/auth/me"); }
   catch { window.location.reload(); return; }
 
