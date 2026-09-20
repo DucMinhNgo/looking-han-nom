@@ -1123,6 +1123,8 @@ async function watchUiVersion() {
 }
 
 (async function boot() {
+  if ("serviceWorker" in navigator)
+    navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).catch(() => {});
   try { state.me = await api("/api/auth/me"); }
   catch { window.location.reload(); return; }
 

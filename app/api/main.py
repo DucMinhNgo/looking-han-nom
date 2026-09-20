@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -181,6 +181,20 @@ def _register_core_routes(app: FastAPI, auth: AuthConfig) -> None:
         except OSError:
             version = 0
         return {"version": version}
+
+    @app.get("/sw.js")
+    async def service_worker():
+        worker = STATIC_DIR / "sw.js"
+        if not worker.exists():
+            raise HTTPException(404, "service worker not found")
+        return FileResponse(
+            worker,
+            media_type="application/javascript",
+            headers={
+                "Cache-Control": "no-store",
+                "Service-Worker-Allowed": "/",
+            },
+        )
 
     @app.get("/", response_class=HTMLResponse)
     async def index(user: dict = Depends(current_user)):
