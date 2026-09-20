@@ -80,6 +80,40 @@ bạn thấy cơ chế đối chiếu hoạt động, chứ không phải một 
 
 ---
 
+## Group tags và seed dữ liệu ban đầu
+
+Ứng dụng hỗ trợ ánh xạ tên thư mục con trong đường dẫn ảnh thành `group_id` để
+lọc theo nhóm trong UI. Ví dụ bạn muốn mọi ảnh có đường dẫn chứa `/data1/`
+thuộc `group_id` `549457308456387` và `/data2/` thuộc `322453387859386`.
+
+1) Thiết lập `GROUP_TAGS_JSON` trong `.env` hoặc `docker-compose.yml`:
+
+```env
+GROUP_TAGS_JSON={"data1":"549457308456387","data2":"322453387859386"}
+```
+
+2) Khởi động stack (Docker):
+
+```bash
+docker compose up -d --build
+```
+
+3) Import dataset mẫu vào PostgreSQL (chạy trong container `lookup`):
+
+```bash
+# Import file sample/dataset.jsonl vào DB (idempotent)
+docker compose exec lookup python scripts/import_jsonl.py /srv/src/sample/dataset.jsonl
+```
+
+Khi import hoặc upload, server sẽ gán `extra.group_id` và `extra.group` cho từng
+hàng nếu ảnh nằm trong thư mục tương ứng. Trong UI, bộ lọc `group` sẽ hiện
+danh sách các group (tên thư mục) — chọn `data1` hoặc `data2` sẽ lọc ra cả hai
+nhóm tương ứng.
+
+Nếu bạn không dùng PostgreSQL, vẫn có thể seed dữ liệu bằng cách copy
+`sample/dataset.jsonl` và `sample/images/` vào thư mục được mount làm `DATA_DIR`
+trước khi khởi động; app sẽ đọc file `dataset.jsonl` trực tiếp.
+
 ## Dùng dữ liệu của bạn
 
 Dataset là một file JSONL, mỗi dòng một ảnh:

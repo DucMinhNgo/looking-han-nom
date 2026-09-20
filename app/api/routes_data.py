@@ -57,6 +57,28 @@ def _rows_of(runtime) -> list[dict]:
     ]
 
 
+def _assign_group_to_row(row: dict, group_tags: dict[str, str]) -> None:
+    """If the row names an image in a known group folder, set `extra.group_id`.
+
+    Modifies `row` in place. `group_tags` maps folder name -> group id.
+    """
+    image = str(row.get("image") or "").replace("\\", "/")
+    if not image:
+        return
+    # Find the longest matching group name present as a path segment
+    match = None
+    for name in sorted(group_tags, key=len, reverse=True):
+        if f"/{name}/" in f"/{image.lstrip('/')}":
+            match = name
+            break
+    if not match:
+        return
+    extra = dict(row.get("extra") or {})
+    extra.setdefault("group_id", group_tags[match])
+    extra.setdefault("group", match)
+    row["extra"] = extra
+
+
 async def _read_upload(file: UploadFile, limit: int, what: str) -> bytes:
     data = await file.read()
     if len(data) > limit:
@@ -80,6 +102,11 @@ async def preview_dataset(
     await file.close()
 
     incoming, malformed = ingest.parse_jsonl(data)
+
+    runtime = _runtime(request)
+    # Annotate incoming rows with group_id when image path matches configured groups
+    for row in incoming:
+        _assign_group_to_row(row, runtime.settings.group_tags)
     if not incoming:
         raise HTTPException(
             400,
@@ -109,6 +136,12 @@ async def merge_dataset(
     await file.close()
 
     incoming, malformed = ingest.parse_jsonl(data)
+
+    runtime = _runtime(request)
+    # Annotate incoming rows with group_id when image path matches configured groups
+    for row in incoming:
+        _assign_group_to_row(row, runtime.settings.group_tags)
+
     if not incoming:
         raise HTTPException(400, "No readable rows in that file.")
 
@@ -117,21 +150,24 @@ async def merge_dataset(
 
     with _write_lock:
         # Re-read inside the lock: another upload may have landed between the
-        # preview and this call, and merging onto a stale copy would drop its
-        # rows.
+        # preview and this call. Use DB-backed upsert when available.
         runtime.dataset.load(force=True)
-        existing = _rows_of(runtime)
-
-        result = ingest.merge(existing, incoming, malformed=malformed)
-        saved = ingest.backup(path, runtime.settings.backups_dir)
-        try:
-            ingest.write_dataset(path, result.rows)
-        except OSError as exc:
-            raise HTTPException(
-                500,
-                f"Could not write {path}: {exc}. If this is Docker, the data "
-                "mount is probably still read-only (:ro).",
-            ) from exc
+        if hasattr(runtime.dataset, "upsert_rows"):
+            # PgDataset handles merge + upsert atomically and returns MergeResult
+            result = runtime.dataset.upsert_rows(incoming, malformed=malformed)
+            saved = None
+        else:
+            existing = _rows_of(runtime)
+            result = ingest.merge(existing, incoming, malformed=malformed)
+            saved = ingest.backup(path, runtime.settings.backups_dir)
+            try:
+                ingest.write_dataset(path, result.rows)
+            except OSError as exc:
+                raise HTTPException(
+                    500,
+                    f"Could not write {path}: {exc}. If this is Docker, the data "
+                    "mount is probably still read-only (:ro).",
+                ) from exc
         runtime.refresh(force=True)
 
     log.info("merged %d rows by %r (%d added, %d updated)",
@@ -244,18 +280,22 @@ async def add_row(
         "caption": caption.strip(),
         "ground_truth": ground_truth.strip(),
     }
+    # Assign group info for the single row if applicable
+    _assign_group_to_row(row, runtime.settings.group_tags)
 
     path = runtime.settings.dataset_path
     with _write_lock:
         runtime.dataset.load(force=True)
-        existing = _rows_of(runtime)
-
-        result = ingest.merge(existing, [row])
-        ingest.backup(path, runtime.settings.backups_dir)
-        try:
-            ingest.write_dataset(path, result.rows)
-        except OSError as exc:
-            raise HTTPException(500, f"Could not write {path}: {exc}") from exc
+        if hasattr(runtime.dataset, "upsert_rows"):
+            result = runtime.dataset.upsert_rows([row])
+        else:
+            existing = _rows_of(runtime)
+            result = ingest.merge(existing, [row])
+            ingest.backup(path, runtime.settings.backups_dir)
+            try:
+                ingest.write_dataset(path, result.rows)
+            except OSError as exc:
+                raise HTTPException(500, f"Could not write {path}: {exc}") from exc
         runtime.refresh(force=True)
 
     return {
@@ -287,37 +327,62 @@ async def edit_ground_truth(
 
     with _write_lock:
         runtime.dataset.load(force=True)
-        rows = _rows_of(runtime)
-        if not 0 <= index < len(rows):
+        # File-backed: operate on rows and write file. DB-backed: call update_ground_truth.
+        if hasattr(runtime.dataset, "update_ground_truth"):
+            # Validate index against current items
+            items = runtime.dataset.items
+            if not 0 <= index < len(items):
+                raise HTTPException(
+                    404, f"Row {index + 1} is no longer there — the dataset now "
+                         f"has {len(items)} rows. Reload the page."
+                )
+            here = str(items[index].image or "")
+            if expect_image and basename(here).lower() != basename(expect_image).lower():
+                raise HTTPException(
+                    409,
+                    f"Row {index + 1} is now {here or '(no picture)'}, not "
+                    f"{expect_image}. Someone changed the dataset while this page "
+                    "was open. Reload and try again.",
+                )
+            current = items[index].ground_truth or ""
+            if str(current) == ground_truth:
+                return {"changed": False, "index": index,
+                        "ground_truth": ground_truth, "backup": None}
+
+            runtime.dataset.update_ground_truth(index, ground_truth)
+            runtime.refresh(force=True)
+            saved = None
+        else:
+            rows = _rows_of(runtime)
+            if not 0 <= index < len(rows):
             raise HTTPException(
                 404, f"Row {index + 1} is no longer there — the dataset now "
                      f"has {len(rows)} rows. Reload the page."
             )
+            here = str(rows[index].get("image") or "")
+            if expect_image and basename(here).lower() != basename(expect_image).lower():
+                raise HTTPException(
+                    409,
+                    f"Row {index + 1} is now {here or '(no picture)'}, not "
+                    f"{expect_image}. Someone changed the dataset while this page "
+                    "was open. Reload and try again.",
+                )
 
-        here = str(rows[index].get("image") or "")
-        if expect_image and basename(here).lower() != basename(expect_image).lower():
-            raise HTTPException(
-                409,
-                f"Row {index + 1} is now {here or '(no picture)'}, not "
-                f"{expect_image}. Someone changed the dataset while this page "
-                "was open. Reload and try again.",
-            )
+            if str(rows[index].get("ground_truth") or "") == ground_truth:
+                return {"changed": False, "index": index,
+                        "ground_truth": ground_truth, "backup": None}
 
-        if str(rows[index].get("ground_truth") or "") == ground_truth:
-            return {"changed": False, "index": index,
-                    "ground_truth": ground_truth, "backup": None}
-
-        rows[index]["ground_truth"] = ground_truth
-        saved = ingest.backup(path, runtime.settings.backups_dir)
-        try:
-            ingest.write_dataset(path, rows)
-        except OSError as exc:
-            raise HTTPException(
-                500,
-                f"Could not write {path}: {exc}. If this is Docker, the data "
-                "mount is probably still read-only (:ro).",
-            ) from exc
-        runtime.refresh(force=True)
+            rows[index]["ground_truth"] = ground_truth
+            saved = ingest.backup(path, runtime.settings.backups_dir)
+            try:
+                ingest.write_dataset(path, rows)
+            except OSError as exc:
+                raise HTTPException(
+                    500,
+                    f"Could not write {path}: {exc}. If this is Docker, the data "
+                    "mount is probably still read-only (:ro).",
+                ) from exc
+            runtime.refresh(force=True)
 
     log.info("row %d ground truth edited by %r", index + 1, user["username"])
     return {
@@ -341,44 +406,61 @@ async def verify_row(
     path = runtime.settings.dataset_path
     with _write_lock:
         runtime.dataset.load(force=True)
-        rows = _rows_of(runtime)
-        if not 0 <= index < len(rows):
-            raise HTTPException(404, "Row is no longer in the dataset. Reload the page.")
-        here = str(rows[index].get("image") or "")
-        if expect_image and basename(here).lower() != basename(expect_image).lower():
-            raise HTTPException(409, "Dataset changed underneath this page. Reload and try again.")
-        verified_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        history = rows[index].get("verify_history", [])
-        if not isinstance(history, list):
-            history = []
-        history.append({
-            "verified": bool(verified),
-            "username": user["username"],
-            "at": verified_at,
-        })
-        rows[index]["verify_history"] = history
-        rows[index]["verified"] = bool(verified)
-        rows[index]["verified_by"] = user["username"]
-        rows[index]["verified_at"] = verified_at
-        saved = ingest.backup(path, runtime.settings.backups_dir)
-        try:
-            ingest.write_dataset(path, rows)
-        except OSError as exc:
-            raise HTTPException(500, f"Could not write {path}: {exc}") from exc
-        runtime.refresh(force=True)
-    return {
-        "changed": True, "index": index, "verified": bool(verified),
-        "verified_by": rows[index]["verified_by"],
-        "verified_at": rows[index]["verified_at"],
-        "verify_history": rows[index]["verify_history"],
-        "backup": saved.name if saved else None,
-    }
+        if hasattr(runtime.dataset, "update_verify"):
+            # DB-backed update
+            info = runtime.dataset.update_verify(index, bool(verified), user["username"])
+            runtime.refresh(force=True)
+            return {
+                "changed": True,
+                "index": index,
+                "verified": info.get("verified"),
+                "verified_by": info.get("verified_by"),
+                "verified_at": info.get("verified_at"),
+                "verify_history": info.get("verify_history"),
+                "backup": None,
+            }
+        else:
+            rows = _rows_of(runtime)
+            if not 0 <= index < len(rows):
+                raise HTTPException(404, "Row is no longer in the dataset. Reload the page.")
+            here = str(rows[index].get("image") or "")
+            if expect_image and basename(here).lower() != basename(expect_image).lower():
+                raise HTTPException(409, "Dataset changed underneath this page. Reload and try again.")
+            verified_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            history = rows[index].get("verify_history", [])
+            if not isinstance(history, list):
+                history = []
+            history.append({
+                "verified": bool(verified),
+                "username": user["username"],
+                "at": verified_at,
+            })
+            rows[index]["verify_history"] = history
+            rows[index]["verified"] = bool(verified)
+            rows[index]["verified_by"] = user["username"]
+            rows[index]["verified_at"] = verified_at
+            saved = ingest.backup(path, runtime.settings.backups_dir)
+            try:
+                ingest.write_dataset(path, rows)
+            except OSError as exc:
+                raise HTTPException(500, f"Could not write {path}: {exc}") from exc
+            runtime.refresh(force=True)
+            return {
+                "changed": True, "index": index, "verified": bool(verified),
+                "verified_by": rows[index]["verified_by"],
+                "verified_at": rows[index]["verified_at"],
+                "verify_history": rows[index]["verify_history"],
+                "backup": saved.name if saved else None,
+            }
 
 
 @router.get("/backups")
 async def list_backups(request: Request, user: dict = Depends(require_admin)):
     """Previous versions of the dataset, newest first."""
     backups_dir = _runtime(request).settings.backups_dir
+    # Backups only exist for file-backed datasets
+    if hasattr(_runtime(request).dataset, "upsert_rows"):
+        return {"items": []}
     if not backups_dir.is_dir():
         return {"items": []}
     items = []

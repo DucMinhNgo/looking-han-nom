@@ -115,6 +115,19 @@ def normalize_row(raw: dict[str, Any]) -> dict[str, Any]:
     caption      = _pick(raw, "caption")
     ground_truth = _pick(raw, "ground_truth")
     extra        = {k: v for k, v in raw.items() if k not in _consumed(raw)}
+    # Assign group_id from GROUP_TAGS_JSON env if image path matches
+    try:
+        group_tags_raw = os.environ.get("GROUP_TAGS_JSON", "")
+        if group_tags_raw:
+            group_tags = json.loads(group_tags_raw)
+            image_path = (image or "").replace("\\", "/")
+            for name in sorted(group_tags, key=len, reverse=True):
+                if f"/{name}/" in f"/{image_path.lstrip('/')}":
+                    extra.setdefault("group_id", group_tags[name])
+                    extra.setdefault("group", name)
+                    break
+    except Exception:
+        pass
 
     return {
         "image":        image,

@@ -12,6 +12,10 @@ from typing import Any
 
 from app.core.config import Settings
 from app.core.dataset import Dataset
+try:
+    from app.core.pg_dataset import PgDataset
+except Exception:
+    PgDataset = None  # type: ignore
 from app.core.localimages import ImageLibrary, MatchReport
 from app.core.users import UserStore
 
@@ -61,7 +65,17 @@ def _build_user_store(settings: Settings, super_admin: str) -> UserStore:
 class Runtime:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        self.dataset = Dataset(settings.dataset_path)
+        # If DATABASE_URL is set, PgDataset will be used (import above).
+        # For the file-backed Dataset the constructor still takes a path.
+        if settings.database_url and PgDataset is not None:
+            try:
+                self.dataset = PgDataset(settings.database_url)
+            except Exception:
+                # Fallback to file-backed dataset when PgDataset cannot be used
+                log.warning("Could not init PgDataset, falling back to file Dataset")
+                self.dataset = Dataset(settings.dataset_path)
+        else:
+            self.dataset = Dataset(settings.dataset_path)
         self.images = ImageLibrary(settings.images_dir)
         super_admin = os.environ.get("APP_USERNAME", "admin").strip().lower()
         self.users = _build_user_store(settings, super_admin)
