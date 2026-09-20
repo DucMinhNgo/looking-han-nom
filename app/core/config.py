@@ -77,6 +77,9 @@ class Settings:
     users_file: Path | None = None
     page_size: int = 24
     group_tags: dict[str, str] = field(default_factory=dict)
+    qwen_api_key: str = ""
+    qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    qwen_model: str = "qwen-vl-max"
 
     @property
     def users_path(self) -> Path:
@@ -105,6 +108,12 @@ def load_settings() -> Settings:
             "group1": "549457308456387",
             "group2": "322453387859386",
         }),
+        qwen_api_key=_env("QWEN_API_KEY"),
+        qwen_base_url=_env(
+            "QWEN_BASE_URL",
+            "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        ),
+        qwen_model=_env("QWEN_MODEL", "qwen-vl-max"),
     )
 
 

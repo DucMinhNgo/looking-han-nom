@@ -33,6 +33,10 @@ services:
       IMAGES_DIR: /srv/src
       USERS_PATH: /srv/src/users.json
       GROUP_TAGS_JSON: '{"group1":"549457308456387","group2":"322453387859386"}'
+      # Optional. Without it, the Qwen button reports that no key is configured.
+      QWEN_API_KEY: ${QWEN_API_KEY:-}
+      QWEN_BASE_URL: ${QWEN_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      QWEN_MODEL: ${QWEN_MODEL:-qwen-vl-max}
 
     # Bound to loopback: a reverse proxy terminates TLS for the public domain
     # and forwards here.

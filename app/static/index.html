@@ -200,6 +200,12 @@
   a.postlink:hover { text-decoration: underline; }
   .lb-side a.postlink { font-weight: 400; word-break: break-all;
                         white-space: normal; }
+  .qwen-box { margin-top: 0.8rem; border-top: 1px solid var(--border); padding-top: 0.8rem; }
+  .qwen-line { padding: 0.45rem 0; border-bottom: 1px solid var(--border); }
+  .qwen-line:last-child { border-bottom: 0; }
+  .qwen-source { display: block; margin-top: 0.2rem; color: var(--series-1);
+                 font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis;
+                 white-space: nowrap; }
   textarea.block-edit { width: 100%; box-sizing: border-box; resize: vertical;
                         line-height: 1.7; }
   .pill.more { cursor: pointer; background: var(--plane); color: var(--ink-2);
@@ -719,6 +725,11 @@ function openDetail(i, editing = false, showing = null) {
           ? `<button class="primary" id="gt-open">Chỉnh ground truth</button>` : ""}
         <button id="lb-copy">Chép ground truth</button>
       </div>
+      <div class="qwen-box">
+        <button id="qwen-analyze">Dò bằng Qwen</button>
+        <span class="muted" id="qwen-status" style="font-size:0.75rem"></span>
+        <div id="qwen-results"></div>
+      </div>
       <p class="muted" style="font-size:0.72rem; margin-top:0.7rem">← → chuyển ảnh · Esc đóng</p>
     </div>`;
 
@@ -728,6 +739,35 @@ function openDetail(i, editing = false, showing = null) {
     try { await navigator.clipboard.writeText(item.ground_truth || ""); copy.textContent = "Đã chép"; }
     catch { copy.textContent = "Không chép được"; }
     setTimeout(() => { copy.textContent = "Chép ground truth"; }, 1500);
+  };
+
+  $("qwen-analyze").onclick = async () => {
+    const button = $("qwen-analyze");
+    button.disabled = true;
+    $("qwen-status").textContent = "Đang nhận diện và tìm nguồn…";
+    try {
+      const result = await api("/api/qwen/analyze", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ index: item.index }),
+      });
+      if (!result.enabled) {
+        $("qwen-status").textContent = result.message;
+      } else {
+        $("qwen-status").textContent = `${result.lines.length} dòng được nhận diện`;
+        $("qwen-results").innerHTML = result.lines.length
+          ? result.lines.map((line) => `
+              <div class="qwen-line">
+                <div class="gt">${esc(line.text || "")}</div>
+                <span class="muted">Vị trí: ${esc(JSON.stringify(line.bounding_box || []))}</span>
+                ${(line.sources || []).map((source) =>
+                  `<a class="qwen-source" href="${esc(source.url)}" target="_blank"
+                    rel="noopener" title="${esc(source.title)}">↗ ${esc(source.title || source.url)}</a>`
+                ).join("") || `<span class="muted">Không tìm thấy nguồn tham khảo.</span>`}
+              </div>`).join("")
+          : `<span class="muted">Qwen không nhận diện được dòng chữ.</span>`;
+      }
+    } catch (error) { $("qwen-status").textContent = error.message; }
+    button.disabled = false;
   };
 
   $("lb-inner").querySelectorAll("[data-show]").forEach((el) => {

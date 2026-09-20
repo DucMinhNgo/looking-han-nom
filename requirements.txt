@@ -13,3 +13,6 @@ python-multipart==0.0.9
 # Auth
 bcrypt==4.2.0
 PyJWT==2.9.0
+
+# Optional Qwen-compatible OpenAI client. The app still starts without a key.
+openai==1.51.0
