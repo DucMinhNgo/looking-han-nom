@@ -113,9 +113,15 @@
     font-family: "Noto Serif CJK TC", "Source Han Serif", "MS Mincho", serif;
     max-height: 9rem; overflow-y: auto;
   }
-  .cap { font-size: 0.82rem; color: var(--ink-2); line-height: 1.5; }
-  .foot { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;
-          font-size: 0.7rem; color: var(--muted); }
+    .cap { font-size: 0.82rem; color: var(--ink-2); line-height: 1.5;
+     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+     min-width: 0; }
+    .thumb-missing code { display: block; max-width: 100%; overflow: hidden;
+        white-space: nowrap; text-overflow: ellipsis; }
+    .foot { display: flex; gap: 0.4rem; align-items: center; flex-wrap: nowrap;
+      min-width: 0; overflow: hidden; font-size: 0.7rem; color: var(--muted); }
+    .foot > span:not(.spacer), .foot > a, .foot > button { flex: none; }
+    .foot .postlink { flex: 1 1 auto; min-width: 0; }
   .pill {
     font-size: 0.65rem; font-weight: 700; padding: 0.05rem 0.4rem;
     border-radius: 3px; border: 1px solid var(--border); color: var(--muted);
