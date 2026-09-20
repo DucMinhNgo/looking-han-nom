@@ -23,6 +23,15 @@ def _runtime(request: Request):
     return request.app.state.runtime
 
 
+def _group_for_image(image: str, group_tags: dict[str, str]) -> str | None:
+    path = str(image or "").replace("\\", "/")
+    return next(
+        (name for name in sorted(group_tags, key=len, reverse=True)
+         if f"/{name}/" in f"/{path.lstrip('/')}"),
+        None,
+    )
+
+
 @router.get("/lookup")
 async def lookup(
     request: Request,
@@ -31,6 +40,7 @@ async def lookup(
     offset: int = Query(0, ge=0),
     limit: int = Query(0, ge=0, le=200),
     missing_only: bool = Query(False),
+    group: str = Query(""),
     user: dict = Depends(current_user),
 ):
     """Search by Facebook link, post id, caption, ground truth or filename."""
@@ -39,28 +49,27 @@ async def lookup(
     # `missing_only` filters on it.
     runtime.refresh()
 
-    page = runtime.dataset.search(
-        q,
-        field=field,
-        offset=offset,
-        limit=limit or runtime.settings.page_size,
+    page_limit = limit or runtime.settings.page_size
+    everything = runtime.dataset.search(
+        q, field=field, offset=0, limit=len(runtime.dataset.items) or 1
     )
-    payload = page.to_json()
-
+    rows = everything.items
     if missing_only:
-        # Filtering after the page would return a short page; redo the search
-        # unpaged and cut the window from what actually matched.
-        everything = runtime.dataset.search(
-            q, field=field, offset=0, limit=len(runtime.dataset.items) or 1
-        )
-        rows = [i for i in everything.items if not i.has_image]
-        limit = limit or runtime.settings.page_size
-        window = rows[offset : offset + limit]
-        payload.update(
-            items=[i.to_json() for i in window],
-            total=len(rows),
-            has_more=offset + len(window) < len(rows),
-        )
+        rows = [item for item in rows if not item.has_image]
+    if group:
+        rows = [
+            item for item in rows
+            if (_group_for_image(item.image, runtime.settings.group_tags) or "other") == group
+        ]
+    window = rows[offset : offset + page_limit]
+    payload = {
+        **everything.to_json(),
+        "items": [item.to_json() for item in window],
+        "offset": offset,
+        "limit": page_limit,
+        "total": len(rows),
+        "has_more": offset + len(window) < len(rows),
+    }
 
     payload["fields"] = list(FIELDS)
     payload["group_tags"] = runtime.settings.group_tags

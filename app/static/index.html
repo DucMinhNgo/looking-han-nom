@@ -121,11 +121,12 @@
          min-width: 0; min-height: 1.23rem; }
     .thumb-missing code { display: block; max-width: 100%; overflow: hidden;
         white-space: nowrap; text-overflow: ellipsis; }
-    .foot { display: flex; gap: 0.4rem; align-items: center; flex-wrap: nowrap;
-        min-width: 0; overflow: hidden; margin-top: auto;
+      .foot { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;
+        min-width: 0; overflow: visible; margin-top: auto;
         font-size: 0.7rem; color: var(--muted); }
-    .foot > span:not(.spacer), .foot > a, .foot > button { flex: none; }
-    .foot .postlink { flex: 1 1 auto; min-width: 0; }
+      .foot > span:not(.spacer), .foot > a, .foot > button { flex: 0 0 auto; }
+      .foot .spacer { flex: 1 1 0; min-width: 0; }
+      .foot .postlink { max-width: 7rem; overflow: hidden; text-overflow: ellipsis; }
   .pill {
     font-size: 0.65rem; font-weight: 700; padding: 0.05rem 0.4rem;
     border-radius: 3px; border: 1px solid var(--border); color: var(--muted);
@@ -263,6 +264,12 @@
         <option value="caption">Caption</option>
         <option value="ground_truth">Ground truth</option>
         <option value="image">Tên file ảnh</option>
+      </select>
+      <select id="group-filter" aria-label="Lọc theo nhóm">
+        <option value="">Tất cả group</option>
+        <option value="group1">group1</option>
+        <option value="group2">group2</option>
+        <option value="other">other</option>
       </select>
       <button id="btn-clear">Xoá</button>
     </div>
@@ -424,7 +431,7 @@ const imgSrc = (name) =>
   "/img/" + String(name || "").split("/").map(encodeURIComponent).join("/");
 
 const state = {
-  me: null, query: "", field: "all", offset: 0, limit: 20,
+  me: null, query: "", field: "all", group: "", offset: 0, limit: 20,
   mode: "scroll", page: 1, loading: false,
   groupTags: {},
   items: [], total: 0, hasMore: false, missingOnly: false,
@@ -483,7 +490,7 @@ async function search() {
   const requestOffset = state.mode === "pages"
     ? (state.page - 1) * state.limit : state.offset;
   const params = new URLSearchParams({
-    q: state.query, field: state.field,
+    q: state.query, field: state.field, group: state.group,
     offset: requestOffset, limit: state.limit,
   });
   if (state.missingOnly) params.set("missing_only", "true");
@@ -494,6 +501,7 @@ async function search() {
 
   state.offset = requestOffset;
   state.groupTags = data.group_tags || state.groupTags;
+  updateGroupFilter();
   state.items = append ? [...state.items, ...data.items] : data.items;
   state.total = data.total;
   state.hasMore = data.has_more;
@@ -524,6 +532,16 @@ async function search() {
   $("page-number").value = state.page;
   updateLoadControls();
   state.loading = false;
+}
+
+function updateGroupFilter() {
+  const select = $("group-filter");
+  const selected = state.group;
+  select.innerHTML = `<option value="">Tất cả group</option>` +
+    Object.keys(state.groupTags).sort().map((name) =>
+      `<option value="${esc(name)}">${esc(name)}</option>`).join("") +
+    `<option value="other">other</option>`;
+  select.value = selected;
 }
 
 function bindCards(grid) {
@@ -983,6 +1001,7 @@ $("q").oninput = (e) => {
   }, 200);
 };
 $("field").onchange = (e) => { state.field = e.target.value; resetResults(); };
+$("group-filter").onchange = (e) => { state.group = e.target.value; resetResults(); };
 $("btn-clear").onclick = () => {
   $("q").value = ""; state.query = "";
   state.missingOnly = false; $("btn-missing").textContent = "Chỉ xem nhóm này";
