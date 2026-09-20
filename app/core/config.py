@@ -81,11 +81,12 @@ def _env_json_list(key: str, default: list[str]) -> list[str]:
         raise ValueError(f"{key} must be a JSON array of domains")
     return value
 
-    def _env_bool(key: str, default: bool) -> bool:
-        raw = os.environ.get(key, None)
-        if raw is None:
-            return default
-        return str(raw).strip().lower() not in ("0", "false", "no", "")
+
+def _env_bool(key: str, default: bool) -> bool:
+    raw = os.environ.get(key, None)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() not in ("0", "false", "no", "")
 
 @dataclass(frozen=True)
 class Settings:
@@ -95,7 +96,7 @@ class Settings:
     users_file: Path | None = None
     page_size: int = 24
     image_ttl_s: float = 30.0
-        attach_images: bool = True
+    attach_images: bool = True
     group_tags: dict[str, str] = field(default_factory=dict)
     qwen_api_key: str = ""
     qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
@@ -144,8 +145,8 @@ def load_settings() -> Settings:
         ]),
         redis_url=_env("REDIS_URL"),
         database_url=_env("DATABASE_URL"),
-            image_ttl_s=float(_env("IMAGE_TTL_S", "30.0")),
-            attach_images=_env_bool("ATTACH_IMAGES", True),
+        image_ttl_s=float(_env("IMAGE_TTL_S", "30.0")),
+        attach_images=_env_bool("ATTACH_IMAGES", True),
     )
 
 
