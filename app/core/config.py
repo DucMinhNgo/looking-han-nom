@@ -95,6 +95,8 @@ class Settings:
     qwen_model: str = "qwen-vl-max"
     qwen_search_sites: list[str] = field(default_factory=list)
     redis_url: str = ""
+    # PostgreSQL — để trống khi không có DB (fallback về JSONL)
+    database_url: str = ""
 
     @property
     def users_path(self) -> Path:
@@ -134,6 +136,7 @@ def load_settings() -> Settings:
             "kaggle.com", "facebook.com", "github.com", "archive.org",
         ]),
         redis_url=_env("REDIS_URL"),
+        database_url=_env("DATABASE_URL"),
     )
 
 

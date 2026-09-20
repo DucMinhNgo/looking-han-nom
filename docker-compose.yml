@@ -1,77 +1,125 @@
-# Tra cứu Hán-Nôm — one service, no database.
+# Tra cứu Hán-Nôm — full stack với PostgreSQL, pgAdmin và Nginx.
 #
 #   docker compose up -d --build
-#   docker compose logs -f lookup
 #
-# Out of the box this serves the 10-item sample, so the app is usable the
-# moment it starts. Point the ./sample mount at your own folder when you have
-# one: adding rows or pictures afterwards needs no restart.
+# Sau khi stack chạy, import dữ liệu:
+#   docker compose exec lookup python scripts/import_jsonl.py /srv/src/dataset.jsonl
+#
+# Truy cập:
+#   http://localhost          → App tra cứu
+#   http://localhost/pgadmin  → pgAdmin 4
 
 services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:-hannom}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hannom_secret}
+      POSTGRES_DB:       ${POSTGRES_DB:-hannom}
+    volumes:
+      # Data volume — giữ dữ liệu khi restart container
+      - postgres_data:/var/lib/postgresql/data
+      # Init script — chạy một lần khi volume mới được tạo
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      # Expose ra host để kết nối trực tiếp từ tool ngoài Docker (tùy chọn)
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hannom} -d ${POSTGRES_DB:-hannom}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── pgAdmin 4 ───────────────────────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL:    ${PGADMIN_EMAIL:-admin@hannom.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      # Serve tại /pgadmin để Nginx proxy đúng path
+      SCRIPT_NAME: /pgadmin
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    # Không expose ra ngoài trực tiếp — truy cập qua Nginx
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Redis cache ─────────────────────────────────────────────────────────────
+  cache:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save "" --appendonly no --maxmemory 512mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── FastAPI lookup app ──────────────────────────────────────────────────────
   lookup:
     build:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
+      postgres:
+        condition: service_healthy
       cache:
         condition: service_healthy
 
     env_file: .env
-    # env_file:
-    #   # Generate it with:  python -m app.cli --init-env
-    #   #
-    #   # required: false so `docker compose up` still starts without it — the
-    #   # app then prints exactly which keys are missing, which is a far better
-    #   # first experience than Compose refusing to read its own file.
-    #   - path: .env
-    #     required: false
 
-    # Pinned here rather than left to .env: these are the paths *inside* the
-    # container, and a .env written for running without Docker would otherwise
-    # point the app at host paths that do not exist in here.
     environment:
-      DATA_DIR: /data
-      DATASET_PATH: /srv/src/dataset.jsonl
-      IMAGES_DIR: /srv/src
-      USERS_PATH: /srv/src/users.json
+      DATA_DIR:      /data
+      DATASET_PATH:  /srv/src/dataset.jsonl
+      IMAGES_DIR:    /srv/src
+      USERS_PATH:    /srv/src/users.json
       GROUP_TAGS_JSON: '{"group1":"549457308456387","group2":"322453387859386"}'
-      # Optional. Without it, the Qwen button reports that no key is configured.
-      QWEN_API_KEY: ${QWEN_API_KEY:-}
-      QWEN_BASE_URL: ${QWEN_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
-      QWEN_MODEL: ${QWEN_MODEL:-qwen-vl-max}
-      # Optional extra focused domains; general web search always runs.
-      QWEN_SEARCH_SITES_JSON: '${QWEN_SEARCH_SITES_JSON:-[]}'
+
+      # PostgreSQL
+      DATABASE_URL: postgresql://${POSTGRES_USER:-hannom}:${POSTGRES_PASSWORD:-hannom_secret}@postgres:5432/${POSTGRES_DB:-hannom}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB:   ${POSTGRES_DB:-hannom}
+      POSTGRES_USER: ${POSTGRES_USER:-hannom}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hannom_secret}
+
+      # Redis
       REDIS_URL: ${REDIS_URL:-redis://cache:6379/0}
 
-    # Bound to loopback: a reverse proxy terminates TLS for the public domain
-    # and forwards here.
-    ports:
-      - "9080:8000"
+      # Qwen (optional)
+      QWEN_API_KEY:          ${QWEN_API_KEY:-}
+      QWEN_BASE_URL:         ${QWEN_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      QWEN_MODEL:            ${QWEN_MODEL:-qwen-vl-max}
+      QWEN_SEARCH_SITES_JSON: '${QWEN_SEARCH_SITES_JSON:-[]}'
 
     volumes:
-      # Accounts live here and must survive a container replacement.
       - ./data:/data
       - /media:/media
       - /media/khtn/hdd/crawling:/srv/src
+      # Script import chạy từ trong container
+      - ./scripts:/srv/scripts:ro
 
-      # The dataset and the pictures. Point this at your own folder; it needs
-      # a dataset.jsonl and an images/ beside it.
-      #
-      # NOT read-only: admins can add rows and pictures through the web, which
-      # rewrites dataset.jsonl and writes into images/. Add `:ro` back if you
-      # want a strictly read-only deployment — the upload buttons will then
-      # fail with a message saying exactly that.
-      #
-      # A DIRECTORY on purpose, never `- ./sample/dataset.jsonl:/srv/src/...`.
-      # Bind-mounting a single file pins its inode, so an editor that saves by
-      # writing a temp file and renaming it over the original leaves the
-      # container staring at the old content until it is recreated. Mounting
-      # the folder has no such trap: adding, editing and replacing all show up.
-      #
-      # Set DATA_SOURCE in .env to point somewhere else without editing this
-      # file:  DATA_SOURCE=D:/du-lieu-han-nom
-      # - ${DATA_SOURCE:-./sample}:/srv/src
+    # Không expose trực tiếp — traffic đến qua Nginx
+    # Bỏ comment dòng dưới nếu cần debug trực tiếp:
+    # ports:
+    #   - "9080:8000"
 
     deploy:
       resources:
@@ -84,12 +132,29 @@ services:
         max-size: "10m"
         max-file: "5"
 
-  cache:
-    image: redis:7-alpine
+  # ── Nginx reverse proxy ─────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
     restart: unless-stopped
-    command: redis-server --save "" --appendonly no --maxmemory 512mb --maxmemory-policy allkeys-lru
+    depends_on:
+      - lookup
+      - pgadmin
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
+      test: ["CMD", "wget", "-qO-", "http://localhost/nginx-health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# ── Volumes ──────────────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+  pgadmin_data:

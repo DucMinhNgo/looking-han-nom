@@ -388,3 +388,4 @@ python -m pytest
 ```
 
 161 test, không cần Docker, không cần dữ liệu thật.
+docker compose exec lookup python scripts/import_users.py
