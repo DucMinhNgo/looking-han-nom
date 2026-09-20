@@ -89,11 +89,13 @@
   .grid {
     display: grid; gap: 0.9rem;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    align-items: stretch;
   }
   .item {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: 10px; overflow: hidden;
-    display: flex; flex-direction: column; transition: box-shadow .15s ease;
+    min-width: 0; display: flex; flex-direction: column;
+    transition: box-shadow .15s ease;
   }
   .item:hover { box-shadow: var(--shadow); }
   .item.noimg { border-style: dashed; border-color: var(--warning); }
@@ -107,19 +109,21 @@
                                           var(--plane) 7px, var(--plane) 14px);
     color: var(--ink-2); font-size: 0.8rem; text-align: center; padding: 1rem;
   }
-  .meta { padding: 0.65rem 0.75rem; display: flex; flex-direction: column; gap: 0.45rem; }
+  .meta { flex: 1; min-width: 0; padding: 0.65rem 0.75rem;
+          display: flex; flex-direction: column; gap: 0.45rem; }
   .gt {
     font-size: 1rem; line-height: 1.85; white-space: pre-wrap;
     font-family: "Noto Serif CJK TC", "Source Han Serif", "MS Mincho", serif;
-    max-height: 9rem; overflow-y: auto;
+    height: 7.4rem; overflow-y: auto;
   }
     .cap { font-size: 0.82rem; color: var(--ink-2); line-height: 1.5;
      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-     min-width: 0; }
+         min-width: 0; min-height: 1.23rem; }
     .thumb-missing code { display: block; max-width: 100%; overflow: hidden;
         white-space: nowrap; text-overflow: ellipsis; }
     .foot { display: flex; gap: 0.4rem; align-items: center; flex-wrap: nowrap;
-      min-width: 0; overflow: hidden; font-size: 0.7rem; color: var(--muted); }
+        min-width: 0; overflow: hidden; margin-top: auto;
+        font-size: 0.7rem; color: var(--muted); }
     .foot > span:not(.spacer), .foot > a, .foot > button { flex: none; }
     .foot .postlink { flex: 1 1 auto; min-width: 0; }
   .pill {
