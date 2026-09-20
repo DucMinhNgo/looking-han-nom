@@ -103,11 +103,26 @@ class Runtime:
         # immediately. This keeps behaviour safe: items will report no image.
         if not self.settings.attach_images:
             # Build a minimal MatchReport reflecting dataset size
+            # However, rows that carry a public filesystem path should be usable
+            # immediately: mark them as having an image so the UI will render the
+            # external URL without waiting for attach. We do this regardless of
+            # attach setting so public paths are always usable.
+            prefix = (self.settings.public_fs_prefix or "").replace('\\', '/')
+            for item in self.dataset.items:
+                try:
+                    raw = str(item.image or "").strip().replace('\\', '/')
+                except Exception:
+                    raw = ""
+                if raw and prefix and (raw.startswith(prefix) or raw.startswith(prefix.lstrip('/'))):
+                    item.image_name = raw
+                    item.has_image = True
+                    item.siblings = []
+
             items_len = len(self.dataset.items)
             report = MatchReport(
                 scanned=0,
-                matched=0,
-                rows_without_image=items_len,
+                matched=sum(1 for it in self.dataset.items if it.has_image),
+                rows_without_image=sum(1 for it in self.dataset.items if not it.has_image),
                 sibling_images=0,
                 orphan_images=[],
                 scanned_at=0.0,
