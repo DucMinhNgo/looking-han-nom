@@ -735,7 +735,10 @@ function openDetail(i, editing = false, showing = null) {
         <span class="muted" id="qwen-status" style="font-size:0.75rem"></span>
         <textarea id="qwen-text" class="block-edit" rows="8"
                   placeholder="Kết quả Qwen sẽ hiện ở đây…"></textarea>
-        ${isAdmin() ? `<button id="qwen-apply" class="primary">Autofill Ground truth</button>` : ""}
+        <div class="row" style="margin-top:0.4rem">
+          <button id="qwen-copy">Copy kết quả Qwen</button>
+          ${isAdmin() ? `<button id="qwen-apply" class="primary">Autofill Ground truth</button>` : ""}
+        </div>
         <div id="qwen-results"></div>
       </div>
       <p class="muted" style="font-size:0.72rem; margin-top:0.7rem">← → chuyển ảnh · Esc đóng</p>
@@ -747,6 +750,15 @@ function openDetail(i, editing = false, showing = null) {
     try { await navigator.clipboard.writeText(item.ground_truth || ""); copy.textContent = "Đã chép"; }
     catch { copy.textContent = "Không chép được"; }
     setTimeout(() => { copy.textContent = "Chép ground truth"; }, 1500);
+  };
+
+  const qwenCopy = $("qwen-copy");
+  if (qwenCopy) qwenCopy.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText($("qwen-text").value);
+      qwenCopy.textContent = "Đã copy";
+    } catch { qwenCopy.textContent = "Không copy được"; }
+    setTimeout(() => { qwenCopy.textContent = "Copy kết quả Qwen"; }, 1500);
   };
 
   $("qwen-analyze").onclick = async () => {

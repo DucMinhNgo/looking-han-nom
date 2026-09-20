@@ -75,9 +75,12 @@ def _page_match(url: str, text: str) -> dict[str, str | int | bool]:
         return {"found_in_page": False, "snippet": ""}
 
 
-def _reference_search(text: str, item, limit: int = 20) -> list[dict[str, str]]:
-    """Search exact text and Facebook-specific variants, keeping every hit."""
-    queries = [f'"{text}"', text, f'site:facebook.com "{text}"']
+def _reference_search(
+    text: str, item, search_sites: list[str], limit: int = 20
+) -> list[dict[str, str]]:
+    """Search the whole web, then configured domains as extra focused queries."""
+    queries = [f'"{text}"', text]
+    queries.extend(f'site:{site} "{text}"' for site in search_sites)
     if item.caption and item.caption != text:
         queries.append(f'site:facebook.com "{item.caption[:180]}"')
     results: list[dict[str, str]] = []
@@ -94,17 +97,8 @@ def _reference_search(text: str, item, limit: int = 20) -> list[dict[str, str]]:
                     result["url"] = result["url"].split("#", 1)[0] + "#:~:text=" + quote(text)
                 results.append(result)
                 seen.add(result["url"])
-            if len(results) >= limit:
-                return results
-    fallback_links = [
-        ("Tìm trên Google", "https://www.google.com/search?q=" + quote_plus(text)),
-        ("Tìm trên Bing", "https://www.bing.com/search?q=" + quote_plus(text)),
-        ("Tìm trên DuckDuckGo", "https://duckduckgo.com/?q=" + quote_plus(text)),
-        ("Tìm trên Facebook", "https://www.facebook.com/search/posts/?q=" + quote_plus(text)),
-    ]
-    for title, url in fallback_links:
-        if url not in seen:
-            results.append({"title": title, "url": url})
+            # Keep collecting so the per-line image-search links are also
+            # included after concrete web pages.
     return results
 
 
@@ -152,7 +146,9 @@ async def analyze(request: Request, user: dict = Depends(current_user)):
         lines = _json_answer(response.choices[0].message.content or "{}")
         for line in lines:
             text = str(line.get("text", "")).strip()
-            line["sources"] = _reference_search(text, item) if text else []
+            line["sources"] = _reference_search(
+                text, item, settings.qwen_search_sites
+            ) if text else []
         return {"enabled": True, "lines": lines, "image": str(resolved)}
     except Exception as exc:
         raise HTTPException(502, f"Qwen/search failed: {exc}") from exc

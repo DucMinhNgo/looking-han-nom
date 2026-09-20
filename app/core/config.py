@@ -69,6 +69,19 @@ def _env_json_map(key: str, default: dict[str, str]) -> dict[str, str]:
     return value
 
 
+def _env_json_list(key: str, default: list[str]) -> list[str]:
+    raw = _env(key)
+    if not raw:
+        return default
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError:
+        raise ValueError(f"{key} must be a JSON array") from None
+    if not isinstance(value, list) or not all(isinstance(site, str) for site in value):
+        raise ValueError(f"{key} must be a JSON array of domains")
+    return value
+
+
 @dataclass(frozen=True)
 class Settings:
     data_dir: Path = Path("/data")
@@ -80,6 +93,7 @@ class Settings:
     qwen_api_key: str = ""
     qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     qwen_model: str = "qwen-vl-max"
+    qwen_search_sites: list[str] = field(default_factory=list)
 
     @property
     def users_path(self) -> Path:
@@ -114,6 +128,10 @@ def load_settings() -> Settings:
             "https://dashscope.aliyuncs.com/compatible-mode/v1",
         ),
         qwen_model=_env("QWEN_MODEL", "qwen-vl-max"),
+        # Optional focused domains; the general web search always runs too.
+        qwen_search_sites=_env_json_list("QWEN_SEARCH_SITES_JSON", [
+            "kaggle.com", "facebook.com", "github.com", "archive.org",
+        ]),
     )
 
 

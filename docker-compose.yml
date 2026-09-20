@@ -37,6 +37,8 @@ services:
       QWEN_API_KEY: ${QWEN_API_KEY:-}
       QWEN_BASE_URL: ${QWEN_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
       QWEN_MODEL: ${QWEN_MODEL:-qwen-vl-max}
+      # Optional extra focused domains; general web search always runs.
+      QWEN_SEARCH_SITES_JSON: '${QWEN_SEARCH_SITES_JSON:-[]}'
 
     # Bound to loopback: a reverse proxy terminates TLS for the public domain
     # and forwards here.
