@@ -493,7 +493,7 @@ const isAdmin = () => !!state.me && state.me.role === "admin";
 // through the app. Adjust `PUBLIC_FS_PREFIX` / `PUBLIC_URL_BASE` if your setup
 // differs.
 const PUBLIC_FS_PREFIX = "/media/khtn/hdd/crawling";
-const PUBLIC_URL_BASE = "https://kimhannom.clc.hcmus.edu.vn";
+const PUBLIC_URL_BASE = "https://kimhannom.clc.hcmus.edu.vn/crawling";
 const imgSrc = (name) => {
   const s = String(name || "").replaceAll('\\\\', '/');
   if (!s) return "/img/";

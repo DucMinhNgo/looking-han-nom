@@ -103,7 +103,7 @@ class Settings:
     # `public_url_base` to the public base URL. When a dataset row carries a
     # path starting with the prefix, the UI will map it to the public URL.
     public_fs_prefix: str = "/media/khtn/hdd/crawling"
-    public_url_base: str = "https://kimhannom.clc.hcmus.edu.vn"
+    public_url_base: str = "https://kimhannom.clc.hcmus.edu.vn/crawling"
     qwen_api_key: str = ""
     qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     qwen_model: str = "qwen-vl-max"
@@ -154,7 +154,7 @@ def load_settings() -> Settings:
         image_ttl_s=float(_env("IMAGE_TTL_S", "30.0")),
         attach_images=_env_bool("ATTACH_IMAGES", True),
         public_fs_prefix=_env("PUBLIC_FS_PREFIX", "/media/khtn/hdd/crawling"),
-        public_url_base=_env("PUBLIC_URL_BASE", "https://kimhannom.clc.hcmus.edu.vn"),
+        public_url_base=_env("PUBLIC_URL_BASE", "https://kimhannom.clc.hcmus.edu.vn/crawling"),
     )
 
 
