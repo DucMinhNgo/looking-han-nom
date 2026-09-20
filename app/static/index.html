@@ -211,6 +211,8 @@
                     border: 1px solid var(--border); cursor: zoom-in; }
   .verified-tag { color: var(--good-text); border-color: var(--good-text); }
   .unverified-tag { color: var(--warning); border-color: var(--warning); }
+  .click-tag { cursor: pointer; }
+  .click-tag:hover { filter: brightness(0.9); }
   .verify-history { margin-top: 0.45rem; max-height: 8rem; overflow-y: auto;
                     font-size: 0.74rem; color: var(--ink-2); }
   .verify-history div { padding: 0.2rem 0; border-top: 1px solid var(--border); }
@@ -219,6 +221,8 @@
                   font-family: "Noto Serif CJK TC", "Source Han Serif", serif;
                   line-height: 1.8; }
   .diff-preview .different { color: var(--critical); background: color-mix(in srgb, var(--critical) 16%, transparent); }
+  .diff-preview .different { cursor: pointer; text-decoration: underline dotted; }
+  .diff-preview .different:hover { background: var(--critical); color: #fff; }
   .similarity { font-weight: 700; }
   .similarity.low { color: var(--critical); }
   .similarity.high { color: var(--good-text); }
@@ -489,6 +493,50 @@ function persistView() {
   } catch {}
 }
 
+const pageCache = (() => {
+  let database;
+  function open() {
+    if (database) return database;
+    database = new Promise((resolve, reject) => {
+      const request = indexedDB.open("hannom-cache", 1);
+      request.onupgradeneeded = () => request.result.createObjectStore("pages");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    return database;
+  }
+  return {
+    async get(key) {
+      try {
+        const db = await open();
+        return await new Promise((resolve, reject) => {
+          const request = db.transaction("pages").objectStore("pages").get(key);
+          request.onsuccess = () => resolve(request.result || null);
+          request.onerror = () => reject(request.error);
+        });
+      } catch { return null; }
+    },
+    async set(key, value) {
+      try {
+        const db = await open();
+        await new Promise((resolve, reject) => {
+          const request = db.transaction("pages", "readwrite").objectStore("pages").put(value, key);
+          request.onsuccess = resolve;
+          request.onerror = () => reject(request.error);
+        });
+      } catch {}
+    },
+  };
+})();
+
+function pageCacheKey(offset) {
+  return JSON.stringify({
+    q: state.query, field: state.field, group: state.group,
+    verified: state.verifyFilter, missing: state.missingOnly,
+    offset, limit: state.limit,
+  });
+}
+
 function renderComparison(groundTruth, qwenText) {
   const target = $("qwen-comparison");
   if (!target) return;
@@ -511,6 +559,7 @@ function renderComparison(groundTruth, qwenText) {
   const similarity = Math.round((1 - distance / Math.max(gt.length, qwen.length, 1)) * 100);
   const cls = similarity >= 90 ? "high" : similarity < 70 ? "low" : "";
   const differentIndexes = new Set();
+  const replacements = new Map();
   let row = gt.length;
   let column = qwen.length;
   while (row || column) {
@@ -518,7 +567,9 @@ function renderComparison(groundTruth, qwenText) {
         matrix[row][column] === matrix[row - 1][column - 1]) {
       row--; column--;
     } else if (row && column && matrix[row][column] === matrix[row - 1][column - 1] + 1) {
-      differentIndexes.add(row - 1); row--; column--;
+      differentIndexes.add(row - 1);
+      replacements.set(row - 1, qwen[column - 1]);
+      row--; column--;
     } else if (row && matrix[row][column] === matrix[row - 1][column] + 1) {
       differentIndexes.add(row - 1); row--;
     } else {
@@ -528,11 +579,34 @@ function renderComparison(groundTruth, qwenText) {
   let html = "";
   for (let index = 0; index < gt.length; index++) {
     const different = differentIndexes.has(index);
-    html += different ? `<span class="different">${esc(gt[index])}</span>` : esc(gt[index]);
+    html += different
+      ? `<span class="different" data-diff-index="${index}" title="Bấm để thay bằng ký tự Qwen">${esc(gt[index])}</span>`
+      : esc(gt[index]);
   }
   target.innerHTML = `<div class="similarity ${cls}">Khớp Qwen: ${similarity}%</div>` +
     `<div>${html || "(Ground truth trống)"}</div>` +
     (qwen.length > gt.length ? `<div class="muted">Qwen có thêm: ${esc(qwen.slice(gt.length))}</div>` : "");
+  target.querySelectorAll("[data-diff-index]").forEach((element) => {
+    element.onclick = () => {
+      const index = Number(element.dataset.diffIndex);
+      const replacement = replacements.get(index);
+      if (replacement === undefined) return;
+      const update = (box) => {
+        const chars = Array.from(box.value);
+        chars[index] = replacement;
+        box.value = chars.join("");
+        box.dispatchEvent(new Event("input"));
+        box.focus();
+      };
+      if (!$("gt-edit")) {
+        const qwenValue = $("qwen-text")?.value || qwen;
+        const currentIndex = state.current?.index;
+        if (currentIndex !== undefined) openDetail(currentIndex, true);
+        if ($("qwen-text")) $("qwen-text").value = qwenValue;
+      }
+      if ($("gt-edit")) update($("gt-edit"));
+    };
+  });
 }
 
 const fmt = (n) => (n === null || n === undefined) ? "—" : Number(n).toLocaleString("vi-VN");
@@ -580,22 +654,7 @@ function highlight(text, needle) {
 }
 
 /* ---------------- search ---------------- */
-async function search() {
-  if (state.loading) return;
-  state.loading = true;
-  const append = state.mode === "scroll" && state.offset > 0;
-  const requestOffset = state.mode === "pages"
-    ? (state.page - 1) * state.limit : state.offset;
-  const params = new URLSearchParams({
-    q: state.query, field: state.field, group: state.group, verified: state.verifyFilter,
-    offset: requestOffset, limit: state.limit,
-  });
-  if (state.missingOnly) params.set("missing_only", "true");
-
-  let data;
-  try { data = await api(`/api/lookup?${params}`); }
-  catch { state.loading = false; return; }
-
+function renderLookupData(data, append, requestOffset) {
   state.offset = requestOffset;
   persistView();
   state.groupTags = data.group_tags || state.groupTags;
@@ -628,8 +687,33 @@ async function search() {
     `${fmt(from)}–${fmt(to)} trên ${fmt(data.total)}` +
     (state.missingOnly ? " · chỉ dòng thiếu ảnh" : "");
   $("page-number").value = state.page;
-  state.loading = false;
   updateLoadControls();
+}
+
+async function search() {
+  if (state.loading) return;
+  state.loading = true;
+  const append = state.mode === "scroll" && state.offset > 0;
+  const requestOffset = state.mode === "pages"
+    ? (state.page - 1) * state.limit : state.offset;
+  const cacheKey = pageCacheKey(requestOffset);
+  const cached = await pageCache.get(cacheKey);
+  if (cached) {
+    renderLookupData(cached, append, requestOffset);
+    state.loading = false;
+  }
+  const params = new URLSearchParams({
+    q: state.query, field: state.field, group: state.group, verified: state.verifyFilter,
+    offset: requestOffset, limit: state.limit,
+  });
+  if (state.missingOnly) params.set("missing_only", "true");
+
+  let data;
+  try { data = await api(`/api/lookup?${params}`); }
+  catch { state.loading = false; return; }
+  await pageCache.set(cacheKey, data);
+  renderLookupData(data, append, requestOffset);
+  state.loading = false;
 }
 
 function updateGroupFilter() {
@@ -726,7 +810,7 @@ function card(item, i) {
   const groupTag = groupKey && groupId
     ? `<a class="group-tag" href="https://www.facebook.com/groups/${encodeURIComponent(groupId)}/"
          target="_blank" rel="noopener" title="${esc(groupKey + ":" + groupId)}">${esc(groupKey + ":" + groupId)}</a>`
-    : `<span class="pill">other</span>`;
+    : `<span class="pill click-tag" data-open="${i}">other</span>`;
 
   return `
     <div class="item ${item.has_image ? "" : "noimg"}">
@@ -736,10 +820,10 @@ function card(item, i) {
         <div class="foot">
           ${item.has_image ? "" : `<span class="pill miss">thiếu ảnh</span>`}
           ${item.verified
-            ? `<span class="pill verified-tag" title="${esc(item.verified_at || "")}">
+            ? `<span class="pill click-tag verified-tag" data-open="${i}" title="${esc(item.verified_at || "")}">
                  Đã verify${item.verified_by ? ` · ${esc(item.verified_by)}` : ""}
                </span>`
-            : `<span class="pill unverified-tag">Chưa verify</span>`}
+            : `<span class="pill click-tag unverified-tag" data-open="${i}">Chưa verify</span>`}
           ${item.siblings && item.siblings.length
             ? `<span class="pill more" data-open="${i}"
                      title="Post này còn ${item.siblings.length} ảnh nữa">+${
