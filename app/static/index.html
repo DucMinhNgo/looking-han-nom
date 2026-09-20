@@ -210,6 +210,10 @@
                     margin-top: 0.35rem; object-fit: contain; object-position: left;
                     border: 1px solid var(--border); cursor: zoom-in; }
   .verified-tag { color: var(--good-text); border-color: var(--good-text); }
+  .unverified-tag { color: var(--warning); border-color: var(--warning); }
+  .verify-history { margin-top: 0.45rem; max-height: 8rem; overflow-y: auto;
+                    font-size: 0.74rem; color: var(--ink-2); }
+  .verify-history div { padding: 0.2rem 0; border-top: 1px solid var(--border); }
   textarea.block-edit { width: 100%; box-sizing: border-box; resize: vertical;
                         line-height: 1.7; }
   .pill.more { cursor: pointer; background: var(--plane); color: var(--ink-2);
@@ -642,7 +646,11 @@ function card(item, i) {
         ${gt}${cap}
         <div class="foot">
           ${item.has_image ? "" : `<span class="pill miss">thiếu ảnh</span>`}
-          ${item.verified ? `<span class="pill verified-tag">Đã verify</span>` : ""}
+          ${item.verified
+            ? `<span class="pill verified-tag" title="${esc(item.verified_at || "")}">
+                 Đã verify${item.verified_by ? ` · ${esc(item.verified_by)}` : ""}
+               </span>`
+            : `<span class="pill unverified-tag">Chưa verify</span>`}
           ${item.siblings && item.siblings.length
             ? `<span class="pill more" data-open="${i}"
                      title="Post này còn ${item.siblings.length} ảnh nữa">+${
@@ -713,6 +721,20 @@ function openDetail(i, editing = false, showing = null) {
       </div>
       <dl class="kv">
         <dt>Dòng số</dt><dd>${item.index + 1}</dd>
+        <dt>Kết quả cuối</dt><dd><span class="pill ${item.verified ? "verified-tag" : "unverified-tag"}">
+          ${item.verified
+            ? `Đã verify bởi ${esc(item.verified_by || "không rõ")}${item.verified_at ? ` · ${esc(item.verified_at)}` : ""}`
+            : `Chưa verify${item.verified_by ? ` · lần cuối bởi ${esc(item.verified_by)}` : ""}`}
+        </span></dd>
+        <dt>Lịch sử verify</dt><dd><div class="verify-history">
+          ${(item.verify_history || []).length
+            ? item.verify_history.slice().reverse().map((entry) => `
+                <div><span class="pill ${entry.verified ? "verified-tag" : "unverified-tag"}">
+                  ${entry.verified ? "Verify" : "Bỏ verify"}
+                </span> ${esc(entry.username || "?")} · ${esc(entry.at || "")}</div>
+              `).join("")
+            : "Chưa có lịch sử"}
+        </div></dd>
         ${gallery.length > 1
           ? `<dt>Ảnh của post</dt><dd>${gallery.length} tấm: ${
                gallery.map((n) => esc(n.split("/").pop())).join(", ")}</dd>` : ""}
@@ -730,7 +752,7 @@ function openDetail(i, editing = false, showing = null) {
           ? `<button class="primary" id="gt-open">Chỉnh ground truth</button>` : ""}
         <button id="lb-copy">Chép ground truth</button>
         ${isAdmin()
-          ? `<button id="verify-row" class="${item.verified ? "verified-tag" : ""}">
+          ? `<button id="verify-row" class="${item.verified ? "verified-tag" : "unverified-tag"}">
                ${item.verified ? "Bỏ verify" : "Verify"}</button>` : ""}
       </div>
       <div class="qwen-box">
@@ -764,6 +786,19 @@ function openDetail(i, editing = false, showing = null) {
     setTimeout(() => { qwenCopy.textContent = "Copy kết quả Qwen"; }, 1500);
   };
 
+  const applyQwen = $("qwen-apply");
+  if (applyQwen) applyQwen.onclick = () => {
+    const currentQwenText = $("qwen-text").value.trim();
+    if (!$('gt-edit')) {
+      openDetail(state.items.findIndex((row) => row.index === item.index), true);
+    }
+    if ($('gt-edit')) {
+      $('gt-edit').value = currentQwenText;
+      $('gt-edit').focus();
+      if ($('qwen-apply')) $('qwen-apply').textContent = "Đã autofill, bấm Lưu để ghi";
+    }
+  };
+
   $("qwen-analyze").onclick = async () => {
     const button = $("qwen-analyze");
     button.disabled = true;
@@ -793,18 +828,6 @@ function openDetail(i, editing = false, showing = null) {
                 ).join("") || `<span class="muted">Không tìm thấy nguồn tham khảo.</span>`}
               </div>`).join("")
           : `<span class="muted">Qwen không nhận diện được dòng chữ.</span>`;
-        const apply = $("qwen-apply");
-        if (apply) apply.onclick = async () => {
-          const currentQwenText = $("qwen-text").value.trim();
-          if (!$('gt-edit')) {
-            openDetail(state.items.findIndex((row) => row.index === item.index), true);
-          }
-          if ($('gt-edit')) {
-            $('gt-edit').value = currentQwenText;
-            $('gt-edit').focus();
-            apply.textContent = "Đã autofill, bấm Lưu để ghi";
-          }
-        };
       }
     } catch (error) { $("qwen-status").textContent = error.message; }
     button.disabled = false;
@@ -820,6 +843,9 @@ function openDetail(i, editing = false, showing = null) {
     try {
       const result = await api("/api/data/verify", { method: "POST", body: form });
       item.verified = result.verified;
+      item.verified_by = result.verified_by;
+      item.verified_at = result.verified_at;
+      item.verify_history = result.verify_history || item.verify_history || [];
       await loadStats();
       openDetail(i, editing, shown);
     } catch (error) { verify.disabled = false; verify.textContent = error.message; }

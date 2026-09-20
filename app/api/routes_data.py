@@ -347,11 +347,19 @@ async def verify_row(
         here = str(rows[index].get("image") or "")
         if expect_image and basename(here).lower() != basename(expect_image).lower():
             raise HTTPException(409, "Dataset changed underneath this page. Reload and try again.")
+        verified_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        history = rows[index].get("verify_history", [])
+        if not isinstance(history, list):
+            history = []
+        history.append({
+            "verified": bool(verified),
+            "username": user["username"],
+            "at": verified_at,
+        })
+        rows[index]["verify_history"] = history
         rows[index]["verified"] = bool(verified)
-        rows[index]["verified_by"] = user["username"] if verified else ""
-        rows[index]["verified_at"] = (
-            datetime.now(timezone.utc).isoformat(timespec="seconds") if verified else ""
-        )
+        rows[index]["verified_by"] = user["username"]
+        rows[index]["verified_at"] = verified_at
         saved = ingest.backup(path, runtime.settings.backups_dir)
         try:
             ingest.write_dataset(path, rows)
@@ -362,6 +370,7 @@ async def verify_row(
         "changed": True, "index": index, "verified": bool(verified),
         "verified_by": rows[index]["verified_by"],
         "verified_at": rows[index]["verified_at"],
+        "verify_history": rows[index]["verify_history"],
         "backup": saved.name if saved else None,
     }
 

@@ -106,4 +106,5 @@ class Item:
             "verified": bool(self.extra.get("verified", False)),
             "verified_by": self.extra.get("verified_by", ""),
             "verified_at": self.extra.get("verified_at", ""),
+            "verify_history": self.extra.get("verify_history", []),
         }
