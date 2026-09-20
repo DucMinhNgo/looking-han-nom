@@ -24,6 +24,9 @@ CREATE TABLE IF NOT EXISTS dataset_items (
 
     -- Mọi cột bổ sung trong file JSONL (verified, verified_by, ...).
     extra         JSONB NOT NULL DEFAULT '{}',
+    -- Optional integer used to order items in the UI. Older DBs may lack
+    -- this column; the ALTER TABLE below ensures the column exists.
+    display_index INTEGER NULL,
 
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -69,6 +72,10 @@ DROP TRIGGER IF EXISTS trg_dataset_updated_at ON dataset_items;
 CREATE TRIGGER trg_dataset_updated_at
     BEFORE UPDATE ON dataset_items
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ─── Backwards-compatible migration: add `display_index` if missing ────────
+ALTER TABLE dataset_items
+    ADD COLUMN IF NOT EXISTS display_index INTEGER;
 
 -- ─── Users table ──────────────────────────────────────────────────────────────
 -- Lưu tài khoản reviewer và admin.
