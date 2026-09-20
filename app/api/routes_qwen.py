@@ -75,31 +75,29 @@ def _page_match(url: str, text: str) -> dict[str, str | int | bool]:
         return {"found_in_page": False, "snippet": ""}
 
 
+def _image_search(text: str) -> dict[str, str] | None:
+    """Return one direct image URL, rather than a search-results URL."""
+    try:
+        request = UrlRequest(
+            "https://www.bing.com/images/search?q=" + quote_plus(text),
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        html = urlopen(request, timeout=10).read().decode("utf-8", "ignore")
+        match = re.search(r'"murl":"(https?://.+?)"', html)
+        if not match:
+            return None
+        image_url = bytes(match.group(1), "utf-8").decode("unicode_escape")
+        return {"title": "Ảnh tham khảo trực tiếp", "url": image_url, "image_url": image_url}
+    except Exception:
+        return None
+
+
 def _reference_search(
     text: str, item, search_sites: list[str], limit: int = 20
 ) -> list[dict[str, str]]:
-    """Search the whole web, then configured domains as extra focused queries."""
-    queries = [f'"{text}"', text]
-    queries.extend(f'site:{site} "{text}"' for site in search_sites)
-    if item.caption and item.caption != text:
-        queries.append(f'site:facebook.com "{item.caption[:180]}"')
-    results: list[dict[str, str]] = []
-    seen: set[str] = set()
-    if item.post_url:
-        results.append({"title": "Bài viết trong dataset", "url": item.post_url})
-        seen.add(item.post_url)
-    for query in queries:
-        for result in _web_search(query):
-            if result["url"] not in seen:
-                result["query"] = query
-                result.update(_page_match(result["url"], text))
-                if result.get("found_in_page"):
-                    result["url"] = result["url"].split("#", 1)[0] + "#:~:text=" + quote(text)
-                results.append(result)
-                seen.add(result["url"])
-            # Keep collecting so the per-line image-search links are also
-            # included after concrete web pages.
-    return results
+    """Find one concrete image URL for this line, not a search page."""
+    result = _image_search(text)
+    return [result] if result else []
 
 
 @router.get("/status")
