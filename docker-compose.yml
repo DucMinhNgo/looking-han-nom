@@ -14,14 +14,15 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
 
-    env_file:
-      # Generate it with:  python -m app.cli --init-env
-      #
-      # required: false so `docker compose up` still starts without it — the
-      # app then prints exactly which keys are missing, which is a far better
-      # first experience than Compose refusing to read its own file.
-      - path: .env
-        required: false
+    env_file: .env
+    # env_file:
+    #   # Generate it with:  python -m app.cli --init-env
+    #   #
+    #   # required: false so `docker compose up` still starts without it — the
+    #   # app then prints exactly which keys are missing, which is a far better
+    #   # first experience than Compose refusing to read its own file.
+    #   - path: .env
+    #     required: false
 
     # Pinned here rather than left to .env: these are the paths *inside* the
     # container, and a .env written for running without Docker would otherwise
@@ -34,11 +35,13 @@ services:
     # Bound to loopback: a reverse proxy terminates TLS for the public domain
     # and forwards here.
     ports:
-      - "127.0.0.1:8000:8000"
+      - "9080:8000"
 
     volumes:
       # Accounts live here and must survive a container replacement.
       - ./data:/data
+      - /media:/media
+      - /media/khtn/hdd/crawling:/media/khtn/hdd/crawling:ro
 
       # The dataset and the pictures. Point this at your own folder; it needs
       # a dataset.jsonl and an images/ beside it.
@@ -56,7 +59,8 @@ services:
       #
       # Set DATA_SOURCE in .env to point somewhere else without editing this
       # file:  DATA_SOURCE=D:/du-lieu-han-nom
-      - ${DATA_SOURCE:-./sample}:/srv/src
+      # - ${DATA_SOURCE:-./sample}:/srv/src
+      - DATA_SOURCE=/media/khtn/hdd/crawling
 
     deploy:
       resources:

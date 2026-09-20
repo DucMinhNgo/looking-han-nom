@@ -19,3 +19,4 @@ __pycache__/
 coverage.xml
 .mypy_cache/
 .ruff_cache/
+sample/dataset2.jsonl

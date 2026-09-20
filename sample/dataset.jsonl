@@ -6,5 +6,6 @@
 {"image": "sample_06.jpg", "post_id": "https://www.facebook.com/permalink.php?story_fbid=27835489826093105&id=100000593113258", "caption": "Lục Du", "ground_truth": "山重水複疑無路\n柳暗花明又一村"}
 {"image": "sample_07.jpg", "post_id": "https://www.facebook.com/permalink.php?story_fbid=27835489826093106&id=100000593113258", "caption": "Chu Hy", "ground_truth": "問渠那得清如許\n為有源頭活水來"}
 {"image": "sample_08.jpg", "post_id": "https://www.facebook.com/permalink.php?story_fbid=27835489826093107&id=100000593113258", "caption": "Vương Duy", "ground_truth": "勸君更盡一杯酒\n西出陽關無故人"}
-{"image": "sample_09.jpg", "post_id": "https://www.facebook.com/permalink.php?story_fbid=27835489826093108&id=100000593113258", "caption": "Đằng Vương các tự", "ground_truth": "落霞與孤鶩齊飛\n秋水共長天一色"}
-{"image": "sample_10.jpg", "post_id": "https://www.facebook.com/permalink.php?story_fbid=27835489826093109&id=100000593113258", "caption": "Vương An Thạch — ảnh chưa copy sang", "ground_truth": "不畏浮雲遮望眼\n自緣身在最高層"}
+{"image": "/media/khtn/hdd/crawling/labs/group2/images/10003340783103883/1.jpg", "post_id": "https://www.facebook.com/permalink.php?story_fbid=27835489826093108&id=100000593113258", "caption": "Đằng Vương các tự", "ground_truth": "落霞與孤鶩齊飛\n秋水共長天一色"}
+{"image": "/media/khtn/hdd/crawling/data1/UzpfSTEwMDAwMDM2OTIxMDcyNTpWSzoyNzgzNjI2NTg0NjAxNTQ5OA__.png", "post_id": "https://www.facebook.com/groups/549457308456387/posts/27836265846015498/", "caption": "Vương An Thạch — ảnh chưa copy sang", "ground_truth": "不畏浮雲遮望眼\n自緣身在最高層"}
+
