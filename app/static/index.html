@@ -214,6 +214,14 @@
   .verify-history { margin-top: 0.45rem; max-height: 8rem; overflow-y: auto;
                     font-size: 0.74rem; color: var(--ink-2); }
   .verify-history div { padding: 0.2rem 0; border-top: 1px solid var(--border); }
+  .diff-preview { margin-top: 0.45rem; padding: 0.55rem 0.7rem; border: 1px solid var(--border);
+                  border-radius: 6px; background: var(--plane); white-space: pre-wrap;
+                  font-family: "Noto Serif CJK TC", "Source Han Serif", serif;
+                  line-height: 1.8; }
+  .diff-preview .different { color: var(--critical); background: color-mix(in srgb, var(--critical) 16%, transparent); }
+  .similarity { font-weight: 700; }
+  .similarity.low { color: var(--critical); }
+  .similarity.high { color: var(--good-text); }
   textarea.block-edit { width: 100%; box-sizing: border-box; resize: vertical;
                         line-height: 1.7; }
   .pill.more { cursor: pointer; background: var(--plane); color: var(--ink-2);
@@ -456,6 +464,67 @@ const state = {
   current: null, orphanOffset: 0,
 };
 
+try {
+  const savedView = JSON.parse(localStorage.getItem("hannom.view") || "{}");
+  for (const key of ["query", "field", "group", "mode", "limit", "page", "offset"])
+    if (savedView[key] !== undefined) state[key] = savedView[key];
+} catch {}
+
+function persistView() {
+  try {
+    localStorage.setItem("hannom.view", JSON.stringify({
+      query: state.query, field: state.field, group: state.group,
+      mode: state.mode, limit: state.limit, page: state.page, offset: state.offset,
+    }));
+  } catch {}
+}
+
+function renderComparison(groundTruth, qwenText) {
+  const target = $("qwen-comparison");
+  if (!target) return;
+  const gt = groundTruth || "";
+  const qwen = qwenText || "";
+  if (!gt && !qwen) { target.innerHTML = ""; return; }
+  const matrix = Array.from({ length: gt.length + 1 }, (_, row) =>
+    Array.from({ length: qwen.length + 1 }, (_, column) =>
+      row === 0 ? column : column === 0 ? row : 0));
+  for (let row = 1; row <= gt.length; row++) {
+    for (let column = 1; column <= qwen.length; column++) {
+      matrix[row][column] = Math.min(
+        matrix[row - 1][column] + 1,
+        matrix[row][column - 1] + 1,
+        matrix[row - 1][column - 1] + (gt[row - 1] === qwen[column - 1] ? 0 : 1),
+      );
+    }
+  }
+  const distance = matrix[gt.length][qwen.length];
+  const similarity = Math.round((1 - distance / Math.max(gt.length, qwen.length, 1)) * 100);
+  const cls = similarity >= 90 ? "high" : similarity < 70 ? "low" : "";
+  const differentIndexes = new Set();
+  let row = gt.length;
+  let column = qwen.length;
+  while (row || column) {
+    if (row && column && gt[row - 1] === qwen[column - 1] &&
+        matrix[row][column] === matrix[row - 1][column - 1]) {
+      row--; column--;
+    } else if (row && column && matrix[row][column] === matrix[row - 1][column - 1] + 1) {
+      differentIndexes.add(row - 1); row--; column--;
+    } else if (row && matrix[row][column] === matrix[row - 1][column] + 1) {
+      differentIndexes.add(row - 1); row--;
+    } else {
+      column--;
+    }
+  }
+  let html = "";
+  for (let index = 0; index < gt.length; index++) {
+    const different = differentIndexes.has(index);
+    html += different ? `<span class="different">${esc(gt[index])}</span>` : esc(gt[index]);
+  }
+  target.innerHTML = `<div class="similarity ${cls}">Khớp Qwen: ${similarity}%</div>` +
+    `<div>${html || "(Ground truth trống)"}</div>` +
+    (qwen.length > gt.length ? `<div class="muted">Qwen có thêm: ${esc(qwen.slice(gt.length))}</div>` : "");
+}
+
 const fmt = (n) => (n === null || n === undefined) ? "—" : Number(n).toLocaleString("vi-VN");
 const esc = (s) => { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; };
 
@@ -518,6 +587,7 @@ async function search() {
   catch { state.loading = false; return; }
 
   state.offset = requestOffset;
+  persistView();
   state.groupTags = data.group_tags || state.groupTags;
   updateGroupFilter();
   state.items = append ? [...state.items, ...data.items] : data.items;
@@ -571,6 +641,13 @@ function bindCards(grid) {
   });
 }
 
+function renderVisibleCards() {
+  const grid = $("results");
+  if (!grid || !state.items.length) return;
+  grid.innerHTML = state.items.map((item, index) => card(item, index)).join("");
+  bindCards(grid);
+}
+
 function updateLoadControls() {
   const pages = state.mode === "pages";
   $("page-number-label").classList.toggle("hide", !pages);
@@ -608,6 +685,7 @@ function resetResults() {
   state.offset = 0;
   state.page = 1;
   state.items = [];
+  persistView();
   $("results").innerHTML = "";
   search();
 }
@@ -616,6 +694,7 @@ function goToPage(page) {
   const lastPage = Math.max(1, Math.ceil(state.total / state.limit));
   state.page = Math.max(1, Math.min(page, lastPage));
   state.offset = (state.page - 1) * state.limit;
+  persistView();
   search();
 }
 
@@ -760,6 +839,7 @@ function openDetail(i, editing = false, showing = null) {
         <span class="muted" id="qwen-status" style="font-size:0.75rem"></span>
         <textarea id="qwen-text" class="block-edit" rows="8"
                   placeholder="Kết quả Qwen sẽ hiện ở đây…"></textarea>
+        <div id="qwen-comparison" class="diff-preview"></div>
         <div class="row" style="margin-top:0.4rem">
           <button id="qwen-copy">Copy kết quả Qwen</button>
           ${isAdmin() ? `<button id="qwen-apply" type="button" class="primary">Push vào Ground truth</button>` : ""}
@@ -786,6 +866,11 @@ function openDetail(i, editing = false, showing = null) {
     setTimeout(() => { qwenCopy.textContent = "Copy kết quả Qwen"; }, 1500);
   };
 
+  const qwenTextBox = $("qwen-text");
+  if (qwenTextBox) qwenTextBox.oninput = () => {
+    renderComparison($("gt-edit")?.value || item.ground_truth, qwenTextBox.value);
+  };
+
   const applyQwen = $("qwen-apply");
   if (applyQwen) applyQwen.onclick = () => {
     const currentQwenText = $("qwen-text").value.trim();
@@ -794,6 +879,8 @@ function openDetail(i, editing = false, showing = null) {
     }
     if ($('gt-edit')) {
       $('gt-edit').value = currentQwenText;
+      if ($('qwen-text')) $('qwen-text').value = currentQwenText;
+      renderComparison($('gt-edit').value, currentQwenText);
       $('gt-edit').focus();
       if ($('qwen-apply')) $('qwen-apply').textContent = "Đã autofill, bấm Lưu để ghi";
     }
@@ -814,6 +901,7 @@ function openDetail(i, editing = false, showing = null) {
         $("qwen-status").textContent = `${result.lines.length} dòng được nhận diện`;
         const qwenText = result.lines.map((line) => line.text || "").filter(Boolean).join("\n");
         $("qwen-text").value = qwenText;
+        renderComparison($("gt-edit")?.value || item.ground_truth, qwenText);
         $("qwen-results").innerHTML = result.lines.length
           ? result.lines.map((line) => `
               <div class="qwen-line">
@@ -840,6 +928,17 @@ function openDetail(i, editing = false, showing = null) {
     form.append("expect_image", item.image || "");
     form.append("verified", item.verified ? "false" : "true");
     verify.disabled = true;
+    const previous = {
+      verified: item.verified, verified_by: item.verified_by, verified_at: item.verified_at,
+      verify_history: item.verify_history,
+    };
+    item.verified = !item.verified;
+    item.verified_by = state.me.username;
+    item.verified_at = new Date().toISOString();
+    item.verify_history = [...(item.verify_history || []), {
+      verified: item.verified, username: state.me.username, at: item.verified_at,
+    }];
+    renderVisibleCards();
     try {
       const result = await api("/api/data/verify", { method: "POST", body: form });
       item.verified = result.verified;
@@ -848,7 +947,11 @@ function openDetail(i, editing = false, showing = null) {
       item.verify_history = result.verify_history || item.verify_history || [];
       await loadStats();
       openDetail(i, editing, shown);
-    } catch (error) { verify.disabled = false; verify.textContent = error.message; }
+    } catch (error) {
+      Object.assign(item, previous);
+      renderVisibleCards();
+      verify.disabled = false; verify.textContent = error.message;
+    }
   };
 
   $("lb-inner").querySelectorAll("[data-show]").forEach((el) => {
@@ -864,6 +967,7 @@ function openDetail(i, editing = false, showing = null) {
   if (box) {
     box.focus();
     box.setSelectionRange(box.value.length, box.value.length);
+    box.oninput = () => renderComparison(box.value, $("qwen-text")?.value || "");
     // Ctrl/Cmd+Enter saves, so a long correction does not need the mouse.
     box.onkeydown = (e) => {
       if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save(); }
@@ -1171,27 +1275,30 @@ $("q").oninput = (e) => {
   clearTimeout(timer);
   timer = setTimeout(() => {
     state.query = e.target.value.trim();
+    persistView();
     resetResults();
   }, 200);
 };
-$("field").onchange = (e) => { state.field = e.target.value; resetResults(); };
-$("group-filter").onchange = (e) => { state.group = e.target.value; resetResults(); };
+$("field").onchange = (e) => { state.field = e.target.value; persistView(); resetResults(); };
+$("group-filter").onchange = (e) => { state.group = e.target.value; persistView(); resetResults(); };
 $("btn-clear").onclick = () => {
   $("q").value = ""; state.query = "";
   state.missingOnly = false; $("btn-missing").textContent = "Chỉ xem nhóm này";
-  resetResults(); $("q").focus();
+  persistView(); resetResults(); $("q").focus();
 };
 
 $("load-mode").onchange = (e) => {
   state.mode = e.target.value;
+  persistView();
   resetResults();
 };
 $("page-size").onchange = (e) => {
   state.limit = Number(e.target.value) || 20;
+  persistView();
   resetResults();
 };
 $("page-number").onkeydown = (e) => {
-  if (e.key === "Enter") goToPage(Number(e.target.value) || 1);
+  if (e.key === "Enter") { state.page = Number(e.target.value) || 1; persistView(); goToPage(state.page); }
 };
 $("btn-go-page").onclick = () => goToPage(Number($("page-number").value) || 1);
 
@@ -1250,11 +1357,20 @@ async function watchUiVersion() {
   catch { window.location.reload(); return; }
 
   $("whoami").textContent = `${state.me.username} · ${state.me.role}`;
+  $("q").value = state.query;
+  $("field").value = state.field;
+  $("load-mode").value = state.mode;
+  $("page-size").value = String(state.limit);
+  $("page-number").value = state.page;
+  $("page-number-label").classList.toggle("hide", state.mode !== "pages");
+  $("page-number").classList.toggle("hide", state.mode !== "pages");
+  $("btn-go-page").classList.toggle("hide", state.mode !== "pages");
   if (state.me.role !== "admin") {
     $("admin-card").classList.add("hide");
     $("data-card").classList.add("hide");
   }
-  await Promise.all([loadStats(), search(), loadUsers(), loadBackups()]);
+  await search();
+  void Promise.all([loadStats(), loadUsers(), loadBackups()]);
   await watchUiVersion();
   setInterval(watchUiVersion, 5000);
 })();
