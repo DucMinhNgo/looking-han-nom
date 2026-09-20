@@ -222,6 +222,7 @@
   .load-status { min-height: 1.35rem; display: flex; align-items: center;
                  justify-content: center; gap: 0.55rem; padding: 0.8rem;
                  color: var(--muted); font-size: 0.78rem; }
+  .load-status button { font-size: 0.78rem; padding: 0.3rem 0.65rem; }
   .load-status.loading::before { content: ""; width: 0.8rem; height: 0.8rem;
                                  border: 2px solid var(--grid);
                                  border-top-color: var(--series-1);
@@ -530,8 +531,8 @@ async function search() {
     `${fmt(from)}–${fmt(to)} trên ${fmt(data.total)}` +
     (state.missingOnly ? " · chỉ dòng thiếu ảnh" : "");
   $("page-number").value = state.page;
-  updateLoadControls();
   state.loading = false;
+  updateLoadControls();
 }
 
 function updateGroupFilter() {
@@ -564,8 +565,12 @@ function updateLoadControls() {
     status.classList.add("loading");
     status.textContent = "Đang tải ảnh…";
   } else if (state.mode === "scroll") {
-    status.textContent = state.hasMore ? "Cuộn xuống để tải thêm" : "Đã tải hết kết quả";
+    status.innerHTML = state.hasMore
+      ? `<button id="btn-load-more">Tải thêm ảnh</button>`
+      : "Đã tải hết kết quả";
     if (!state.hasMore && state.items.length) status.classList.add("end");
+    const loadMore = $("btn-load-more");
+    if (loadMore) loadMore.onclick = loadMoreItems;
   } else {
     const lastPage = Math.max(1, Math.ceil(state.total / state.limit));
     status.innerHTML = `<button id="btn-page-prev" ${state.page <= 1 ? "disabled" : ""}>Trước</button>
@@ -574,6 +579,12 @@ function updateLoadControls() {
     $("btn-page-prev").onclick = () => goToPage(state.page - 1);
     $("btn-page-next").onclick = () => goToPage(state.page + 1);
   }
+}
+
+function loadMoreItems() {
+  if (state.loading || !state.hasMore) return;
+  state.offset = state.items.length;
+  search();
 }
 
 function resetResults() {
@@ -1061,7 +1072,7 @@ $("btn-logout").onclick = async () => {
 
 const loadObserver = new IntersectionObserver((entries) => {
   if (entries[0].isIntersecting && state.mode === "scroll" && state.hasMore)
-    search();
+    loadMoreItems();
 }, { rootMargin: "420px 0px" });
 loadObserver.observe($("load-sentinel"));
 
