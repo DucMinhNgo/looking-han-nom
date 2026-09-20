@@ -1433,8 +1433,26 @@ $("field").onchange = (e) => { state.field = e.target.value; persistView(); rese
 $("group-filter").onchange = (e) => { state.group = e.target.value; persistView(); resetResults(); };
 $("verify-filter").onchange = (e) => { state.verifyFilter = e.target.value; persistView(); resetResults(); };
 $("btn-clear").onclick = () => {
-  $("q").value = ""; state.query = "";
-  state.missingOnly = false; $("btn-missing").textContent = "Chỉ xem nhóm này";
+  $("q").value = "";
+  $("field").value = "all";
+  $("group-filter").value = "";
+  $("verify-filter").value = "";
+  state.query = "";
+  state.field = "all";
+  state.group = "";
+  state.verifyFilter = "";
+  state.missingOnly = false;
+  state.mode = "scroll";
+  state.limit = 20;
+  state.page = 1;
+  state.offset = 0;
+  $("load-mode").value = state.mode;
+  $("page-size").value = String(state.limit);
+  $("page-number").value = "1";
+  $("page-number-label").classList.add("hide");
+  $("page-number").classList.add("hide");
+  $("btn-go-page").classList.add("hide");
+  $("btn-missing").textContent = "Chỉ xem nhóm này";
   persistView(); resetResults(); $("q").focus();
 };
 
