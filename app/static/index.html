@@ -733,6 +733,9 @@ function openDetail(i, editing = false, showing = null) {
       <div class="qwen-box">
         <button id="qwen-analyze">Dò bằng Qwen</button>
         <span class="muted" id="qwen-status" style="font-size:0.75rem"></span>
+        <textarea id="qwen-text" class="block-edit" rows="8"
+                  placeholder="Kết quả Qwen sẽ hiện ở đây…"></textarea>
+        ${isAdmin() ? `<button id="qwen-apply" class="primary">Autofill Ground truth</button>` : ""}
         <div id="qwen-results"></div>
       </div>
       <p class="muted" style="font-size:0.72rem; margin-top:0.7rem">← → chuyển ảnh · Esc đóng</p>
@@ -760,31 +763,29 @@ function openDetail(i, editing = false, showing = null) {
       } else {
         $("qwen-status").textContent = `${result.lines.length} dòng được nhận diện`;
         const qwenText = result.lines.map((line) => line.text || "").filter(Boolean).join("\n");
+        $("qwen-text").value = qwenText;
         $("qwen-results").innerHTML = result.lines.length
-          ? `<div class="row" style="margin:0.5rem 0">
-               ${isAdmin() ? `<button id="qwen-apply" class="primary">Áp dụng tất cả vào Ground truth</button>` : ""}
-             </div>` + result.lines.map((line) => `
+          ? result.lines.map((line) => `
               <div class="qwen-line">
                 <div class="gt">${esc(line.text || "")}</div>
                 <span class="muted">Vị trí: ${esc(JSON.stringify(line.bounding_box || []))}</span>
                 ${(line.sources || []).map((source) =>
                   `<a class="qwen-source" href="${esc(source.url)}" target="_blank"
-                    rel="noopener" title="${esc(source.title)}">↗ ${esc(source.title || source.url)}</a>`
+                    rel="noopener" title="${esc(source.snippet || source.title)}">↗ ${esc(source.title || source.url)}${source.found_in_page ? " · đã thấy trong trang" : ""}</a>`
                 ).join("") || `<span class="muted">Không tìm thấy nguồn tham khảo.</span>`}
               </div>`).join("")
           : `<span class="muted">Qwen không nhận diện được dòng chữ.</span>`;
         const apply = $("qwen-apply");
         if (apply) apply.onclick = async () => {
-          const form = new FormData();
-          form.append("index", String(item.index));
-          form.append("ground_truth", qwenText);
-          form.append("expect_image", item.image || "");
-          try {
-            await api("/api/data/ground-truth", { method: "POST", body: form });
-            await loadStats();
-            item.ground_truth = qwenText;
-            apply.textContent = "Đã áp dụng";
-          } catch (error) { $("qwen-status").textContent = error.message; }
+          const currentQwenText = $("qwen-text").value.trim();
+          if (!$('gt-edit')) {
+            openDetail(state.items.findIndex((row) => row.index === item.index), true);
+          }
+          if ($('gt-edit')) {
+            $('gt-edit').value = currentQwenText;
+            $('gt-edit').focus();
+            apply.textContent = "Đã autofill, bấm Lưu để ghi";
+          }
         };
       }
     } catch (error) { $("qwen-status").textContent = error.message; }

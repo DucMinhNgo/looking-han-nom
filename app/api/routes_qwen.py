@@ -7,7 +7,7 @@ import json
 import re
 from html import unescape
 from pathlib import Path
-from urllib.parse import parse_qs, quote_plus, unquote, urlparse
+from urllib.parse import parse_qs, quote, quote_plus, unquote, urlparse
 from urllib.request import Request as UrlRequest, urlopen
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -53,6 +53,28 @@ def _web_search(query: str, limit: int = 10) -> list[dict[str, str]]:
     return found
 
 
+def _page_match(url: str, text: str) -> dict[str, str | int | bool]:
+    """Fetch a concrete result page and report whether the text is present."""
+    try:
+        request = UrlRequest(url, headers={"User-Agent": "Mozilla/5.0"})
+        html = urlopen(request, timeout=8).read(2_000_000).decode("utf-8", "ignore")
+        plain = re.sub(r"<script[^>]*>.*?</script>|<style[^>]*>.*?</style>", " ", html, flags=re.S | re.I)
+        plain = re.sub(r"<[^>]+>", " ", unescape(plain))
+        plain = re.sub(r"\s+", " ", plain).strip()
+        position = plain.casefold().find(text.casefold())
+        if position < 0:
+            return {"found_in_page": False, "snippet": ""}
+        start = max(0, position - 180)
+        end = min(len(plain), position + len(text) + 180)
+        return {
+            "found_in_page": True,
+            "snippet": plain[start:end],
+            "position": position,
+        }
+    except Exception:
+        return {"found_in_page": False, "snippet": ""}
+
+
 def _reference_search(text: str, item, limit: int = 20) -> list[dict[str, str]]:
     """Search exact text and Facebook-specific variants, keeping every hit."""
     queries = [f'"{text}"', text, f'site:facebook.com "{text}"']
@@ -67,6 +89,9 @@ def _reference_search(text: str, item, limit: int = 20) -> list[dict[str, str]]:
         for result in _web_search(query):
             if result["url"] not in seen:
                 result["query"] = query
+                result.update(_page_match(result["url"], text))
+                if result.get("found_in_page"):
+                    result["url"] = result["url"].split("#", 1)[0] + "#:~:text=" + quote(text)
                 results.append(result)
                 seen.add(result["url"])
             if len(results) >= limit:
