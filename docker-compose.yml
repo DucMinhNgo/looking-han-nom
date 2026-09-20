@@ -135,7 +135,7 @@ services:
 
     volumes:
       - ./data:/data
-      - /media:/media
+      # - /media:/media
       - /media/khtn/hdd/crawling:/srv/src
       # Script import chạy từ trong container
       - ./scripts:/srv/scripts:ro
