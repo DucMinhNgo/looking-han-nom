@@ -198,6 +198,29 @@
                  border: 2px solid transparent; background: var(--plane); }
   .strip-thumb:hover { opacity: 0.85; }
   .strip-thumb.on { opacity: 1; border-color: var(--series-1); }
+  .results-toolbar { display: flex; align-items: center; gap: 0.55rem;
+                     flex-wrap: wrap; margin-bottom: 0.9rem; }
+  .results-toolbar .page-label { font-size: 0.78rem; font-weight: 600;
+                                 color: var(--ink-2); }
+  .results-toolbar input[type="number"] { width: 5.2rem; padding: 0.4rem 0.55rem; }
+  .results-toolbar select { padding: 0.4rem 0.55rem; }
+  .load-status { min-height: 1.35rem; display: flex; align-items: center;
+                 justify-content: center; gap: 0.55rem; padding: 0.8rem;
+                 color: var(--muted); font-size: 0.78rem; }
+  .load-status.loading::before { content: ""; width: 0.8rem; height: 0.8rem;
+                                 border: 2px solid var(--grid);
+                                 border-top-color: var(--series-1);
+                                 border-radius: 50%; animation: spin .7s linear infinite; }
+  .load-status.end { padding-top: 1rem; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (max-width: 620px) {
+    body { padding: 0.65rem; }
+    .card { padding: 0.8rem; }
+    .results-toolbar { align-items: stretch; }
+    .results-toolbar .spacer { display: none; }
+    .results-toolbar .page-label { width: 100%; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.65rem; }
+  }
 </style>
 </head>
 <body>
@@ -263,14 +286,29 @@
 
   <!-- ============ results ============ -->
   <div class="card">
-    <div class="row" style="margin-bottom:0.85rem">
+    <div class="results-toolbar">
       <span class="muted" id="page-info"></span>
       <span class="spacer"></span>
-      <button id="btn-prev" disabled>Trước</button>
-      <button id="btn-next" disabled>Sau</button>
+      <label class="page-label" for="load-mode">Hiển thị</label>
+      <select id="load-mode" aria-label="Cách tải kết quả">
+        <option value="scroll">Cuộn để tải thêm</option>
+        <option value="pages">Phân trang</option>
+      </select>
+      <label class="page-label" for="page-size">Mỗi lần</label>
+      <select id="page-size" aria-label="Số ảnh mỗi lần">
+        <option value="20" selected>20 ảnh</option>
+        <option value="40">40 ảnh</option>
+        <option value="80">80 ảnh</option>
+      </select>
+      <label class="page-label hide" id="page-number-label" for="page-number">Trang</label>
+      <input class="hide" id="page-number" type="number" min="1" value="1"
+             aria-label="Số trang" />
+      <button class="hide" id="btn-go-page">Đi</button>
     </div>
     <div class="grid" id="results"></div>
     <div class="empty" id="results-empty" style="display:none"></div>
+    <div class="load-status" id="load-status" aria-live="polite"></div>
+    <div id="load-sentinel" aria-hidden="true"></div>
   </div>
 
   <details class="card" id="orphan-card">
@@ -372,7 +410,8 @@ const imgSrc = (name) =>
   "/img/" + String(name || "").split("/").map(encodeURIComponent).join("/");
 
 const state = {
-  me: null, query: "", field: "all", offset: 0, limit: 24,
+  me: null, query: "", field: "all", offset: 0, limit: 20,
+  mode: "scroll", page: 1, loading: false,
   items: [], total: 0, hasMore: false, missingOnly: false,
   current: null, orphanOffset: 0,
 };
@@ -423,21 +462,28 @@ function highlight(text, needle) {
 
 /* ---------------- search ---------------- */
 async function search() {
+  if (state.loading) return;
+  state.loading = true;
+  const append = state.mode === "scroll" && state.offset > 0;
+  const requestOffset = state.mode === "pages"
+    ? (state.page - 1) * state.limit : state.offset;
   const params = new URLSearchParams({
     q: state.query, field: state.field,
-    offset: state.offset, limit: state.limit,
+    offset: requestOffset, limit: state.limit,
   });
   if (state.missingOnly) params.set("missing_only", "true");
 
   let data;
-  try { data = await api(`/api/lookup?${params}`); } catch { return; }
+  try { data = await api(`/api/lookup?${params}`); }
+  catch { state.loading = false; return; }
 
-  state.items = data.items;
+  state.offset = requestOffset;
+  state.items = append ? [...state.items, ...data.items] : data.items;
   state.total = data.total;
   state.hasMore = data.has_more;
 
   const grid = $("results"), empty = $("results-empty");
-  if (!data.items.length) {
+  if (!state.items.length) {
     grid.innerHTML = "";
     empty.style.display = "block";
     empty.textContent = state.query
@@ -447,22 +493,68 @@ async function search() {
         : "Dataset đang trống. Hãy mount file dataset.jsonl vào container.";
   } else {
     empty.style.display = "none";
-    grid.innerHTML = data.items.map((item, i) => card(item, i)).join("");
-    grid.querySelectorAll("[data-open]").forEach((el) => {
-      el.onclick = () => openDetail(+el.dataset.open);
-    });
-    grid.querySelectorAll("[data-edit]").forEach((el) => {
-      el.onclick = () => openDetail(+el.dataset.edit, true);
-    });
+    if (append) grid.insertAdjacentHTML("beforeend",
+      data.items.map((item, i) => card(item, state.items.length - data.items.length + i)).join(""));
+    else grid.innerHTML = state.items.map((item, i) => card(item, i)).join("");
+    bindCards(grid);
   }
 
   $("c-results").textContent = fmt(data.total);
-  const from = data.total ? state.offset + 1 : 0;
+  const from = data.total ? (state.mode === "scroll" ? 1 : requestOffset + 1) : 0;
+  const to = state.mode === "scroll" ? state.items.length : requestOffset + data.items.length;
   $("page-info").textContent =
-    `${fmt(from)}–${fmt(state.offset + data.items.length)} trên ${fmt(data.total)}` +
+    `${fmt(from)}–${fmt(to)} trên ${fmt(data.total)}` +
     (state.missingOnly ? " · chỉ dòng thiếu ảnh" : "");
-  $("btn-prev").disabled = state.offset <= 0;
-  $("btn-next").disabled = !data.has_more;
+  $("page-number").value = state.page;
+  updateLoadControls();
+  state.loading = false;
+}
+
+function bindCards(grid) {
+  grid.querySelectorAll("[data-open]").forEach((el) => {
+    el.onclick = () => openDetail(+el.dataset.open);
+  });
+  grid.querySelectorAll("[data-edit]").forEach((el) => {
+    el.onclick = () => openDetail(+el.dataset.edit, true);
+  });
+}
+
+function updateLoadControls() {
+  const pages = state.mode === "pages";
+  $("page-number-label").classList.toggle("hide", !pages);
+  $("page-number").classList.toggle("hide", !pages);
+  $("btn-go-page").classList.toggle("hide", !pages);
+  const status = $("load-status");
+  status.className = "load-status";
+  if (state.loading) {
+    status.classList.add("loading");
+    status.textContent = "Đang tải ảnh…";
+  } else if (state.mode === "scroll") {
+    status.textContent = state.hasMore ? "Cuộn xuống để tải thêm" : "Đã tải hết kết quả";
+    if (!state.hasMore && state.items.length) status.classList.add("end");
+  } else {
+    const lastPage = Math.max(1, Math.ceil(state.total / state.limit));
+    status.innerHTML = `<button id="btn-page-prev" ${state.page <= 1 ? "disabled" : ""}>Trước</button>
+      <span>Trang ${fmt(state.page)} / ${fmt(lastPage)}</span>
+      <button id="btn-page-next" ${state.page >= lastPage ? "disabled" : ""}>Sau</button>`;
+    $("btn-page-prev").onclick = () => goToPage(state.page - 1);
+    $("btn-page-next").onclick = () => goToPage(state.page + 1);
+  }
+}
+
+function resetResults() {
+  state.offset = 0;
+  state.page = 1;
+  state.items = [];
+  $("results").innerHTML = "";
+  search();
+}
+
+function goToPage(page) {
+  const lastPage = Math.max(1, Math.ceil(state.total / state.limit));
+  state.page = Math.max(1, Math.min(page, lastPage));
+  state.offset = (state.page - 1) * state.limit;
+  search();
 }
 
 function card(item, i) {
@@ -862,24 +954,33 @@ $("q").oninput = (e) => {
   clearTimeout(timer);
   timer = setTimeout(() => {
     state.query = e.target.value.trim();
-    state.offset = 0;
-    search();
+    resetResults();
   }, 200);
 };
-$("field").onchange = (e) => { state.field = e.target.value; state.offset = 0; search(); };
+$("field").onchange = (e) => { state.field = e.target.value; resetResults(); };
 $("btn-clear").onclick = () => {
-  $("q").value = ""; state.query = ""; state.offset = 0;
+  $("q").value = ""; state.query = "";
   state.missingOnly = false; $("btn-missing").textContent = "Chỉ xem nhóm này";
-  search(); $("q").focus();
+  resetResults(); $("q").focus();
 };
-$("btn-prev").onclick = () => { state.offset = Math.max(0, state.offset - state.limit); search(); };
-$("btn-next").onclick = () => { state.offset += state.limit; search(); };
+
+$("load-mode").onchange = (e) => {
+  state.mode = e.target.value;
+  resetResults();
+};
+$("page-size").onchange = (e) => {
+  state.limit = Number(e.target.value) || 20;
+  resetResults();
+};
+$("page-number").onkeydown = (e) => {
+  if (e.key === "Enter") goToPage(Number(e.target.value) || 1);
+};
+$("btn-go-page").onclick = () => goToPage(Number($("page-number").value) || 1);
 
 $("btn-missing").onclick = () => {
   state.missingOnly = !state.missingOnly;
-  state.offset = 0;
   $("btn-missing").textContent = state.missingOnly ? "Bỏ lọc" : "Chỉ xem nhóm này";
-  search();
+  resetResults();
 };
 $("btn-orphans").onclick = () => {
   const card = $("orphan-card");
@@ -913,6 +1014,12 @@ $("btn-logout").onclick = async () => {
   await fetch("/api/auth/logout", { method: "POST" });
   window.location.reload();
 };
+
+const loadObserver = new IntersectionObserver((entries) => {
+  if (entries[0].isIntersecting && state.mode === "scroll" && state.hasMore)
+    search();
+}, { rootMargin: "420px 0px" });
+loadObserver.observe($("load-sentinel"));
 
 /* ---------------- boot ---------------- */
 (async function boot() {
