@@ -63,6 +63,7 @@ async def lookup(
         )
 
     payload["fields"] = list(FIELDS)
+    payload["group_tags"] = runtime.settings.group_tags
     return payload
 
 

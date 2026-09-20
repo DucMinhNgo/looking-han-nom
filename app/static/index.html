@@ -132,6 +132,10 @@
     white-space: nowrap;
   }
   .pill.miss { color: var(--warning); border-color: var(--warning); }
+  .group-tag { flex: none; max-width: 11rem; overflow: hidden; text-overflow: ellipsis;
+               white-space: nowrap; color: var(--series-1); text-decoration: none;
+               font-weight: 700; }
+  .group-tag:hover { text-decoration: underline; }
   mark { background: color-mix(in srgb, var(--series-2) 35%, transparent); color: inherit; }
 
   /* ---- lightbox ---- */
@@ -422,6 +426,7 @@ const imgSrc = (name) =>
 const state = {
   me: null, query: "", field: "all", offset: 0, limit: 20,
   mode: "scroll", page: 1, loading: false,
+  groupTags: {},
   items: [], total: 0, hasMore: false, missingOnly: false,
   current: null, orphanOffset: 0,
 };
@@ -488,6 +493,7 @@ async function search() {
   catch { state.loading = false; return; }
 
   state.offset = requestOffset;
+  state.groupTags = data.group_tags || state.groupTags;
   state.items = append ? [...state.items, ...data.items] : data.items;
   state.total = data.total;
   state.hasMore = data.has_more;
@@ -578,6 +584,14 @@ function card(item, i) {
             src="${imgSrc(item.image_name)}" alt="" />`
     : `<div class="thumb-missing" data-open="${i}">Không tìm thấy file ảnh<br>
          <code style="font-size:0.72rem">${esc(item.image || "(trống)")}</code></div>`;
+  const imagePath = String(item.image || "").replaceAll("\\", "/");
+  const groupKey = Object.keys(state.groupTags).sort((a, b) => b.length - a.length)
+    .find((key) => imagePath.includes(`/${key}/`));
+  const groupId = groupKey ? state.groupTags[groupKey] : "";
+  const groupTag = groupKey && groupId
+    ? `<a class="group-tag" href="https://www.facebook.com/groups/${encodeURIComponent(groupId)}/"
+         target="_blank" rel="noopener" title="${esc(groupKey + ":" + groupId)}">${esc(groupKey + ":" + groupId)}</a>`
+    : `<span class="pill">other</span>`;
 
   return `
     <div class="item ${item.has_image ? "" : "noimg"}">
@@ -591,6 +605,7 @@ function card(item, i) {
                      title="Post này còn ${item.siblings.length} ảnh nữa">+${
                        item.siblings.length} ảnh</span>` : ""}
           <span>#${item.index + 1}</span>
+          ${groupTag}
           <span class="spacer"></span>
           ${item.post_url
             ? `<a class="postlink" href="${esc(item.post_url)}" target="_blank"

@@ -7,8 +7,9 @@ host, so the same image runs locally and on the VPS with only the env changing.
 from __future__ import annotations
 
 import logging
+import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -52,12 +53,29 @@ def _env_int(key: str, default: int) -> int:
         raise ValueError(f"{key} must be an integer, got {raw!r}") from None
 
 
+def _env_json_map(key: str, default: dict[str, str]) -> dict[str, str]:
+    raw = _env(key)
+    if not raw:
+        return default
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError:
+        raise ValueError(f"{key} must be a JSON object") from None
+    if not isinstance(value, dict) or not all(
+        isinstance(name, str) and isinstance(group_id, str)
+        for name, group_id in value.items()
+    ):
+        raise ValueError(f"{key} must map group names to string IDs")
+    return value
+
+
 @dataclass(frozen=True)
 class Settings:
     data_dir: Path = Path("/data")
     dataset_path: Path = Path("/data/dataset.jsonl")
     images_dir: Path = Path("/data/images")
     page_size: int = 24
+    group_tags: dict[str, str] = field(default_factory=dict)
 
     @property
     def users_path(self) -> Path:
@@ -81,6 +99,10 @@ def load_settings() -> Settings:
         dataset_path=Path(_env("DATASET_PATH", str(data_dir / "dataset.jsonl"))),
         images_dir=Path(_env("IMAGES_DIR", str(data_dir / "images"))),
         page_size=_env_int("PAGE_SIZE", 24),
+        group_tags=_env_json_map("GROUP_TAGS_JSON", {
+            "group1": "549457308456387",
+            "group2": "322453387859386",
+        }),
     )
 
 

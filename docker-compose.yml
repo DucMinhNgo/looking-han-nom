@@ -31,6 +31,7 @@ services:
       DATA_DIR: /data
       DATASET_PATH: /srv/src/dataset.jsonl
       IMAGES_DIR: /srv/src
+      GROUP_TAGS_JSON: '{"group1":"549457308456387","group2":"322453387859386"}'
 
     # Bound to loopback: a reverse proxy terminates TLS for the public domain
     # and forwards here.
