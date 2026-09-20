@@ -1113,6 +1113,15 @@ $("btn-logout").onclick = async () => {
 };
 
 /* ---------------- boot ---------------- */
+let uiVersion = null;
+async function watchUiVersion() {
+  try {
+    const body = await api("/api/ui-version");
+    if (uiVersion === null) uiVersion = body.version;
+    else if (body.version !== uiVersion) window.location.reload();
+  } catch { /* a restarting container is checked on the next interval */ }
+}
+
 (async function boot() {
   try { state.me = await api("/api/auth/me"); }
   catch { window.location.reload(); return; }
@@ -1123,6 +1132,8 @@ $("btn-logout").onclick = async () => {
     $("data-card").classList.add("hide");
   }
   await Promise.all([loadStats(), search(), loadUsers(), loadBackups()]);
+  await watchUiVersion();
+  setInterval(watchUiVersion, 5000);
 })();
 </script>
 </body>

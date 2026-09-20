@@ -173,12 +173,24 @@ def _register_core_routes(app: FastAPI, auth: AuthConfig) -> None:
         return {"username": stored.username, "role": stored.role,
                 "display_name": stored.display_name}
 
+    @app.get("/api/ui-version")
+    async def ui_version(user: dict = Depends(current_user)):
+        index_file = STATIC_DIR / "index.html"
+        try:
+            version = index_file.stat().st_mtime_ns
+        except OSError:
+            version = 0
+        return {"version": version}
+
     @app.get("/", response_class=HTMLResponse)
     async def index(user: dict = Depends(current_user)):
         index_file = STATIC_DIR / "index.html"
         if not index_file.exists():
             return HTMLResponse("<h1>Tra cứu Hán-Nôm</h1><p>UI not found.</p>", 500)
-        return HTMLResponse(index_file.read_text(encoding="utf-8"))
+        return HTMLResponse(
+            index_file.read_text(encoding="utf-8"),
+            headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+        )
 
 
 def _login_page() -> str:
