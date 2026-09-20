@@ -90,7 +90,29 @@ class Runtime:
         """
         if force:
             self.dataset.load(force=True)
-            self.images.scan(force=True)
+            # only force-scan images when attach is enabled
+            if self.settings.attach_images:
+                self.images.scan(force=True)
+
+        # If image attach is disabled, skip expensive matching and return
+        # an empty-ish MatchReport so the API can return dataset rows
+        # immediately. This keeps behaviour safe: items will report no image.
+        if not self.settings.attach_images:
+            # Build a minimal MatchReport reflecting dataset size
+            items_len = len(self.dataset.items)
+            report = MatchReport(
+                scanned=0,
+                matched=0,
+                rows_without_image=items_len,
+                sibling_images=0,
+                orphan_images=[],
+                scanned_at=0.0,
+                directory=str(self.settings.images_dir),
+                exists=self.settings.images_dir.is_dir(),
+            )
+            self._report = report
+            return report
+
         self._report = self.images.attach(self.dataset.items)
         return self._report
 
