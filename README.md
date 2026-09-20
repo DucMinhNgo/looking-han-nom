@@ -102,7 +102,7 @@ docker compose up -d --build
 
 ```bash
 # Import file sample/dataset.jsonl vào DB (idempotent)
-docker compose exec lookup python scripts/import_jsonl.py /srv/src/sample/dataset.jsonl
+docker compose exec lookup python scripts/import_jsonl.py /srv/src/dataset.jsonl
 ```
 
 Khi import hoặc upload, server sẽ gán `extra.group_id` và `extra.group` cho từng

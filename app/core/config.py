@@ -89,6 +89,7 @@ class Settings:
     images_dir: Path = Path("/data/images")
     users_file: Path | None = None
     page_size: int = 24
+    image_ttl_s: float = 30.0
     group_tags: dict[str, str] = field(default_factory=dict)
     qwen_api_key: str = ""
     qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
@@ -137,6 +138,7 @@ def load_settings() -> Settings:
         ]),
         redis_url=_env("REDIS_URL"),
         database_url=_env("DATABASE_URL"),
+        image_ttl_s=float(_env("IMAGE_TTL_S", "30.0")),
     )
 
 
