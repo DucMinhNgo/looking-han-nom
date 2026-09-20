@@ -30,7 +30,7 @@ services:
     environment:
       DATA_DIR: /data
       DATASET_PATH: /srv/src/dataset.jsonl
-      IMAGES_DIR: /srv/src/images
+      IMAGES_DIR: /srv/src
 
     # Bound to loopback: a reverse proxy terminates TLS for the public domain
     # and forwards here.
@@ -41,7 +41,7 @@ services:
       # Accounts live here and must survive a container replacement.
       - ./data:/data
       - /media:/media
-      - /media/khtn/hdd/crawling:/media/khtn/hdd/crawling:ro
+      - /media/khtn/hdd/crawling:/srv/src
 
       # The dataset and the pictures. Point this at your own folder; it needs
       # a dataset.jsonl and an images/ beside it.
