@@ -1540,13 +1540,14 @@ async function watchUiVersion() {
 
 (async function boot() {
   if ("serviceWorker" in navigator) {
+    const hadWorkerController = !!navigator.serviceWorker.controller;
     navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (!window.__reloadingForWorker) {
+      if (hadWorkerController && !window.__reloadingForWorker) {
         window.__reloadingForWorker = true;
         window.location.reload();
       }
     });
-    navigator.serviceWorker.register(`/sw.js?v=${Date.now()}`, {
+    navigator.serviceWorker.register("/sw.js", {
       updateViaCache: "none",
     }).then((registration) => registration.update()).catch(() => {});
   }
