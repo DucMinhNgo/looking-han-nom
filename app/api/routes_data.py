@@ -355,10 +355,10 @@ async def edit_ground_truth(
         else:
             rows = _rows_of(runtime)
             if not 0 <= index < len(rows):
-            raise HTTPException(
-                404, f"Row {index + 1} is no longer there — the dataset now "
-                     f"has {len(rows)} rows. Reload the page."
-            )
+                raise HTTPException(
+                    404, f"Row {index + 1} is no longer there — the dataset now "
+                         f"has {len(rows)} rows. Reload the page."
+                )
             here = str(rows[index].get("image") or "")
             if expect_image and basename(here).lower() != basename(expect_image).lower():
                 raise HTTPException(
@@ -391,7 +391,6 @@ async def edit_ground_truth(
         "ground_truth": ground_truth,
         "backup": saved.name if saved else None,
     }
-
 
 @router.post("/verify")
 async def verify_row(
