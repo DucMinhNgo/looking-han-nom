@@ -312,7 +312,7 @@
         <option value="">Tất cả group</option>
         <option value="group1">group1</option>
         <option value="group2">group2</option>
-        <option value="other">other</option>
+        <option value="other">voting</option>
       </select>
       <select id="verify-filter" aria-label="Lọc theo trạng thái verify">
         <option value="">Tất cả trạng thái</option>
@@ -768,7 +768,7 @@ function updateGroupFilter() {
   select.innerHTML = `<option value="">Tất cả group</option>` +
     Object.keys(state.groupTags).sort().map((name) =>
       `<option value="${esc(name)}">${esc(name)}</option>`).join("") +
-    `<option value="other">other</option>`;
+    `<option value="other">voting</option>`;
   select.value = selected;
 }
 

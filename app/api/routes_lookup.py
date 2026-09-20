@@ -64,7 +64,7 @@ async def lookup(
     if group:
         rows = [
             item for item in rows
-            if (_group_for_image(item.image, runtime.settings.group_tags) or "other") == group
+            if (_group_for_image(item.image, runtime.settings.group_tags) or "voting") == group
         ]
     window = rows[offset : offset + page_limit]
     payload = {
