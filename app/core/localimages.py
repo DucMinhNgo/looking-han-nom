@@ -94,9 +94,14 @@ DEFAULT_TTL_S = 30.0
 class ImageLibrary:
     """The picture folder, indexed for tolerant lookup."""
 
-    def __init__(self, images_dir: Path, ttl_s: float = DEFAULT_TTL_S) -> None:
+    def __init__(self, images_dir: Path, ttl_s: float = DEFAULT_TTL_S, public_fs_prefix: str = "") -> None:
         self.images_dir = Path(images_dir)
         self.ttl_s = ttl_s
+        # Filesystem prefix that is served directly by an external webserver.
+        # When a dataset row carries a path that starts with this prefix we
+        # treat it as externally addressable and do not require the file to
+        # exist inside `images_dir`.
+        self.public_fs_prefix = (public_fs_prefix or "").replace('\\', '/')
         self._by_path: dict[str, str] = {}
         self._by_name: dict[str, str] = {}
         self._by_lower: dict[str, str] = {}
@@ -315,18 +320,37 @@ class ImageLibrary:
         companions: set[str] = set()
         for item in items:
             resolved = self.resolve(item.image)
-            item.image_name = resolved or ""
-            item.has_image = resolved is not None
-            item.siblings = self.siblings(resolved) if resolved else []
+            # If resolved locally, use that.
             if resolved:
+                item.image_name = resolved
+                item.has_image = True
+                item.siblings = self.siblings(resolved)
                 claimed.add(resolved)
-                # A picture another row already describes is that row's, not a
-                # companion of this one: the count below is of pictures with no
-                # text of their own.
                 companions.update(item.siblings)
                 matched += 1
-            else:
-                missing += 1
+                continue
+
+            # Not resolved locally. If the original image string points to a
+            # public filesystem location (served by an external webserver),
+            # accept it as-is and mark as having an image so the UI can render
+            # the public URL without the server checking the file exists.
+            raw = str(item.image or "").strip().replace('\\', '/')
+            if raw:
+                prefix = self.public_fs_prefix
+                # Accept both with and without leading slash
+                if prefix and (raw.startswith(prefix) or raw.startswith(prefix.lstrip('/'))):
+                    item.image_name = raw
+                    item.has_image = True
+                    item.siblings = []
+                    matched += 1
+                    # don't add to claimed (file isn't inside library index)
+                    continue
+
+            # No image found anywhere
+            item.image_name = ""
+            item.has_image = False
+            item.siblings = []
+            missing += 1
 
         companions -= claimed
 

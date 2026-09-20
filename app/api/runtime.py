@@ -76,7 +76,11 @@ class Runtime:
                 self.dataset = Dataset(settings.dataset_path)
         else:
             self.dataset = Dataset(settings.dataset_path)
-        self.images = ImageLibrary(settings.images_dir, ttl_s=settings.image_ttl_s)
+        self.images = ImageLibrary(
+            settings.images_dir,
+            ttl_s=settings.image_ttl_s,
+            public_fs_prefix=settings.public_fs_prefix,
+        )
         super_admin = os.environ.get("APP_USERNAME", "admin").strip().lower()
         self.users = _build_user_store(settings, super_admin)
         self._report: MatchReport | None = None
