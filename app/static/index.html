@@ -494,7 +494,7 @@ const state = {
   mode: "scroll", page: 1, loading: false,
   groupTags: {},
   items: [], total: 0, hasMore: false, missingOnly: false,
-  current: null, orphanOffset: 0,
+  current: null, orphanOffset: 0, renderToken: 0,
 };
 
 try {
@@ -690,6 +690,7 @@ function renderLookupData(data, append, requestOffset) {
   state.hasMore = data.has_more;
 
   const grid = $("results"), empty = $("results-empty");
+  state.renderToken++;
   if (!state.items.length) {
     grid.innerHTML = "";
     empty.style.display = "block";
@@ -700,10 +701,8 @@ function renderLookupData(data, append, requestOffset) {
         : "Dataset đang trống. Hãy mount file dataset.jsonl vào container.";
   } else {
     empty.style.display = "none";
-    if (append) grid.insertAdjacentHTML("beforeend",
-      data.items.map((item, i) => card(item, state.items.length - data.items.length + i)).join(""));
-    else grid.innerHTML = state.items.map((item, i) => card(item, i)).join("");
-    bindCards(grid);
+    renderCardsProgressively(grid, data.items, append,
+      state.items.length - data.items.length);
   }
 
   $("c-results").textContent = fmt(data.total);
@@ -714,6 +713,25 @@ function renderLookupData(data, append, requestOffset) {
     (state.missingOnly ? " · chỉ dòng thiếu ảnh" : "");
   $("page-number").value = state.page;
   updateLoadControls();
+}
+
+function renderCardsProgressively(grid, items, append, startIndex) {
+  const token = ++state.renderToken;
+  if (!append) grid.innerHTML = "";
+  let cursor = 0;
+  const chunkSize = 4;
+  const paint = () => {
+    if (token !== state.renderToken) return;
+    const chunk = items.slice(cursor, cursor + chunkSize);
+    if (chunk.length) {
+      grid.insertAdjacentHTML("beforeend", chunk.map((item, index) =>
+        card(item, startIndex + cursor + index)).join(""));
+      bindCards(grid);
+      cursor += chunk.length;
+      requestAnimationFrame(paint);
+    }
+  };
+  requestAnimationFrame(paint);
 }
 
 async function search() {
