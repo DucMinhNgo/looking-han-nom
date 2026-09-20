@@ -834,7 +834,7 @@ function card(item, i) {
   const cap = item.caption
     ? `<div class="cap">${highlight(item.caption, q)}</div>` : "";
   const thumb = item.has_image
-    ? `<img class="thumb" loading="lazy" data-open="${i}"
+    ? `<img class="thumb" loading="lazy" decoding="async" fetchpriority="low" data-open="${i}"
             src="${imgSrc(item.image_name)}" alt="" />`
     : `<div class="thumb-missing" data-open="${i}">Không tìm thấy file ảnh<br>
          <code style="font-size:0.72rem">${esc(item.image || "(trống)")}</code></div>`;
@@ -1155,15 +1155,26 @@ document.addEventListener("keydown", (e) => {
 
 /* ---------------- stats & mismatch ---------------- */
 async function loadStats() {
+  const paintStats = (s) => {
+    const d = s.dataset, im = s.images;
+    $("c-rows").textContent = fmt(d.rows);
+    $("c-matched").textContent = fmt(im.matched);
+    $("c-verified").textContent = fmt(d.verified);
+    $("c-missing").textContent = fmt(im.rows_without_image);
+    $("c-orphans").textContent = fmt(im.orphan_images);
+    $("corpus-line").textContent = `${fmt(d.rows)} dòng · ${fmt(im.files)} ảnh` +
+      (im.sibling_images ? ` · ${fmt(im.sibling_images)} ảnh kèm theo` : "");
+  };
+  try {
+    const cached = JSON.parse(localStorage.getItem("hannom.stats") || "null");
+    if (cached) paintStats(cached);
+  } catch {}
   let s;
   try { s = await api("/api/lookup/stats"); } catch { return; }
+  try { localStorage.setItem("hannom.stats", JSON.stringify(s)); } catch {}
+  paintStats(s);
 
   const d = s.dataset, im = s.images;
-  $("c-rows").textContent = fmt(d.rows);
-  $("c-matched").textContent = fmt(im.matched);
-  $("c-verified").textContent = fmt(d.verified);
-  $("c-missing").textContent = fmt(im.rows_without_image);
-  $("c-orphans").textContent = fmt(im.orphan_images);
   $("btn-missing").classList.toggle("hide", !im.rows_without_image);
   $("btn-orphans").classList.toggle("hide", !im.orphan_images);
   $("orphan-card").classList.toggle("hide", !im.orphan_images);
