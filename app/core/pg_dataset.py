@@ -26,8 +26,8 @@ log = logging.getLogger(__name__)
 # ─── SQL ──────────────────────────────────────────────────────────────────────
 
 _SQL_LOAD = """
-SELECT id, image, post_id, post_link, caption, ground_truth, extra
-  FROM dataset_items
+SELECT id, image, post_id, post_link, caption, ground_truth, phonetic, extra
+    FROM dataset_items
  ORDER BY display_index NULLS LAST, id
 """
 
@@ -35,14 +35,15 @@ _SQL_SIGNATURE = "SELECT MAX(updated_at) FROM dataset_items"
 
 _SQL_UPSERT_IMAGE = """
 INSERT INTO dataset_items
-    (image, post_id, post_link, caption, ground_truth, extra, display_index)
-VALUES (%s, %s, %s, %s, %s, %s, %s)
+    (image, post_id, post_link, caption, ground_truth, phonetic, extra, display_index)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
 ON CONFLICT (image) WHERE image <> ''
 DO UPDATE SET
     post_id       = EXCLUDED.post_id,
     post_link     = EXCLUDED.post_link,
     caption       = EXCLUDED.caption,
     ground_truth  = EXCLUDED.ground_truth,
+    phonetic      = EXCLUDED.phonetic,
     extra         = EXCLUDED.extra,
     display_index = EXCLUDED.display_index,
     updated_at    = NOW()
@@ -51,6 +52,7 @@ WHERE
     dataset_items.post_link     IS DISTINCT FROM EXCLUDED.post_link     OR
     dataset_items.caption       IS DISTINCT FROM EXCLUDED.caption       OR
     dataset_items.ground_truth  IS DISTINCT FROM EXCLUDED.ground_truth  OR
+    dataset_items.phonetic      IS DISTINCT FROM EXCLUDED.phonetic      OR
     dataset_items.extra         IS DISTINCT FROM EXCLUDED.extra         OR
     dataset_items.display_index IS DISTINCT FROM EXCLUDED.display_index
 RETURNING id
@@ -58,13 +60,14 @@ RETURNING id
 
 _SQL_UPSERT_NO_IMAGE = """
 INSERT INTO dataset_items
-    (image, post_id, post_link, caption, ground_truth, extra, display_index)
-VALUES ('', %s, %s, %s, %s, %s, %s)
+    (image, post_id, post_link, caption, ground_truth, phonetic, extra, display_index)
+VALUES ('', %s, %s, %s, %s, %s, %s, %s)
 ON CONFLICT (post_id) WHERE image = '' AND post_id <> ''
 DO UPDATE SET
     post_link     = EXCLUDED.post_link,
     caption       = EXCLUDED.caption,
     ground_truth  = EXCLUDED.ground_truth,
+    phonetic      = EXCLUDED.phonetic,
     extra         = EXCLUDED.extra,
     display_index = EXCLUDED.display_index,
     updated_at    = NOW()
@@ -73,14 +76,20 @@ RETURNING id
 
 _SQL_INSERT_NO_KEY = """
 INSERT INTO dataset_items
-    (image, post_id, post_link, caption, ground_truth, extra, display_index)
-VALUES ('', '', %s, %s, %s, %s, %s)
+    (image, post_id, post_link, caption, ground_truth, phonetic, extra, display_index)
+VALUES ('', '', %s, %s, %s, %s, %s, %s)
 RETURNING id
 """
 
 _SQL_UPDATE_GROUND_TRUTH = """
 UPDATE dataset_items
    SET ground_truth = %s, updated_at = NOW()
+ WHERE id = %s
+"""
+
+_SQL_UPDATE_PHONETIC = """
+UPDATE dataset_items
+     SET phonetic = %s, updated_at = NOW()
  WHERE id = %s
 """
 
@@ -224,7 +233,7 @@ class PgDataset:
 
             items: list[Item] = []
             db_ids: list[int] = []
-            for i, (db_id, image, post_id, post_link, caption, ground_truth, extra) in enumerate(rows):
+            for i, (db_id, image, post_id, post_link, caption, ground_truth, phonetic, extra) in enumerate(rows):
                 items.append(Item(
                     index=i,
                     image=image or "",
@@ -232,6 +241,7 @@ class PgDataset:
                     post_link=post_link or "",
                     caption=caption or "",
                     ground_truth=ground_truth or "",
+                    phonetic=phonetic or "",
                     extra=self._parse_extra(extra),
                 ))
                 db_ids.append(db_id)
@@ -310,7 +320,7 @@ class PgDataset:
         conn = self._get_conn()
         cur = conn.cursor()
         try:
-            for display_idx, row in enumerate(result.rows):
+                for display_idx, row in enumerate(result.rows):
                 self._upsert_one(cur, row, display_idx)
             conn.commit()
         except Exception as exc:
@@ -332,18 +342,19 @@ class PgDataset:
         post_link = _pick_url(row)
         caption = _pick(row, "caption")
         ground_truth = _pick(row, "ground_truth")
+        phonetic = _pick(row, "phonetic")
         extra = {k: v for k, v in row.items() if k not in _consumed(row)}
         ep = self._json_param(extra)
 
         if image:
             cur.execute(_SQL_UPSERT_IMAGE,
-                        (image, post_id, post_link, caption, ground_truth, ep, display_idx))
+                        (image, post_id, post_link, caption, ground_truth, phonetic, ep, display_idx))
         elif post_id:
             cur.execute(_SQL_UPSERT_NO_IMAGE,
-                        (post_id, post_link, caption, ground_truth, ep, display_idx))
+                        (post_id, post_link, caption, ground_truth, phonetic, ep, display_idx))
         else:
             cur.execute(_SQL_INSERT_NO_KEY,
-                        (post_link, caption, ground_truth, ep, display_idx))
+                        (post_link, caption, ground_truth, phonetic, ep, display_idx))
 
     def update_ground_truth(
         self, index: int, ground_truth: str
@@ -359,6 +370,19 @@ class PgDataset:
         with self._lock:
             if index < len(self._items):
                 self._items[index].ground_truth = ground_truth
+
+    def update_phonetic(self, index: int, phonetic: str) -> None:
+        """UPDATE phonetic tại index; giữ cache in-memory đồng bộ."""
+        with self._lock:
+            if not 0 <= index < len(self._items):
+                raise IndexError(index)
+            db_id = self._db_ids[index]
+
+        self._execute(_SQL_UPDATE_PHONETIC, (phonetic, db_id))
+
+        with self._lock:
+            if index < len(self._items):
+                self._items[index].phonetic = phonetic
 
     def update_verify(
         self, index: int, verified: bool, username: str

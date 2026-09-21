@@ -18,7 +18,10 @@ import logging
 import threading
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, Body
+from app.api.auth import require_admin, current_user
+import os
+import httpx
 from fastapi.responses import FileResponse
 
 from app.api.auth import require_admin
@@ -52,6 +55,7 @@ def _rows_of(runtime) -> list[dict]:
         item.extra | {
             "image": item.image, "post_id": item.post_id,
             "caption": item.caption, "ground_truth": item.ground_truth,
+            "phonetic": getattr(item, "phonetic", ""),
         }
         for item in runtime.dataset.items
     ]
@@ -350,6 +354,7 @@ async def edit_ground_truth(
                         "ground_truth": ground_truth, "backup": None}
 
             runtime.dataset.update_ground_truth(index, ground_truth)
+            # preserve phonetic if provided in payload? ground truth edit does not change phonetic
             runtime.refresh(force=True)
             saved = None
         else:
@@ -373,6 +378,7 @@ async def edit_ground_truth(
                         "ground_truth": ground_truth, "backup": None}
 
             rows[index]["ground_truth"] = ground_truth
+            # Keep existing phonetic unchanged here
             saved = ingest.backup(path, runtime.settings.backups_dir)
             try:
                 ingest.write_dataset(path, rows)
@@ -391,6 +397,94 @@ async def edit_ground_truth(
         "ground_truth": ground_truth,
         "backup": saved.name if saved else None,
     }
+
+
+@router.post("/phonetic")
+async def edit_phonetic(
+    request: Request,
+    index: int = Form(...),
+    phonetic: str = Form(...),
+    expect_image: str = Form(""),
+    user: dict = Depends(require_admin),
+):
+    """Edit phonetic transcription for a row without marking it verified."""
+    runtime = _runtime(request)
+    path = runtime.settings.dataset_path
+
+    with _write_lock:
+        runtime.dataset.load(force=True)
+        if hasattr(runtime.dataset, "update_phonetic"):
+            items = runtime.dataset.items
+            if not 0 <= index < len(items):
+                raise HTTPException(404, "Row not found")
+            here = str(items[index].image or "")
+            if expect_image and basename(here).lower() != basename(expect_image).lower():
+                raise HTTPException(409, "Image mismatch; reload and try again.")
+            current = getattr(items[index], "phonetic", "")
+            if str(current) == phonetic:
+                return {"changed": False, "index": index, "phonetic": phonetic}
+            runtime.dataset.update_phonetic(index, phonetic)
+            runtime.refresh(force=True)
+            saved = None
+        else:
+            rows = _rows_of(runtime)
+            if not 0 <= index < len(rows):
+                raise HTTPException(404, "Row not found")
+            here = str(rows[index].get("image") or "")
+            if expect_image and basename(here).lower() != basename(expect_image).lower():
+                raise HTTPException(409, "Image mismatch; reload and try again.")
+            if str(rows[index].get("phonetic") or "") == phonetic:
+                return {"changed": False, "index": index, "phonetic": phonetic}
+            rows[index]["phonetic"] = phonetic
+            saved = ingest.backup(path, runtime.settings.backups_dir)
+            try:
+                ingest.write_dataset(path, rows)
+            except OSError as exc:
+                raise HTTPException(500, f"Could not write {path}: {exc}") from exc
+            runtime.refresh(force=True)
+
+    log.info("row %d phonetic edited by %r", index + 1, user["username"])
+    return {"changed": True, "index": index, "phonetic": phonetic, "backup": saved.name if saved else None}
+
+
+@router.post("/notify/telegram")
+async def notify_telegram(request: Request, payload: dict = Body(...), user: dict = Depends(current_user)):
+    """Send a short notification to the configured Telegram chat.
+
+    Expects JSON payload with keys: `index` (int), `action` (str), `post_url` (optional).
+    Does nothing if TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID are not set.
+    """
+    bot = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    chat = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+    if not bot or not chat:
+        raise HTTPException(400, "Telegram not configured (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID)")
+
+    index = payload.get("index")
+    action = payload.get("action", "action")
+    post_url = payload.get("post_url", "")
+    try:
+        idx = int(index) if index is not None else None
+    except Exception:
+        idx = None
+
+    text = f"[{user.get('username', '?')}] {action}"
+    if idx is not None:
+        text += f" · dòng #{idx + 1}"
+    if post_url:
+        text += f" · {post_url}"
+
+    url = f"https://api.telegram.org/bot{bot}/sendMessage"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.post(url, json={"chat_id": chat, "text": text})
+        if resp.status_code != 200:
+            raise HTTPException(502, f"Telegram error: {resp.status_code} {resp.text}")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(502, f"Telegram send failed: {exc}") from exc
+
+    return {"sent": True}
 
 @router.post("/verify")
 async def verify_row(

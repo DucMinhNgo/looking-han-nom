@@ -37,6 +37,8 @@ class Item:
     post_id: str
     caption: str = ""
     ground_truth: str = ""
+    # Phonetic transcription / bản dịch âm (có thể rỗng)
+    phonetic: str = ""
     # The permalink, when the file keeps it in a column of its own. Some
     # exports put an opaque base64 blob in post_id and the real URL in
     # post_link, so the two cannot be assumed to be the same string.
@@ -102,6 +104,7 @@ class Item:
             "post_number": self.post_number,
             "caption": self.caption,
             "ground_truth": self.ground_truth,
+            "phonetic": self.phonetic,
             "extra": self.extra,
             "verified": bool(self.extra.get("verified", False)),
             "verified_by": self.extra.get("verified_by", ""),

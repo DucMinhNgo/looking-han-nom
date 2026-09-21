@@ -963,6 +963,16 @@ function openDetail(i, editing = false, showing = null) {
                highlight(item.ground_truth || "(trống)", state.query)}</div>`}
       </div>
       <div style="margin-bottom:0.8rem">
+        <label class="field">Phiên âm / Phonetic</label>
+        ${editing
+          ? `<textarea id="phonetic-edit" class="block-edit" rows="3">${esc(item.phonetic || "")}</textarea>
+             <div class="row" style="margin-top:0.4rem">
+               <button class="primary" id="phonetic-save">Lưu (không verify)</button>
+               <span class="muted" id="phonetic-status"></span>
+             </div>`
+          : `<div class="block">${esc(item.phonetic || "(trống)")}</div>`}
+      </div>
+      <div style="margin-bottom:0.8rem">
         <label class="field">Caption</label>
         <div class="block">${highlight(item.caption || "(trống)", state.query)}</div>
       </div>
@@ -1001,6 +1011,11 @@ function openDetail(i, editing = false, showing = null) {
         ${isAdmin()
           ? `<button id="verify-row" class="${item.verified ? "verified-tag" : "unverified-tag"}">
                ${item.verified ? "Bỏ verify" : "Verify"}</button>` : ""}
+      </div>
+      <div style="margin-top:0.6rem">
+        ${item.post_url
+          ? `<a class="postlink" id="postlink-${i}" href="${esc(item.post_url)}" target="_blank" rel="noopener">Mở bài ↗</a>`
+          : ""}
       </div>
       <div class="qwen-box">
         <button id="qwen-analyze">Dò bằng Qwen</button>
@@ -1122,6 +1137,26 @@ function openDetail(i, editing = false, showing = null) {
     }
   };
 
+  // Notify Telegram when a post link is clicked, or when detail is opened.
+  const postLinkEl = $("postlink-" + i);
+  if (postLinkEl) {
+    postLinkEl.onclick = async (e) => {
+      try {
+        await fetch("/api/data/notify/telegram", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ index: item.index, action: "open_post_link", post_url: item.post_url })
+        });
+      } catch {}
+    };
+  }
+  // Also notify when the detail is opened (view action)
+  try {
+    fetch("/api/data/notify/telegram", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ index: item.index, action: "open_detail", post_url: item.post_url })
+    });
+  } catch {}
+
   $("lb-inner").querySelectorAll("[data-show]").forEach((el) => {
     el.onclick = () => openDetail(i, editing, el.dataset.show);
   });
@@ -1169,6 +1204,27 @@ function openDetail(i, editing = false, showing = null) {
   };
   const saveButton = $("gt-save");
   if (saveButton) saveButton.onclick = save;
+
+  const savePhonetic = async () => {
+    const form = new FormData();
+    form.append("index", String(item.index));
+    form.append("phonetic", $("phonetic-edit").value);
+    form.append("expect_image", item.image || "");
+    $("phonetic-save").disabled = true;
+    $("phonetic-status").textContent = "Đang lưu…";
+    try {
+      const body = await api("/api/data/phonetic", { method: "POST", body: form });
+      item.phonetic = body.phonetic;
+      await Promise.all([search(), loadStats()]);
+      $("phonetic-status").textContent = "Đã lưu";
+      setTimeout(() => { $("phonetic-status").textContent = ""; }, 1200);
+    } catch (e) {
+      $("phonetic-status").textContent = e.message;
+      $("phonetic-save").disabled = false;
+    }
+  };
+  const phoneticButton = $("phonetic-save");
+  if (phoneticButton) phoneticButton.onclick = savePhonetic;
 }
 
 function closeDetail() {

@@ -76,6 +76,9 @@ CREATE TRIGGER trg_dataset_updated_at
 -- ─── Backwards-compatible migration: add `display_index` if missing ────────
 ALTER TABLE dataset_items
     ADD COLUMN IF NOT EXISTS display_index INTEGER;
+-- Add phonetic column for phonetic transcription / bản dịch âm
+ALTER TABLE dataset_items
+    ADD COLUMN IF NOT EXISTS phonetic TEXT NOT NULL DEFAULT '';
 
 -- ─── Users table ──────────────────────────────────────────────────────────────
 -- Lưu tài khoản reviewer và admin.
