@@ -475,9 +475,9 @@ async def notify_telegram(request: Request, payload: dict = Body(...), user: dic
     if post_url:
         text += f" · {post_url}"
     if ground_truth:
-        text += f" · Ground Truth: {ground_truth}"
+        text += f"\n · Ground Truth: {ground_truth}"
     if image:
-        text += f" · Image: {image}"
+        text += f"\n · Image: {image}"
 
     url = f"https://api.telegram.org/bot{bot}/sendMessage"
     try:
