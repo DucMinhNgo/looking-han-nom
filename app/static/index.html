@@ -1150,7 +1150,7 @@ function openDetail(i, editing = false, showing = null) {
       try {
         await fetch("/api/data/notify/telegram", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ index: item.index, action: "open_post_link", post_url: item.post_url })
+          body: JSON.stringify({ index: item.index, action: "open_post_link", post_url: item.post_url, image: item.image, ground_truth: item.ground_truth })
         });
       } catch {}
     };
