@@ -75,6 +75,15 @@ class TestLoading:
         path = write(tmp_path / "d.jsonl", [row(reviewer="mai", score=0.9)])
         assert Dataset(path).items[0].extra == {"reviewer": "mai", "score": 0.9}
 
+    def test_reads_phonetic_field(self, tmp_path):
+        path = write(tmp_path / "d.jsonl", [{
+            "image": "a.jpg", "post_id": URL,
+            "caption": "cap", "ground_truth": "花開",
+            "phonetic": "Hoa khai",
+        }])
+        item = Dataset(path).items[0]
+        assert item.phonetic == "Hoa khai"
+
     def test_an_edited_file_is_picked_up_without_a_restart(self, tmp_path, dataset):
         assert len(dataset.items) == 3
         write(tmp_path / "d.jsonl", [row(), row(image="b.jpg")])
@@ -122,6 +131,17 @@ class TestSearch:
         # The poem is in ground_truth, never in the caption.
         assert dataset.search("采菊", field="ground_truth").total == 1
         assert dataset.search("采菊", field="caption").total == 0
+
+    def test_search_phonetic_field(self, tmp_path):
+        path = write(tmp_path / "d.jsonl", [{
+            "image": "a.jpg", "post_id": URL,
+            "caption": "cap", "ground_truth": "花開",
+            "phonetic": "Hoa khai hoa lạc",
+        }])
+        d = Dataset(path)
+        assert d.search("Hoa khai").total == 1
+        assert d.search("Hoa khai", field="phonetic").total == 1
+        assert d.search("Hoa khai", field="ground_truth").total == 0
 
     def test_search_does_not_match_across_two_fields(self, dataset):
         """The haystack seam must not create matches that are not there."""

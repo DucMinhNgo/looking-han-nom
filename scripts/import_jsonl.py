@@ -54,6 +54,7 @@ _ALIASES: dict[str, tuple[str, ...]] = {
     "post_id":      ("post_id", "post_url", "post_link", "url", "link", "postid"),
     "caption":      ("caption", "fb_caption", "fb caption", "sub_caption"),
     "ground_truth": ("ground_truth", "groundtruth", "ground truth", "gt", "label"),
+    "phonetic":     ("phonetic", "phien_am", "phienam", "phiên âm", "pinyin"),
 }
 
 
@@ -114,6 +115,7 @@ def normalize_row(raw: dict[str, Any]) -> dict[str, Any]:
     post_link    = _pick_url(raw)
     caption      = _pick(raw, "caption")
     ground_truth = _pick(raw, "ground_truth")
+    phonetic     = _pick(raw, "phonetic")
     extra        = {k: v for k, v in raw.items() if k not in _consumed(raw)}
     # Assign group_id from GROUP_TAGS_JSON env if image path matches
     try:
@@ -135,6 +137,7 @@ def normalize_row(raw: dict[str, Any]) -> dict[str, Any]:
         "post_link":    post_link,
         "caption":      caption,
         "ground_truth": ground_truth,
+        "phonetic":     phonetic,
         "extra":        extra,
     }
 
@@ -193,10 +196,10 @@ def connect(url: str):
 
 _SQL_UPSERT_WITH_IMAGE = """
 INSERT INTO dataset_items
-    (image, post_id, post_link, caption, ground_truth, extra)
+    (image, post_id, post_link, caption, ground_truth, phonetic, extra)
 VALUES
     (%(image)s, %(post_id)s, %(post_link)s,
-     %(caption)s, %(ground_truth)s, %(extra)s)
+     %(caption)s, %(ground_truth)s, %(phonetic)s, %(extra)s)
 ON CONFLICT (image)
 WHERE image <> ''
 DO UPDATE SET
@@ -204,6 +207,7 @@ DO UPDATE SET
     post_link    = EXCLUDED.post_link,
     caption      = EXCLUDED.caption,
     ground_truth = EXCLUDED.ground_truth,
+    phonetic     = EXCLUDED.phonetic,
     extra        = EXCLUDED.extra,
     updated_at   = NOW()
 WHERE
@@ -211,37 +215,40 @@ WHERE
     dataset_items.post_link    IS DISTINCT FROM EXCLUDED.post_link    OR
     dataset_items.caption      IS DISTINCT FROM EXCLUDED.caption      OR
     dataset_items.ground_truth IS DISTINCT FROM EXCLUDED.ground_truth OR
+    dataset_items.phonetic     IS DISTINCT FROM EXCLUDED.phonetic     OR
     dataset_items.extra        IS DISTINCT FROM EXCLUDED.extra
 RETURNING xmax::text::int = 0 AS inserted;
 """
 
 _SQL_UPSERT_NO_IMAGE = """
 INSERT INTO dataset_items
-    (image, post_id, post_link, caption, ground_truth, extra)
+    (image, post_id, post_link, caption, ground_truth, phonetic, extra)
 VALUES
     ('', %(post_id)s, %(post_link)s,
-     %(caption)s, %(ground_truth)s, %(extra)s)
+     %(caption)s, %(ground_truth)s, %(phonetic)s, %(extra)s)
 ON CONFLICT (post_id)
 WHERE image = '' AND post_id <> ''
 DO UPDATE SET
     post_link    = EXCLUDED.post_link,
     caption      = EXCLUDED.caption,
     ground_truth = EXCLUDED.ground_truth,
+    phonetic     = EXCLUDED.phonetic,
     extra        = EXCLUDED.extra,
     updated_at   = NOW()
 WHERE
     dataset_items.post_link    IS DISTINCT FROM EXCLUDED.post_link    OR
     dataset_items.caption      IS DISTINCT FROM EXCLUDED.caption      OR
     dataset_items.ground_truth IS DISTINCT FROM EXCLUDED.ground_truth OR
+    dataset_items.phonetic     IS DISTINCT FROM EXCLUDED.phonetic     OR
     dataset_items.extra        IS DISTINCT FROM EXCLUDED.extra
 RETURNING xmax::text::int = 0 AS inserted;
 """
 
 _SQL_INSERT_NO_KEY = """
 INSERT INTO dataset_items
-    (image, post_id, post_link, caption, ground_truth, extra)
+    (image, post_id, post_link, caption, ground_truth, phonetic, extra)
 VALUES
-    ('', '', %(post_link)s, %(caption)s, %(ground_truth)s, %(extra)s)
+    ('', '', %(post_link)s, %(caption)s, %(ground_truth)s, %(phonetic)s, %(extra)s)
 RETURNING id;
 """
 

@@ -1,4 +1,4 @@
-{"image": "sample_01.jpg", "post_id": "https://www.facebook.com/permalink.php?story_fbid=27835489826093100&id=100000593113258", "caption": "Bốn câu thơ về thời gian trôi", "ground_truth": "花開花落又一秋\n時光匆匆似水流\n多少往事隨風去\n悠悠歲月染白頭"}
+{"image": "sample_01.jpg", "post_id": "https://www.facebook.com/permalink.php?story_fbid=27835489826093100&id=100000593113258", "caption": "Bốn câu thơ về thời gian trôi", "ground_truth": "花開花落又一秋\n時光匆匆似水流\n多少往事隨風去\n悠悠歲月染白頭", "phonetic": "Hoa khai hoa lạc hựu nhất thu\nThời quang thông thông tự thuỷ lưu\nĐa thiểu vãng sự tuỳ phong khứ\nDu du tuế nguyệt nhiễm bạch đầu"}
 {"image": "sample_02.jpg", "post_id": "https://www.facebook.com/permalink.php?story_fbid=27835489826093101&id=100000593113258", "caption": "Thư pháp treo tường", "ground_truth": "年歲漸長\n心要活得自由"}
 {"image": "sample_03.jpg", "post_id": "https://www.facebook.com/permalink.php?story_fbid=27835489826093102&id=100000593113258", "caption": "Đào Uyên Minh", "ground_truth": "采菊東籬下\n悠然見南山"}
 {"image": "sample_04.jpg", "post_id": "https://www.facebook.com/permalink.php?story_fbid=27835489826093103&id=100000593113258", "caption": "Đỗ Phủ — Vọng Nhạc", "ground_truth": "會當凌絕頂\n一覽眾山小"}

@@ -81,12 +81,14 @@ class Item:
             parts = [self.caption]
         elif field_name == "ground_truth":
             parts = [self.ground_truth]
+        elif field_name == "phonetic":
+            parts = [self.phonetic]
         elif field_name == "image":
             parts = [self.image, self.image_name]
         else:
             parts = [
                 self.post_id, self.post_url, self.post_number, self.caption,
-                self.ground_truth, self.image, self.image_name,
+                self.ground_truth, self.phonetic, self.image, self.image_name,
             ]
         # Joined with a separator no query will contain, so a search cannot
         # match across the seam between two fields.

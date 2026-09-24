@@ -70,11 +70,13 @@ class Runtime:
         if settings.database_url and PgDataset is not None:
             try:
                 self.dataset = PgDataset(settings.database_url)
-            except Exception:
+            except Exception as exc:
                 # Fallback to file-backed dataset when PgDataset cannot be used
-                log.warning("Could not init PgDataset, falling back to file Dataset")
+                log.warning("Could not init PgDataset (%s), falling back to file Dataset", exc)
                 self.dataset = Dataset(settings.dataset_path)
         else:
+            if settings.database_url and PgDataset is None:
+                log.warning("DATABASE_URL is set but PgDataset is not available, falling back to file Dataset")
             self.dataset = Dataset(settings.dataset_path)
         self.images = ImageLibrary(
             settings.images_dir,

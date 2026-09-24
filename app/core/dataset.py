@@ -26,7 +26,7 @@ from app.core.models import Item, normalize
 
 log = logging.getLogger(__name__)
 
-FIELDS = ("all", "post", "caption", "ground_truth", "image")
+FIELDS = ("all", "post", "caption", "ground_truth", "phonetic", "image")
 
 # Tolerated spellings for each field, because the file is produced elsewhere
 # and its headers have drifted before.
@@ -35,6 +35,7 @@ _ALIASES = {
     "post_id": ("post_id", "post_url", "post_link", "url", "link", "postid"),
     "caption": ("caption", "fb_caption", "fb caption", "sub_caption"),
     "ground_truth": ("ground_truth", "groundtruth", "ground truth", "gt", "label"),
+    "phonetic": ("phonetic", "phien_am", "phienam", "phiên âm", "pinyin"),
 }
 
 
@@ -154,6 +155,7 @@ class Dataset:
                         post_id=_pick(row, "post_id"),
                         caption=_pick(row, "caption"),
                         ground_truth=_pick(row, "ground_truth"),
+                        phonetic=_pick(row, "phonetic"),
                         post_link=_pick_url(row),
                         # Anything the file carries that was not read into one
                         # of the four fields is kept rather than dropped — it
@@ -222,6 +224,7 @@ class Dataset:
             "malformed_lines": self._malformed,
             "with_caption": sum(1 for i in items if i.caption),
             "with_ground_truth": sum(1 for i in items if i.ground_truth),
+            "with_phonetic": sum(1 for i in items if i.phonetic),
             "verified": sum(1 for i in items if i.extra.get("verified") is True),
             "with_post_url": sum(1 for i in items if i.post_url),
             "posts": len({i.post_id for i in items if i.post_id}),

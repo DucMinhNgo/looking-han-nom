@@ -293,6 +293,7 @@ class PgDataset:
             "malformed_lines": 0,
             "with_caption": sum(1 for i in items if i.caption),
             "with_ground_truth": sum(1 for i in items if i.ground_truth),
+            "with_phonetic": sum(1 for i in items if i.phonetic),
             "verified": sum(1 for i in items if i.extra.get("verified") is True),
             "with_post_url": sum(1 for i in items if i.post_url),
             "posts": len({i.post_id for i in items if i.post_id}),
@@ -320,7 +321,7 @@ class PgDataset:
         conn = self._get_conn()
         cur = conn.cursor()
         try:
-                for display_idx, row in enumerate(result.rows):
+            for display_idx, row in enumerate(result.rows):
                 self._upsert_one(cur, row, display_idx)
             conn.commit()
         except Exception as exc:
@@ -438,6 +439,7 @@ class PgDataset:
                 "post_link": item.post_link,
                 "caption": item.caption,
                 "ground_truth": item.ground_truth,
+                "phonetic": getattr(item, "phonetic", ""),
             }
             for item in self.items
         ]

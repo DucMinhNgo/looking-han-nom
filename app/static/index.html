@@ -119,6 +119,9 @@
     .cap { font-size: 0.82rem; color: var(--ink-2); line-height: 1.5;
      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
          min-width: 0; min-height: 1.23rem; }
+    .phonetic { font-size: 0.82rem; color: var(--series-1); line-height: 1.45;
+     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+         min-width: 0; min-height: 1.2rem; font-style: italic; }
     .thumb-missing code { display: block; max-width: 100%; overflow: hidden;
         white-space: nowrap; text-overflow: ellipsis; }
       .foot { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;
@@ -306,6 +309,7 @@
         <option value="post">Link / Post ID</option>
         <option value="caption">Caption</option>
         <option value="ground_truth">Ground truth</option>
+        <option value="phonetic">Phiên âm</option>
         <option value="image">Tên file ảnh</option>
       </select>
       <select id="group-filter" aria-label="Lọc theo nhóm">
@@ -865,6 +869,8 @@ function card(item, i) {
   const q = state.query;
   const gt = item.ground_truth
     ? `<div class="gt">${highlight(item.ground_truth, q)}</div>` : "";
+  const phon = item.phonetic
+    ? `<div class="phonetic" title="${esc(item.phonetic)}">${highlight(item.phonetic, q)}</div>` : "";
   const cap = item.caption
     ? `<div class="cap">${highlight(item.caption, q)}</div>` : "";
   const thumb = item.has_image
@@ -885,7 +891,7 @@ function card(item, i) {
     <div class="item ${item.has_image ? "" : "noimg"}">
       ${thumb}
       <div class="meta">
-        ${gt}${cap}
+        ${gt}${phon}${cap}
         <div class="foot">
           ${item.has_image ? "" : `<span class="pill miss">thiếu ảnh</span>`}
           ${item.verified
@@ -970,7 +976,7 @@ function openDetail(i, editing = false, showing = null) {
                <button class="primary" id="phonetic-save">Lưu (không verify)</button>
                <span class="muted" id="phonetic-status"></span>
              </div>`
-          : `<div class="block">${esc(item.phonetic || "(trống)")}</div>`}
+          : `<div class="block">${highlight(item.phonetic || "(trống)", state.query)}</div>`}
       </div>
       <div style="margin-bottom:0.8rem">
         <label class="field">Caption</label>
@@ -1191,6 +1197,15 @@ function openDetail(i, editing = false, showing = null) {
     $("gt-save").disabled = true;
     $("gt-status").textContent = "Đang lưu…";
     try {
+      const pEdit = $("phonetic-edit");
+      if (pEdit && pEdit.value !== (item.phonetic || "")) {
+        const pForm = new FormData();
+        pForm.append("index", String(item.index));
+        pForm.append("phonetic", pEdit.value);
+        pForm.append("expect_image", item.image || "");
+        const pBody = await api("/api/data/phonetic", { method: "POST", body: pForm });
+        item.phonetic = pBody.phonetic;
+      }
       const body = await api("/api/data/ground-truth", { method: "POST", body: form });
       item.ground_truth = body.ground_truth;
       await Promise.all([search(), loadStats(), loadBackups()]);
