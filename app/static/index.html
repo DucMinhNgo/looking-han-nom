@@ -924,6 +924,7 @@ const byNumber = (a, b) => a.localeCompare(b, undefined, { numeric: true });
 
 function openDetail(i, editing = false, showing = null) {
   const item = state.items[i];
+  console.log(item);
   if (!item) return;
   // Every picture in this post's folder, the row's own one included. The row
   // describes only its own; the rest are shown, not captioned.
