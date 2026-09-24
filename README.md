@@ -426,3 +426,14 @@ docker compose exec lookup python scripts/import_users.py
 
 
 docker compose exec -T postgres psql -U "${POSTGRES_USER:-hannom}" -d "${POSTGRES_DB:-hannom}" -c "ALTER TABLE dataset_items ADD COLUMN IF NOT EXISTS display_index INTEGER;" && docker compose restart lookup && docker compose logs --no-color --tail 200 lookup
+
+
+```sh
+docker compose exec -T postgres psql -U hannom -d hannom \
+  -c "SELECT COUNT(*) AS total, MAX(updated_at) AS last FROM dataset_items;"
+```
+
+```sh
+docker compose exec -T postgres psql -U hannom -d hannom \
+  -c "TRUNCATE TABLE dataset_items RESTART IDENTITY CASCADE;"
+```

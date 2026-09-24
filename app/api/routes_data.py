@@ -462,6 +462,8 @@ async def notify_telegram(request: Request, payload: dict = Body(...), user: dic
     index = payload.get("index")
     action = payload.get("action", "action")
     post_url = payload.get("post_url", "")
+    image = payload.get("image", "")
+    ground_truth = payload.get("ground_truth", "")
     try:
         idx = int(index) if index is not None else None
     except Exception:
@@ -472,6 +474,10 @@ async def notify_telegram(request: Request, payload: dict = Body(...), user: dic
         text += f" · dòng #{idx + 1}"
     if post_url:
         text += f" · {post_url}"
+    if ground_truth:
+        text += f" · Ground Truth: {ground_truth}"
+    if image:
+        text += f" · Image: {image}"
 
     url = f"https://api.telegram.org/bot{bot}/sendMessage"
     try:
