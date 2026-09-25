@@ -1151,7 +1151,7 @@ function openDetail(i, editing = false, showing = null) {
       try {
         await fetch("/api/data/notify/telegram", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ index: item.index, action: "open_post_link", post_url: item.post_url, image: imgSrc(item.image), ground_truth: item.ground_truth })
+          body: JSON.stringify({ index: item.index, action: "open_post_link", post_url: item.post_url, image: imgSrc(item.image), ground_truth: item.ground_truth, post_id: item.post_id  })
         });
       } catch {}
     };
@@ -1160,7 +1160,7 @@ function openDetail(i, editing = false, showing = null) {
   try {
     fetch("/api/data/notify/telegram", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ index: item.index, action: "open_detail", post_url: item.post_url, image: imgSrc(item.image), ground_truth: item.ground_truth  })
+      body: JSON.stringify({ index: item.index, action: "open_detail", post_url: item.post_url, image: imgSrc(item.image), ground_truth: item.ground_truth, post_id: item.post_id })
     });
   } catch {}
 

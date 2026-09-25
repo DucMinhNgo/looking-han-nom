@@ -462,6 +462,7 @@ async def notify_telegram(request: Request, payload: dict = Body(...), user: dic
     index = payload.get("index")
     action = payload.get("action", "action")
     post_url = payload.get("post_url", "")
+    post_id = payload.get("post_id", "")
     image = payload.get("image", "")
     ground_truth = payload.get("ground_truth", "")
     try:
@@ -478,6 +479,8 @@ async def notify_telegram(request: Request, payload: dict = Body(...), user: dic
         text += f"\n · Ground Truth: {ground_truth}"
     if image:
         text += f"\n · Image: {image}"
+    if post_id:
+        text += f"\n · Post ID: {post_id}"
 
     url = f"https://api.telegram.org/bot{bot}/sendMessage"
     try:
