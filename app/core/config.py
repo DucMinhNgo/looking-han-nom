@@ -138,6 +138,7 @@ def load_settings() -> Settings:
         group_tags=_env_json_map("GROUP_TAGS_JSON", {
             "group1": "549457308456387",
             "group2": "322453387859386",
+            "hieu":"1792625541124212"
         }),
         qwen_api_key=_env("QWEN_API_KEY"),
         qwen_base_url=_env(
