@@ -5,10 +5,10 @@
     "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
     "file": ""
   },
-  "thao": {
-    "label": "Thảo (Hán)",
-    "family": "Thao",
+  "le": {
+    "label": "Lệ",
+    "family": "Le",
     "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
-    "file": "thao.ttf"
+    "file": "CN-Le.ttf"
   }
 }
