@@ -1,6 +1,6 @@
 {
   "default": {
-    "label": "Mặc định",
+    "label": "Khải",
     "family": "Noto Serif CJK TC",
     "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
     "file": ""
@@ -10,5 +10,23 @@
     "family": "Le",
     "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
     "file": "CN-Le.ttf"
+  },
+  "hanh": {
+    "label": "Hành",
+    "family": "hanh",
+    "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
+    "file": "CN_HANH.TTF"
+  },
+  "thao": {
+    "label": "Thảo",
+    "family": "thao",
+    "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
+    "file": "CN-Thao.TTF"
+  },
+  "trien": {
+    "label": "Triện",
+    "family": "trien",
+    "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
+    "file": "CN-Trien.ttf"
   }
 }
