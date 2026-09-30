@@ -1,0 +1,14 @@
+{
+  "default": {
+    "label": "Mặc định",
+    "family": "Noto Serif CJK TC",
+    "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
+    "file": ""
+  },
+  "thao": {
+    "label": "Thảo (Hán)",
+    "family": "Thao",
+    "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
+    "file": "thao.ttf"
+  }
+}
