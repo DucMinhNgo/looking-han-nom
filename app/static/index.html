@@ -997,6 +997,7 @@ function card(item, i) {
 }
 
 function renderHanSimilarity(caption, groundTruth) {
+  if (!isAdmin()) return "";
   const similarity = hanSimilarity(caption, groundTruth);
   if (similarity === null) return "";
   const tone = similarity >= 90 ? "high" : similarity < 70 ? "low" : "";
