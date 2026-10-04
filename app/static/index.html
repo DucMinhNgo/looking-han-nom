@@ -332,6 +332,7 @@
       <select id="font-select" aria-label="Chọn font chữ Hán-Nôm">
         <option value="default">Mặc định</option>
       </select>
+      <span class="muted" id="font-status" aria-live="polite"></span>
       <button id="btn-clear">Xoá</button>
     </div>
 
@@ -576,15 +577,15 @@ async function loadFontRegistry() {
     ? state.fontKey : "default";
   state.fontKey = chosen;
   select.value = chosen;
-  select.onchange = (event) => {
+  select.onchange = async (event) => {
     state.fontKey = event.target.value;
     persistView();
-    applySelectedFont(state.fontKey);
+    await applySelectedFont(state.fontKey);
   };
-  applySelectedFont(chosen);
+  await applySelectedFont(chosen);
 }
 
-function applySelectedFont(key) {
+async function applySelectedFont(key) {
   const info = fontRegistry[key] || fontRegistry.default || {};
   const fallback = info.fallback || '"Noto Serif CJK TC", "Source Han Serif", "MS Mincho", serif';
   const family = info.family || "Noto Serif CJK TC";
@@ -608,6 +609,33 @@ function applySelectedFont(key) {
     "--han-font-family",
     selectedStack ? `${selectedStack}, ${fallback}` : fallback,
   );
+
+  const status = $("font-status");
+  if (!files.length) {
+    if (status) status.textContent = "Font hệ thống";
+    return;
+  }
+  if (!document.fonts?.load) {
+    if (status) status.textContent = "Trình duyệt không hỗ trợ tải font chủ động";
+    return;
+  }
+
+  if (status) status.textContent = `Đang tải ${files.length} font…`;
+  const results = await Promise.allSettled(
+    families.map((fontFamily) => document.fonts.load(`16px "${fontFamily}"`)),
+  );
+  if (state.fontKey !== key) return;
+
+  const loaded = results.filter((result) =>
+    result.status === "fulfilled" && result.value.length > 0).length;
+  if (status) {
+    status.textContent = loaded === files.length
+      ? `Đã tải ${loaded} font`
+      : `Tải được ${loaded}/${files.length} font`;
+    status.title = results.map((result, index) =>
+      result.status === "rejected" || !result.value?.length ? files[index] : "")
+      .filter(Boolean).join("\n");
+  }
 }
 
 const pageCache = (() => {
@@ -1807,7 +1835,6 @@ async function watchUiVersion() {
     $("data-card").classList.add("hide");
   }
   await loadFontRegistry();
-  applySelectedFont(state.fontKey);
   await search();
   try {
     const popup = JSON.parse(localStorage.getItem("hannom.popup") || "{}");
