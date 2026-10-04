@@ -1037,7 +1037,7 @@ function hanSimilarity(first, second) {
 // Natural order, so 10.jpg follows 9.jpg instead of 1.jpg.
 const byNumber = (a, b) => a.localeCompare(b, undefined, { numeric: true });
 
-function openDetail(i, editing = false, showing = null) {
+function openDetail(i, editing = isAdmin(), showing = null) {
   const item = state.items[i];
   console.log(item);
   if (!item) return;

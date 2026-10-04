@@ -3,30 +3,30 @@
     "label": "Khải",
     "family": "Noto Serif CJK TC",
     "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
-    "file": ""
+    "file": "khai.ttf"
   },
   "le": {
     "label": "Lệ",
     "family": "Le",
     "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
-    "file": "CN-Le.ttf"
+    "file": "le.ttf"
   },
   "hanh": {
     "label": "Hành",
     "family": "hanh",
     "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
-    "file": "CN_HANH.TTF"
+    "file": "hanh.ttf"
   },
   "thao": {
     "label": "Thảo",
     "family": "thao",
     "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
-    "file": "CN-Thao.TTF"
+    "file": "thao.ttf"
   },
   "trien": {
     "label": "Triện",
     "family": "trien",
     "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
-    "file": "CN-Trien.ttf"
+    "file": "trien.ttf"
   }
 }
