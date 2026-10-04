@@ -231,6 +231,7 @@
   .diff-preview .different { cursor: pointer; text-decoration: underline dotted; }
   .diff-preview .different:hover { background: var(--critical); color: #fff; }
   .similarity { font-weight: 700; }
+  .han-similarity { font-size: 0.72rem; }
   .similarity.low { color: var(--critical); }
   .similarity.high { color: var(--good-text); }
   textarea.block-edit { width: 100%; box-sizing: border-box; resize: vertical;
@@ -948,6 +949,7 @@ function card(item, i) {
     ? `<div class="phonetic" title="${esc(item.phonetic)}">${highlight(item.phonetic, q)}</div>` : "";
   const cap = item.caption
     ? `<div class="cap">${highlight(item.caption, q)}</div>` : "";
+  const hanMatch = renderHanSimilarity(item.caption, item.ground_truth);
   const thumb = item.has_image
     ? `<img class="thumb" loading="lazy" decoding="async" fetchpriority="low" data-open="${i}"
             src="${imgSrc(item.image_name)}" alt="" />`
@@ -966,7 +968,7 @@ function card(item, i) {
     <div class="item ${item.has_image ? "" : "noimg"}">
       ${thumb}
       <div class="meta">
-        ${gt}${phon}${cap}
+        ${gt}${phon}${cap}${hanMatch}
         <div class="foot">
           ${item.has_image ? "" : `<span class="pill miss">thiếu ảnh</span>`}
           ${item.verified
@@ -992,6 +994,42 @@ function card(item, i) {
         </div>
       </div>
     </div>`;
+}
+
+function renderHanSimilarity(caption, groundTruth) {
+  const similarity = hanSimilarity(caption, groundTruth);
+  if (similarity === null) return "";
+  const tone = similarity >= 90 ? "high" : similarity < 70 ? "low" : "";
+  return `<div class="similarity han-similarity ${tone}"
+               title="Chỉ so sánh chữ Hán; bỏ qua dấu câu và ký tự khác">
+            Độ tương đồng chữ Hán: ${similarity}%
+          </div>`;
+}
+
+function hanSimilarity(first, second) {
+  const hanChars = (text) => Array.from(
+    String(text || "").normalize("NFC").matchAll(/\p{Script=Han}/gu),
+    (match) => match[0],
+  );
+  const left = hanChars(first);
+  const right = hanChars(second);
+  if (!left.length || !right.length) return null;
+
+  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let row = 1; row <= left.length; row++) {
+    const current = [row];
+    for (let column = 1; column <= right.length; column++) {
+      current[column] = Math.min(
+        current[column - 1] + 1,
+        previous[column] + 1,
+        previous[column - 1] + (left[row - 1] === right[column - 1] ? 0 : 1),
+      );
+    }
+    previous = current;
+  }
+
+  const distance = previous[right.length];
+  return Math.round((1 - distance / Math.max(left.length, right.length)) * 100);
 }
 
 /* ---------------- detail ---------------- */
@@ -1058,6 +1096,7 @@ function openDetail(i, editing = false, showing = null) {
       <div style="margin-bottom:0.8rem">
         <label class="field">Caption</label>
         <div class="block">${highlight(item.caption || "(trống)", state.query)}</div>
+        ${renderHanSimilarity(item.caption, item.ground_truth)}
       </div>
       <dl class="kv">
         <dt>Dòng số</dt><dd>${item.index + 1}</dd>
