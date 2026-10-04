@@ -4,6 +4,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Tra cứu Hán-Nôm</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Noto+Serif+TC:wght@400;700&display=swap" rel="stylesheet" />
 <style>
   :root {
     color-scheme: light;
@@ -527,6 +530,7 @@ const fontRegistry = {
     file: "",
   },
 };
+const CJK_FALLBACK = '"Noto Serif TC", "Noto Sans TC", "Noto Serif CJK TC", "Source Han Serif", "MS Mincho", serif';
 
 const state = {
   me: null, query: "", field: "all", group: "", verifyFilter: "", offset: 0, limit: 20,
@@ -565,7 +569,7 @@ async function loadFontRegistry() {
     Object.assign(fontRegistry, { default: fontRegistry.default || {
       label: "Mặc định",
       family: "Noto Serif CJK TC",
-      fallback: '"Noto Serif CJK TC", "Source Han Serif", "MS Mincho", serif',
+      fallback: CJK_FALLBACK,
       file: "",
     }});
   }
@@ -587,7 +591,7 @@ async function loadFontRegistry() {
 
 async function applySelectedFont(key) {
   const info = fontRegistry[key] || fontRegistry.default || {};
-  const fallback = info.fallback || '"Noto Serif CJK TC", "Source Han Serif", "MS Mincho", serif';
+  const fallback = info.fallback || CJK_FALLBACK;
   const family = info.family || "Noto Serif CJK TC";
   const files = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
   const families = files.map((_, index) => `${family}-${index}`);

@@ -2,7 +2,7 @@
   "default": {
     "label": "Khải",
     "family": "han-khai",
-    "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
+    "fallback": "\"Noto Serif TC\", \"Noto Sans TC\", \"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
     "files": [
       "Khai/CN-Times.ttf",
       "Khai/CN-Minh.ttf",
@@ -12,13 +12,13 @@
   "le": {
     "label": "Lệ",
     "family": "han-le",
-    "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
+    "fallback": "\"Noto Serif TC\", \"Noto Sans TC\", \"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
     "files": ["Le/CN-Le.ttf"]
   },
   "hanh": {
     "label": "Hành",
     "family": "han-hanh",
-    "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
+    "fallback": "\"Noto Serif TC\", \"Noto Sans TC\", \"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
     "files": [
       "Hanh/CN_HANHKHAI.TTF",
       "Hanh/CN_HANH.TTF"
@@ -27,7 +27,7 @@
   "thao": {
     "label": "Thảo",
     "family": "han-thao",
-    "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
+    "fallback": "\"Noto Serif TC\", \"Noto Sans TC\", \"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
     "files": [
       "Thao/博洋草书7000.TTF",
       "Thao/博洋草书3500.TTF"
@@ -36,7 +36,7 @@
   "trien": {
     "label": "Triện",
     "family": "han-trien",
-    "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
+    "fallback": "\"Noto Serif TC\", \"Noto Sans TC\", \"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
     "files": [
       "Trien/篆书繁.ttf",
       "Trien/Font_chu_trien_北师大说文小篆.ttf",
