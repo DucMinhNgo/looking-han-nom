@@ -114,7 +114,7 @@ services:
       DATASET_PATH:  /srv/src/dataset.jsonl
       IMAGES_DIR:    /srv/src
       USERS_PATH:    /srv/src/users.json
-      GROUP_TAGS_JSON: '{"group1":"549457308456387","data1":"549457308456387","group2":"322453387859386","data2":"322453387859386", "hieu":"1792625541124212", "data3": "1792625541124212"}'
+      GROUP_TAGS_JSON: '{"group1":"549457308456387","data1":"549457308456387","group2":"322453387859386","data2":"322453387859386", "hieu":"1792625541124212", "data3": "1792625541124212", "test": "1792625541124212"}'
 
       # PostgreSQL
       DATABASE_URL: postgresql://${POSTGRES_USER:-hannom}:${POSTGRES_PASSWORD:-hannom_secret}@postgres:5432/${POSTGRES_DB:-hannom}
