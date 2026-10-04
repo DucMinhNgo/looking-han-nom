@@ -259,6 +259,50 @@ class TestEditingGroundTruth:
         assert client.post("/api/data/ground-truth", data={
             "index": 999, "ground_truth": "x"}).status_code == 404
 
+
+class TestDeletingRows:
+    def test_admin_can_delete_one_row_and_the_previous_dataset_is_backed_up(self, client):
+        login(client)
+        response = client.delete("/api/data/row", json={
+            "index": 0,
+            "expect_image": "sample_00.jpg",
+            "expect_post_id": URL,
+        })
+
+        assert response.status_code == 200
+        assert response.json()["deleted"] is True
+        assert response.json()["total"] == 9
+        assert client.get("/api/lookup").json()["total"] == 9
+        assert client.get("/img/sample_00.jpg").status_code == 200
+        backups = client.get("/api/data/backups").json()["items"]
+        assert len(backups) == 1
+        restored = client.get(f"/api/data/backups/{backups[0]['name']}")
+        assert len(restored.text.strip().splitlines()) == 10
+
+    def test_a_stale_page_cannot_delete_a_different_row(self, client):
+        login(client)
+        response = client.delete("/api/data/row", json={
+            "index": 0,
+            "expect_image": "sample_01.jpg",
+            "expect_post_id": URL,
+        })
+
+        assert response.status_code == 409
+        assert client.get("/api/lookup").json()["total"] == 10
+
+    def test_non_admin_cannot_delete_a_row(self, client):
+        login(client)
+        client.post("/api/users", json={"username": "mai", "password": "password123"})
+        client.post("/api/auth/logout")
+        login(client, "mai", "password123")
+
+        response = client.delete("/api/data/row", json={
+            "index": 0,
+            "expect_image": "sample_00.jpg",
+            "expect_post_id": URL,
+        })
+        assert response.status_code == 403
+
     def test_columns_the_app_does_not_model_survive_the_write(self, client):
         """Editing one row must not strip another row's extra columns."""
         login(client)

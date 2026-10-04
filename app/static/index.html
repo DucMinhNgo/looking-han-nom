@@ -878,6 +878,9 @@ function bindCards(grid) {
   grid.querySelectorAll("[data-edit]").forEach((el) => {
     el.onclick = () => openDetail(+el.dataset.edit, true);
   });
+  grid.querySelectorAll("[data-delete]").forEach((el) => {
+    el.onclick = () => deletePost(state.items[+el.dataset.delete]);
+  });
 }
 
 function renderVisibleCards() {
@@ -983,7 +986,8 @@ function card(item, i) {
                   rel="noopener" title="${esc(item.post_url)}">Bài post ↗</a>`
             : `<span class="pill">không có link</span>`}
           ${isAdmin()
-            ? `<button class="primary" data-edit="${i}">Chỉnh ground truth</button>`
+            ? `<button class="primary" data-edit="${i}">Chỉnh ground truth</button>
+               <button class="danger-user" data-delete="${i}">Xoá post</button>`
             : ""}
         </div>
       </div>
@@ -1089,7 +1093,8 @@ function openDetail(i, editing = false, showing = null) {
         <button id="lb-copy">Chép ground truth</button>
         ${isAdmin()
           ? `<button id="verify-row" class="${item.verified ? "verified-tag" : "unverified-tag"}">
-               ${item.verified ? "Bỏ verify" : "Verify"}</button>` : ""}
+               ${item.verified ? "Bỏ verify" : "Verify"}</button>
+             <button class="danger-user" id="delete-post">Xoá post</button>` : ""}
       </div>
       <div style="margin-top:0.6rem">
         ${item.post_url
@@ -1216,6 +1221,9 @@ function openDetail(i, editing = false, showing = null) {
     }
   };
 
+  const deleteButton = $("delete-post");
+  if (deleteButton) deleteButton.onclick = () => deletePost(item);
+
   // Notify Telegram when a post link is clicked, or when detail is opened.
   const postLinkEl = $("postlink-" + i);
   if (postLinkEl) {
@@ -1313,6 +1321,30 @@ function openDetail(i, editing = false, showing = null) {
   };
   const phoneticButton = $("phonetic-save");
   if (phoneticButton) phoneticButton.onclick = savePhonetic;
+}
+
+async function deletePost(item) {
+  if (!item || !isAdmin()) return;
+  if (!confirm("Xoá bài post này khỏi dataset? File ảnh sẽ được giữ lại.")) return;
+  try {
+    await api("/api/data/row", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        index: item.index,
+        expect_image: item.image || "",
+        expect_post_id: item.post_id || "",
+      }),
+    });
+    if (state.current?.item.index === item.index) closeDetail();
+    state.page = 1;
+    state.offset = 0;
+    state.items = [];
+    persistView();
+    await Promise.all([search(), loadStats(), loadBackups()]);
+  } catch (error) {
+    alert(error.message);
+  }
 }
 
 function closeDetail() {

@@ -399,6 +399,64 @@ async def edit_ground_truth(
     }
 
 
+@router.delete("/row")
+async def delete_row(
+    request: Request,
+    payload: dict = Body(...),
+    user: dict = Depends(require_admin),
+):
+    """Remove one dataset row, refusing stale row indexes."""
+    try:
+        index = int(payload.get("index"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "A valid row index is required.")
+
+    expect_image = str(payload.get("expect_image") or "")
+    expect_post_id = str(payload.get("expect_post_id") or "")
+    runtime = _runtime(request)
+    path = runtime.settings.dataset_path
+
+    with _write_lock:
+        runtime.dataset.load(force=True)
+        items = runtime.dataset.items
+        if not 0 <= index < len(items):
+            raise HTTPException(404, "Row is no longer in the dataset. Reload the page.")
+
+        item = items[index]
+        if (str(item.image or "") != expect_image
+            or str(item.post_id or "") != expect_post_id):
+            raise HTTPException(
+                409,
+                "Dataset changed underneath this page. Reload and try again.",
+            )
+
+        if hasattr(runtime.dataset, "delete_row"):
+            runtime.dataset.delete_row(index)
+            saved = None
+        else:
+            rows = _rows_of(runtime)
+            rows.pop(index)
+            saved = ingest.backup(path, runtime.settings.backups_dir)
+            try:
+                ingest.write_dataset(path, rows)
+            except OSError as exc:
+                raise HTTPException(
+                    500,
+                    f"Could not write {path}: {exc}. If this is Docker, the data "
+                    "mount is probably still read-only (:ro).",
+                ) from exc
+
+        runtime.refresh(force=True)
+
+    log.info("row %d deleted by %r", index + 1, user["username"])
+    return {
+        "deleted": True,
+        "index": index,
+        "total": len(runtime.dataset.items),
+        "backup": saved.name if saved else None,
+    }
+
+
 @router.post("/phonetic")
 async def edit_phonetic(
     request: Request,

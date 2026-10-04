@@ -372,6 +372,16 @@ class PgDataset:
             if index < len(self._items):
                 self._items[index].ground_truth = ground_truth
 
+    def delete_row(self, index: int) -> None:
+        """Delete a row by its stable database ID, not its display index."""
+        with self._lock:
+            if not 0 <= index < len(self._db_ids):
+                raise IndexError(index)
+            db_id = self._db_ids[index]
+
+        self._execute("DELETE FROM dataset_items WHERE id = %s", (db_id,))
+        self.invalidate()
+
     def update_phonetic(self, index: int, phonetic: str) -> None:
         """UPDATE phonetic tại index; giữ cache in-memory đồng bộ."""
         with self._lock:
