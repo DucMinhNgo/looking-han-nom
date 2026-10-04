@@ -1,2 +1,2 @@
-python -m venv crawling
-source crawling/bin/activate
+python -m venv looking
+source looking/bin/activate

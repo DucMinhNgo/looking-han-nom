@@ -1,32 +1,49 @@
 {
   "default": {
     "label": "Khải",
-    "family": "Noto Serif CJK TC",
+    "family": "han-khai",
     "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
-    "file": "khai.ttf"
+    "files": [
+      "Khai/CN-Times.ttf",
+      "Khai/CN-Minh.ttf",
+      "Khai/CN_TONG_A_LIGHT.TTF"
+    ]
   },
   "le": {
     "label": "Lệ",
-    "family": "Le",
+    "family": "han-le",
     "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
-    "file": "le.ttf"
+    "files": ["Le/CN-Le.ttf"]
   },
   "hanh": {
     "label": "Hành",
-    "family": "hanh",
+    "family": "han-hanh",
     "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
-    "file": "hanh.woff2"
+    "files": [
+      "Hanh/CN_HANHKHAI.TTF",
+      "Hanh/CN_HANH.TTF"
+    ]
   },
   "thao": {
     "label": "Thảo",
-    "family": "thao",
+    "family": "han-thao",
     "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
-    "file": "thao.ttf"
+    "files": [
+      "Thao/博洋草书7000.TTF",
+      "Thao/博洋草书3500.TTF"
+    ]
   },
   "trien": {
     "label": "Triện",
-    "family": "trien",
+    "family": "han-trien",
     "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
-    "file": "trien.ttf"
+    "files": [
+      "Trien/篆书繁.ttf",
+      "Trien/Font_chu_trien_北师大说文小篆.ttf",
+      "Trien/汉仪篆书繁.ttf",
+      "Trien/汉仪粗篆繁.ttf",
+      "Trien/白舟篆古印.ttf",
+      "Trien/汉仪娃娃篆简.ttf"
+    ]
   }
 }

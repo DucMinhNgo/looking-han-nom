@@ -588,22 +588,26 @@ function applySelectedFont(key) {
   const info = fontRegistry[key] || fontRegistry.default || {};
   const fallback = info.fallback || '"Noto Serif CJK TC", "Source Han Serif", "MS Mincho", serif';
   const family = info.family || "Noto Serif CJK TC";
-  document.documentElement.style.setProperty("--han-font-family", info.file
-    ? `"${family}", ${fallback}`
-    : fallback);
+  const files = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
+  const families = files.map((_, index) => `${family}-${index}`);
 
-  if (!info.file) return;
-  const url = `/static/fonts/${encodeURIComponent(info.file)}`;
-  const fontName = family.replace(/\s+/g, "-").replace(/["']/g, "");
-  const id = `han-font-${fontName}`;
-  let style = document.getElementById(id);
-  if (!style) {
-    style = document.createElement("style");
+  files.forEach((file, index) => {
+    const fontFamily = families[index];
+    const id = `han-font-${fontFamily.replace(/[^a-z0-9_-]/gi, "-")}`;
+    if (document.getElementById(id)) return;
+
+    const url = `/static/fonts/${file.split("/").map(encodeURIComponent).join("/")}`;
+    const style = document.createElement("style");
     style.id = id;
-    style.textContent = `@font-face { font-family: "${family}"; src: url("${url}") format("truetype"); font-display: swap; }`;
+    style.textContent = `@font-face { font-family: "${fontFamily}"; src: url("${url}") format("truetype"); font-display: swap; }`;
     document.head.appendChild(style);
-  }
-  document.documentElement.style.setProperty("--han-font-family", `"${family}", ${fallback}`);
+  });
+
+  const selectedStack = families.map((name) => `"${name}"`).join(", ");
+  document.documentElement.style.setProperty(
+    "--han-font-family",
+    selectedStack ? `${selectedStack}, ${fallback}` : fallback,
+  );
 }
 
 const pageCache = (() => {
