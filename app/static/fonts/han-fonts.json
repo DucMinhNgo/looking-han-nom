@@ -15,7 +15,7 @@
     "label": "Hành",
     "family": "hanh",
     "fallback": "\"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
-    "file": "hanh.ttf"
+    "file": "hanh.woff2"
   },
   "thao": {
     "label": "Thảo",

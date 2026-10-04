@@ -1,91 +1,31 @@
-# -*- coding: utf-8 -*-
 from pathlib import Path
-import subprocess
-import shutil
+from fontTools.ttLib import TTFont
 
-def merge_with_fontforge(ttf_files: list[Path], output_file: Path, family_name: str) -> bool:
-    if not ttf_files:
-        return False
+def convert_ttf_to_woff2(font_dir="app/static/fonts"):
+    font_path = Path(font_dir).resolve()
+    ttf_files = list(font_path.glob("*.ttf"))
 
-    if len(ttf_files) == 1:
-        shutil.copy2(ttf_files[0], output_file)
-        print(f"  ✅ Chỉ 1 file → copy: {ttf_files[0].name}")
-        return True
+    print(f"📂 Tìm thấy {len(ttf_files)} file TTF trong {font_path}\n")
 
-    pe_script = f'Open("{ttf_files[0].as_posix()}");\n'
-    for f in ttf_files[1:]:
-        pe_script += f'MergeFonts("{f.as_posix()}");\n'
+    for ttf_file in ttf_files:
+        woff2_file = ttf_file.with_suffix(".woff2")
+        print(f"▶ Đang nén: {ttf_file.name} ({ttf_file.stat().st_size // 1024} KB)...")
 
-    pe_script += f'''
-SetFontNames("{family_name}", "{family_name}", "{family_name}", "Regular", "Merged");
-SetTTFName(0x409, 1, "{family_name}");
-SetTTFName(0x409, 2, "Regular");
-SetTTFName(0x409, 4, "{family_name}");
-SetTTFName(0x409, 16, "{family_name}");
-SetTTFName(0x409, 17, "Regular");
-Generate("{output_file.as_posix()}", "", 0x84);
-Quit();
-'''
+        try:
+            # Mở font
+            font = TTFont(ttf_file)
+            
+            # Lưu lại dưới dạng WOFF2
+            font.flavor = "woff2"
+            font.save(woff2_file)
+            font.close()
 
-    script_path = output_file.parent / "_merge_temp.pe"
-    script_path.write_text(pe_script, encoding="utf-8")
+            orig_kb = ttf_file.stat().st_size // 1024
+            woff2_kb = woff2_file.stat().st_size // 1024
+            print(f"  ✅ Tạo thành công {woff2_file.name}: {orig_kb} KB ➔ {woff2_kb} KB")
 
-    try:
-        result = subprocess.run(
-            ["fontforge", "-lang=ff", "-script", str(script_path)],
-            capture_output=True,
-            text=True,
-            timeout=180
-        )
-        script_path.unlink(missing_ok=True)
-
-        if output_file.exists() and output_file.stat().st_size > 5000:
-            size_kb = output_file.stat().st_size // 1024
-            print(f"  ✅ Đã tạo: {output_file.name} ({size_kb} KB)")
-            return True
-        else:
-            print("  ❌ Không tạo được file hợp lệ")
-            if result.stderr:
-                print(result.stderr[:600])
-            return False
-    except FileNotFoundError:
-        print("  ❌ Vẫn chưa có FontForge. Chạy: brew install fontforge")
-        return False
-    except Exception as e:
-        print(f"  ❌ Lỗi: {e}")
-        return False
-
-
-def process_all_folders(source_dir="font", output_dir="tff"):
-    source = Path(source_dir).resolve()
-    output = Path(output_dir).resolve()
-    output.mkdir(parents=True, exist_ok=True)
-
-    subfolders = sorted([d for d in source.iterdir() if d.is_dir()])
-    print(f"📂 Tìm thấy {len(subfolders)} thư mục con\n")
-
-    success = 0
-    for folder in subfolders:
-        out_name = folder.name.lower() + ".ttf"
-        out_path = output / out_name
-        family = folder.name.capitalize()
-
-        ttf_files = sorted([
-            f for f in folder.iterdir()
-            if f.is_file() and f.suffix.lower() in {".ttf", ".tff"}
-        ])
-
-        print(f"▶ Xử lý: {folder.name}/ → {out_name}")
-        print(f"  🔄 Gộp {len(ttf_files)} file...")
-        for f in ttf_files:
-            print(f"      - {f.name}")
-
-        if merge_with_fontforge(ttf_files, out_path, family):
-            success += 1
-        print()
-
-    print(f"🎉 Xong! Tạo được {success}/{len(subfolders)} font trong: {output}")
-
+        except Exception as e:
+            print(f"  ❌ Lỗi: {e}")
 
 if __name__ == "__main__":
-    process_all_folders("font", "app/static/fonts")
+    convert_ttf_to_woff2("app/static/fonts")
