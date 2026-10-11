@@ -26,7 +26,8 @@ log = logging.getLogger(__name__)
 # ─── SQL ──────────────────────────────────────────────────────────────────────
 
 _SQL_LOAD = """
-SELECT id, image, post_id, post_link, caption, ground_truth, phonetic, extra
+SELECT id, image, post_id, post_link, caption, ground_truth, phonetic, extra,
+       created_at, updated_at
     FROM dataset_items
  ORDER BY display_index NULLS LAST, id
 """
@@ -134,6 +135,8 @@ class PgDataset:
       upsert_rows(), update_ground_truth(), update_verify()
     """
 
+    database_backed = True
+
     def __init__(self, database_url: str) -> None:
         self._url = database_url
         self._items: list[Item] = []
@@ -233,7 +236,8 @@ class PgDataset:
 
             items: list[Item] = []
             db_ids: list[int] = []
-            for i, (db_id, image, post_id, post_link, caption, ground_truth, phonetic, extra) in enumerate(rows):
+            for i, (db_id, image, post_id, post_link, caption, ground_truth,
+                    phonetic, extra, created_at, updated_at) in enumerate(rows):
                 items.append(Item(
                     index=i,
                     image=image or "",
@@ -243,6 +247,8 @@ class PgDataset:
                     ground_truth=ground_truth or "",
                     phonetic=phonetic or "",
                     extra=self._parse_extra(extra),
+                    created_at=created_at,
+                    updated_at=updated_at,
                 ))
                 db_ids.append(db_id)
 

@@ -8,6 +8,7 @@ always drift, and the useful thing is to see by how much.
 from __future__ import annotations
 
 import logging
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
@@ -43,6 +44,9 @@ async def lookup(
     group: str = Query(""),
     verified: str = Query(""),
     min_han_similarity: int = Query(0, ge=0, le=100),
+    sort: Literal[
+        "display", "created_desc", "created_asc", "updated_desc", "updated_asc",
+    ] = Query("display"),
     user: dict = Depends(current_user),
 ):
     """Search by Facebook link, post id, caption, ground truth or filename."""
@@ -50,6 +54,12 @@ async def lookup(
     # Resolve before searching: `has_image` is part of what a result shows, and
     # `missing_only` filters on it.
     runtime.refresh()
+
+    if sort != "display" and not getattr(runtime.dataset, "database_backed", False):
+        raise HTTPException(
+            status_code=503,
+            detail="Sắp xếp theo ngày yêu cầu dataset từ PostgreSQL.",
+        )
 
     page_limit = limit or runtime.settings.page_size
     everything = runtime.dataset.search(
@@ -73,6 +83,16 @@ async def lookup(
             item for item in rows
             if (_group_for_image(item.image, runtime.settings.group_tags) or "other") == group
         ]
+    if sort != "display":
+        field_name, direction = sort.rsplit("_", 1)
+        timestamp_field = f"{field_name}_at"
+        dated = [item for item in rows if getattr(item, timestamp_field) is not None]
+        undated = [item for item in rows if getattr(item, timestamp_field) is None]
+        dated.sort(
+            key=lambda item: getattr(item, timestamp_field),
+            reverse=direction == "desc",
+        )
+        rows = dated + undated
     window = rows[offset : offset + page_limit]
     payload = {
         **everything.to_json(),

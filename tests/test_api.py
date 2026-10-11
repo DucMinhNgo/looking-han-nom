@@ -4,10 +4,13 @@ The app fixture and its helpers live in conftest.py.
 """
 
 import json
+from datetime import datetime, timezone
 
 import pytest
 
 from tests.conftest import POEM, URL, login  # noqa: F401
+from app.core.dataset import Dataset
+from app.core.pg_dataset import PgDataset
 
 
 class TestAuth:
@@ -80,6 +83,34 @@ class TestSearch:
         login(client)
         body = client.get("/api/lookup", params={"min_han_similarity": 80}).json()
         assert body["total"] == 0
+
+    def test_timestamp_sort_requires_database_backend(self, client):
+        login(client)
+        runtime = client.app.state.runtime
+        runtime.dataset = Dataset(runtime.settings.dataset_path)
+
+        response = client.get("/api/lookup", params={"sort": "created_desc"})
+        assert response.status_code == 503
+
+    def test_timestamp_sort_uses_database_columns(self, client):
+        login(client)
+        runtime = client.app.state.runtime
+        dataset = PgDataset("postgresql://unused")
+        newest = datetime(2025, 1, 3, tzinfo=timezone.utc)
+        oldest = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        dataset._execute = lambda sql, params=(): (
+            [(newest,)] if sql == "SELECT MAX(updated_at) FROM dataset_items" else [
+                (1, "db_oldest.jpg", "p1", "", "", "", "", {}, oldest, oldest),
+                (2, "db_newest.jpg", "p2", "", "", "", "", {}, newest, newest),
+            ]
+        )
+        runtime.dataset = dataset
+
+        response = client.get("/api/lookup", params={
+            "sort": "created_desc", "limit": 1,
+        })
+        assert response.status_code == 200
+        assert response.json()["items"][0]["image"] == "db_newest.jpg"
 
     def test_paging(self, client):
         login(client)
