@@ -42,6 +42,7 @@ async def lookup(
     limit: int = Query(0, ge=0, le=200),
     missing_only: bool = Query(False),
     group: str = Query(""),
+    groups: str = Query(""),
     verified: str = Query(""),
     min_han_similarity: int = Query(0, ge=0, le=100),
     sort: Literal[
@@ -78,11 +79,16 @@ async def lookup(
         rows = [item for item in rows if item.extra.get("verified") is True]
     elif verified == "unverified":
         rows = [item for item in rows if item.extra.get("verified") is not True]
-    if group:
-        rows = [
-            item for item in rows
-            if (_group_for_image(item.image, runtime.settings.group_tags) or "other") == group
-        ]
+    raw_groups = request.query_params.getlist("group") + request.query_params.getlist("groups")
+    selected_groups = {part.strip() for g in raw_groups for part in g.split(",") if part.strip()}
+    if selected_groups:
+        if "__none__" in selected_groups:
+            rows = []
+        else:
+            rows = [
+                item for item in rows
+                if (_group_for_image(item.image, runtime.settings.group_tags) or "other") in selected_groups
+            ]
     if sort != "display":
         field_name, direction = sort.rsplit("_", 1)
         timestamp_field = f"{field_name}_at"

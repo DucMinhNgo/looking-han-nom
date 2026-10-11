@@ -1,1230 +1,2160 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Tra cứu Hán-Nôm</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Noto+Serif+TC:wght@400;700&display=swap" rel="stylesheet" />
-<style>
-  :root {
-    color-scheme: light;
-    --surface: #fcfcfb; --plane: #f9f9f7;
-    --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
-    --grid: #e1e0d9; --border: rgba(11,11,11,0.10);
-    --series-1: #2a78d6; --series-2: #eb6834;
-    --good: #0ca30c; --warning: #fab219; --critical: #d03b3b;
-    --good-text: #006300;
-    --han-font-family: "Noto Serif CJK TC", "Source Han Serif", "MS Mincho", serif;
-    --shadow: 0 1px 2px rgba(11,11,11,0.06), 0 4px 12px rgba(11,11,11,0.05);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:where(:not([data-theme="light"])) {
-      color-scheme: dark;
-      --surface: #1a1a19; --plane: #0d0d0d;
-      --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
-      --grid: #2c2c2a; --border: rgba(255,255,255,0.10);
-      --series-1: #3987e5; --series-2: #d95926;
-      --good-text: #0ca30c;
-      --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.3);
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tra cứu Hán-Nôm</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Noto+Serif+TC:wght@400;700&display=swap"
+    rel="stylesheet" />
+  <style>
+    :root {
+      color-scheme: light;
+      --surface: #fcfcfb;
+      --plane: #f9f9f7;
+      --ink: #0b0b0b;
+      --ink-2: #52514e;
+      --muted: #898781;
+      --grid: #e1e0d9;
+      --border: rgba(11, 11, 11, 0.10);
+      --series-1: #2a78d6;
+      --series-2: #eb6834;
+      --good: #0ca30c;
+      --warning: #fab219;
+      --critical: #d03b3b;
+      --good-text: #006300;
+      --han-font-family: "Noto Serif CJK TC", "Source Han Serif", "MS Mincho", serif;
+      --shadow: 0 1px 2px rgba(11, 11, 11, 0.06), 0 4px 12px rgba(11, 11, 11, 0.05);
     }
-  }
-  :root[data-theme="dark"] {
-    color-scheme: dark;
-    --surface: #1a1a19; --plane: #0d0d0d;
-    --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
-    --grid: #2c2c2a; --border: rgba(255,255,255,0.10);
-    --series-1: #3987e5; --series-2: #d95926;
-    --good-text: #0ca30c;
-    --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.3);
-  }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    background: var(--plane); color: var(--ink);
-    font-size: 14px; line-height: 1.45; padding: 1rem;
-  }
-  .wrap { max-width: 1560px; margin: 0 auto; }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) {
+        color-scheme: dark;
+        --surface: #1a1a19;
+        --plane: #0d0d0d;
+        --ink: #ffffff;
+        --ink-2: #c3c2b7;
+        --muted: #898781;
+        --grid: #2c2c2a;
+        --border: rgba(255, 255, 255, 0.10);
+        --series-1: #3987e5;
+        --series-2: #d95926;
+        --good-text: #0ca30c;
+        --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+    }
 
-  header { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; margin-bottom: 1rem; }
-  header h1 { font-size: 1.05rem; font-weight: 700; }
-  .spacer { flex: 1; }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --surface: #1a1a19;
+      --plane: #0d0d0d;
+      --ink: #ffffff;
+      --ink-2: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --border: rgba(255, 255, 255, 0.10);
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --good-text: #0ca30c;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
 
-  .card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 10px; padding: 1rem 1.15rem; margin-bottom: 1rem;
-  }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-  button {
-    font-family: inherit; font-size: 0.83rem; font-weight: 600;
-    border: 1px solid var(--border); border-radius: 6px;
-    padding: 0.4rem 0.8rem; cursor: pointer;
-    background: var(--surface); color: var(--ink);
-  }
-  button:hover:not(:disabled) { filter: brightness(0.95); }
-  button:disabled { opacity: 0.45; cursor: not-allowed; }
-  button.primary { background: var(--series-1); color: #fff; border-color: transparent; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--plane);
+      color: var(--ink);
+      font-size: 14px;
+      line-height: 1.45;
+      padding: 1rem;
+    }
 
-  input, select, textarea {
-    font-family: inherit; font-size: 0.9rem; padding: 0.5rem 0.7rem;
-    border: 1px solid var(--border); border-radius: 6px;
-    background: var(--plane); color: var(--ink); max-width: 100%;
-  }
-  input:focus, select:focus { outline: 2px solid var(--series-1); outline-offset: 1px; }
-  #q { flex: 1; min-width: 220px; font-size: 1rem; }
-  .lookup-controls { display: grid; gap: 0.85rem; }
-  .lookup-search-row {
-    display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, 220px) auto;
-    gap: 0.55rem; align-items: center;
-  }
-  .lookup-search-row #q { width: 100%; min-width: 0; }
-  .lookup-filter-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 185px), 1fr));
-    gap: 0.65rem; padding-top: 0.85rem; border-top: 1px solid var(--border);
-  }
-  .lookup-filter-control { display: grid; gap: 0.3rem; min-width: 0; }
-  .lookup-filter-control > span, .lookup-filter-control > label {
-    font-size: 0.72rem; font-weight: 700; color: var(--ink-2);
-  }
-  .lookup-filter-control select { width: 100%; min-width: 0; text-overflow: ellipsis; }
-  .lookup-font-row { display: flex; align-items: center; gap: 0.45rem; min-width: 0; }
-  .lookup-font-row select { flex: 1; min-width: 0; }
-  .lookup-font-row #font-status { font-size: 0.7rem; overflow-wrap: anywhere; }
+    .wrap {
+      max-width: 1560px;
+      margin: 0 auto;
+    }
 
-  .muted { color: var(--muted); }
-  .row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
 
-  /* ---- mismatch counters: the headline of the page ---- */
-  .counts { display: flex; gap: 1.6rem; flex-wrap: wrap; align-items: flex-start; }
-  .count .k {
-    font-size: 0.68rem; font-weight: 600; letter-spacing: 0.05em;
-    text-transform: uppercase; color: var(--muted);
-  }
-  .count .v { font-size: 1.3rem; font-weight: 700; line-height: 1.2; }
-  .count.warn .v { color: var(--warning); }
-  .count.bad .v { color: var(--critical); }
-  .count button { margin-top: 0.15rem; padding: 0.15rem 0.45rem; font-size: 0.7rem; }
+    header h1 {
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
 
-  /* ---- results ---- */
-  .grid {
-    display: grid; gap: 0.9rem;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    align-items: stretch;
-  }
-  .item {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 10px; overflow: hidden;
-    min-width: 0; display: flex; flex-direction: column;
-    transition: box-shadow .15s ease;
-  }
-  .item:hover { box-shadow: var(--shadow); }
-  .item.noimg { border-style: dashed; border-color: var(--warning); }
-  .thumb {
-    width: 100%; aspect-ratio: 3 / 4; background: var(--plane);
-    display: block; object-fit: contain; cursor: zoom-in;
-  }
-  .thumb-missing {
-    width: 100%; aspect-ratio: 3 / 4; display: grid; place-items: center;
-    background: repeating-linear-gradient(45deg, var(--grid), var(--grid) 7px,
-                                          var(--plane) 7px, var(--plane) 14px);
-    color: var(--ink-2); font-size: 0.8rem; text-align: center; padding: 1rem;
-  }
-  .meta { flex: 1; min-width: 0; padding: 0.65rem 0.75rem;
-          display: flex; flex-direction: column; gap: 0.45rem; }
-  .gt, .block, .cjk, textarea.cjk, textarea.block-edit, .diff-preview {
-    font-family: var(--han-font-family);
-  }
-  .gt {
-    font-size: 1rem; line-height: 1.85; white-space: pre-wrap;
-    height: 7.4rem; overflow-y: auto;
-  }
-    .cap { font-size: 0.82rem; color: var(--ink-2); line-height: 1.5;
-     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-         min-width: 0; min-height: 1.23rem; }
-    .phonetic { font-size: 0.82rem; color: var(--series-1); line-height: 1.45;
-     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-         min-width: 0; min-height: 1.2rem; font-style: italic; }
-    .thumb-missing code { display: block; max-width: 100%; overflow: hidden;
-        white-space: nowrap; text-overflow: ellipsis; }
-      .foot { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;
-        min-width: 0; overflow: visible; margin-top: auto;
-        font-size: 0.7rem; color: var(--muted); }
-      .foot > span:not(.spacer), .foot > a, .foot > button { flex: 0 0 auto; }
-      .foot .spacer { flex: 1 1 0; min-width: 0; }
-      .foot .postlink { max-width: 7rem; overflow: hidden; text-overflow: ellipsis; }
-  .pill {
-    font-size: 0.65rem; font-weight: 700; padding: 0.05rem 0.4rem;
-    border-radius: 3px; border: 1px solid var(--border); color: var(--muted);
-    white-space: nowrap;
-  }
-  .pill.miss { color: var(--warning); border-color: var(--warning); }
-  .user-row { justify-content: flex-start; }
-  .user-row .user-name { min-width: 13rem; overflow: hidden; text-overflow: ellipsis; }
-  .danger-user { color: var(--critical); border-color: var(--critical); }
-  .group-tag { flex: none; max-width: 11rem; overflow: hidden; text-overflow: ellipsis;
-               white-space: nowrap; color: var(--series-1); text-decoration: none;
-               font-weight: 700; }
-  .group-tag:hover { text-decoration: underline; }
-  mark { background: color-mix(in srgb, var(--series-2) 35%, transparent); color: inherit; }
+    .spacer {
+      flex: 1;
+    }
 
-  /* ---- lightbox ---- */
-  .lb { display: none; position: fixed; inset: 0; z-index: 50;
-        background: rgba(0,0,0,0.75); padding: 1.2rem;
-        align-items: center; justify-content: center; }
-  .lb.show { display: flex; }
-  .lb-inner { background: var(--surface); border-radius: 12px; overflow: hidden;
-              max-width: 1500px; width: 100%; max-height: 94vh;
-              display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(340px, 1fr); }
-  @media (max-width: 900px) { .lb-inner { grid-template-columns: 1fr; } }
-  .lb-img { background: #000; display: flex; align-items: center; justify-content: center;
-            min-height: 240px; max-height: 94vh; overflow: auto; }
-  .lb-img img { max-width: 100%; max-height: 94vh; object-fit: contain; display: block; }
-  .lb-side { padding: 1.1rem 1.25rem; overflow-y: auto; max-height: 94vh; }
-  .lb-close { position: absolute; top: 1.2rem; right: 1.2rem; }
-  .kv { display: grid; grid-template-columns: 96px 1fr; gap: 0.3rem 0.7rem; font-size: 0.78rem; }
-  .kv dt { color: var(--muted); }
-  .kv dd { word-break: break-all; }
-  label.field { display: block; font-size: 0.68rem; font-weight: 600;
-    text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted);
-    margin-bottom: 0.3rem; }
-  .block { border: 1px solid var(--border); border-radius: 6px; padding: 0.55rem 0.7rem;
-           background: var(--plane); white-space: pre-wrap; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.15rem;
+      margin-bottom: 1rem;
+    }
 
-  details.card > summary {
-    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.07em;
-    text-transform: uppercase; color: var(--muted); cursor: pointer; list-style: none;
-  }
-  details.card > summary::-webkit-details-marker { display: none; }
-  details.card > summary::before { content: "▸ "; }
-  details.card[open] > summary::before { content: "▾ "; }
-  details.card[open] > summary { margin-bottom: 0.85rem; }
+    button {
+      font-family: inherit;
+      font-size: 0.83rem;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.4rem 0.8rem;
+      cursor: pointer;
+      background: var(--surface);
+      color: var(--ink);
+    }
 
-  .banner { display: none; padding: 0.75rem 0.95rem; border-radius: 8px;
-            margin-bottom: 1rem; border: 1px solid var(--warning); font-size: 0.85rem; }
-  .banner.show { display: block; }
-  .banner.crit { border-color: var(--critical); }
-  .banner b { display: block; margin-bottom: 0.2rem; }
-  .empty { text-align: center; padding: 2.5rem 1rem; color: var(--muted); font-size: 0.9rem; }
-  .filelist { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-              gap: 0.3rem; font-family: ui-monospace, monospace; font-size: 0.75rem; }
-  .hide { display: none !important; }
-  h3.sub { font-size: 0.8rem; font-weight: 700; margin: 1.1rem 0 0.3rem; }
-  h3.sub:first-of-type { margin-top: 0.2rem; }
-  p.hint { font-size: 0.76rem; margin-bottom: 0.6rem; line-height: 1.5; }
-  label.inline { font-size: 0.8rem; color: var(--ink-2); display: flex;
-                 align-items: center; gap: 0.3rem; }
-  .rowform { display: grid; gap: 0.5rem; max-width: 620px; }
-  .result { font-size: 0.8rem; margin-top: 0.5rem; line-height: 1.6; }
-  .result .ok { color: var(--good-text); font-weight: 600; }
-  .result .warn { color: var(--warning); font-weight: 600; }
-  .result ul { margin: 0.3rem 0 0 1.1rem; }
-  .result code { font-family: ui-monospace, monospace; font-size: 0.74rem; }
-  a.postlink { color: var(--series-1); text-decoration: none; font-weight: 600;
-               font-size: 0.78rem; white-space: nowrap; overflow: hidden;
-               text-overflow: ellipsis; max-width: 100%; }
-  a.postlink:hover { text-decoration: underline; }
-  .lb-side a.postlink { font-weight: 400; word-break: break-all;
-                        white-space: normal; }
-  .qwen-box { margin-top: 0.8rem; border-top: 1px solid var(--border); padding-top: 0.8rem; }
-  .qwen-line { padding: 0.45rem 0; border-bottom: 1px solid var(--border); }
-  .qwen-line:last-child { border-bottom: 0; }
-  .qwen-source { display: block; margin-top: 0.2rem; color: var(--series-1);
-                 font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis;
-                 white-space: nowrap; }
-  .qwen-reference { display: block; max-width: 100%; max-height: 220px;
-                    margin-top: 0.35rem; object-fit: contain; object-position: left;
-                    border: 1px solid var(--border); cursor: zoom-in; }
-  .verified-tag { color: var(--good-text); border-color: var(--good-text); }
-  .unverified-tag { color: var(--warning); border-color: var(--warning); }
-  .click-tag { cursor: pointer; }
-  .click-tag:hover { filter: brightness(0.9); }
-  #results [data-open] { cursor: pointer; }
-  .verify-history { margin-top: 0.45rem; max-height: 8rem; overflow-y: auto;
-                    font-size: 0.74rem; color: var(--ink-2); }
-  .verify-history div { padding: 0.2rem 0; border-top: 1px solid var(--border); }
-  .diff-preview { margin-top: 0.45rem; padding: 0.55rem 0.7rem; border: 1px solid var(--border);
-                  border-radius: 6px; background: var(--plane); white-space: pre-wrap;
-                  font-family: var(--han-font-family);
-                  line-height: 1.8; }
-  .diff-preview .different { color: var(--critical); background: color-mix(in srgb, var(--critical) 16%, transparent); }
-  .diff-preview .different { cursor: pointer; text-decoration: underline dotted; }
-  .diff-preview .different:hover { background: var(--critical); color: #fff; }
-  .similarity { font-weight: 700; }
-  .han-similarity { font-size: 0.72rem; }
-  .similarity.low { color: var(--critical); }
-  .similarity.high { color: var(--good-text); }
-  textarea.block-edit { width: 100%; box-sizing: border-box; resize: vertical;
-                        line-height: 1.7; }
-  .pill.more { cursor: pointer; background: var(--plane); color: var(--ink-2);
-               border: 1px solid var(--border); }
-  .pill.more:hover { border-color: var(--series-1); color: var(--series-1); }
-  .pill.warn-pill { display: block; margin: 0 0 0.7rem; padding: 0.35rem 0.6rem;
-                    background: var(--plane); border: 1px solid var(--border);
-                    border-radius: 6px; font-size: 0.72rem; line-height: 1.5;
-                    color: var(--ink-2); }
-  .strip { display: flex; gap: 0.4rem; margin-top: 0.5rem; overflow-x: auto;
-           padding-bottom: 0.2rem; }
-  .strip-thumb { height: 56px; width: auto; flex: none; cursor: pointer;
-                 border-radius: 4px; opacity: 0.55;
-                 border: 2px solid transparent; background: var(--plane); }
-  .strip-thumb:hover { opacity: 0.85; }
-  .strip-thumb.on { opacity: 1; border-color: var(--series-1); }
-  .results-toolbar { display: flex; align-items: center; gap: 0.55rem;
-                     flex-wrap: wrap; margin-bottom: 0.9rem; }
-  .results-toolbar .page-label { font-size: 0.78rem; font-weight: 600;
-                                 color: var(--ink-2); }
-  .results-toolbar input[type="number"] { width: 5.2rem; padding: 0.4rem 0.55rem; }
-  .results-toolbar select { padding: 0.4rem 0.55rem; }
-  .load-status { min-height: 1.35rem; display: flex; align-items: center;
-                 justify-content: center; gap: 0.55rem; padding: 0.8rem;
-                 color: var(--muted); font-size: 0.78rem; }
-  .load-status button { font-size: 0.78rem; padding: 0.3rem 0.65rem; }
-  .load-status.loading::before { content: ""; width: 0.8rem; height: 0.8rem;
-                                 border: 2px solid var(--grid);
-                                 border-top-color: var(--series-1);
-                                 border-radius: 50%; animation: spin .7s linear infinite; }
-  .load-status.end { padding-top: 1rem; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .load-modal { display: none; position: fixed; inset: 0; z-index: 80;
-                background: rgba(0,0,0,0.28); align-items: center;
-                justify-content: center; }
-  .load-modal.show { display: flex; }
-  .load-modal-card { min-width: 230px; padding: 1.2rem 1.4rem;
-                     border: 1px solid var(--border); border-radius: 10px;
-                     background: var(--surface); box-shadow: var(--shadow);
-                     text-align: center; }
-  .load-spinner { width: 1.5rem; height: 1.5rem; margin: 0 auto 0.7rem;
-                  border: 3px solid var(--grid); border-top-color: var(--series-1);
-                  border-radius: 50%; animation: spin .7s linear infinite; }
-  .load-modal-detail { margin-top: 0.25rem; color: var(--muted); font-size: 0.76rem; }
-  @media (max-width: 620px) {
-    body { padding: 0.65rem; }
-    .card { padding: 0.8rem; }
-    .lookup-search-row { grid-template-columns: minmax(0, 1fr) auto; }
-    .lookup-search-row #q { grid-column: 1 / -1; }
-    .lookup-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .lookup-font-row { display: grid; grid-template-columns: minmax(0, 1fr); }
-    .results-toolbar { align-items: stretch; }
-    .results-toolbar .spacer { display: none; }
-    .results-toolbar .page-label { width: 100%; }
-    .grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.65rem; }
-  }
-  @media (max-width: 380px) {
-    .lookup-filter-grid { grid-template-columns: minmax(0, 1fr); }
-  }
-</style>
+    button:hover:not(:disabled) {
+      filter: brightness(0.95);
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    button.primary {
+      background: var(--series-1);
+      color: #fff;
+      border-color: transparent;
+    }
+
+    input,
+    select,
+    textarea {
+      font-family: inherit;
+      font-size: 0.9rem;
+      padding: 0.5rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--plane);
+      color: var(--ink);
+      max-width: 100%;
+    }
+
+    input:focus,
+    select:focus {
+      outline: 2px solid var(--series-1);
+      outline-offset: 1px;
+    }
+
+    #q {
+      flex: 1;
+      min-width: 220px;
+      font-size: 1rem;
+    }
+
+    .lookup-controls {
+      display: grid;
+      gap: 0.85rem;
+    }
+
+    .lookup-search-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(150px, 220px) auto;
+      gap: 0.55rem;
+      align-items: center;
+    }
+
+    .lookup-search-row #q {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .lookup-filter-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 185px), 1fr));
+      gap: 0.65rem;
+      padding-top: 0.85rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .lookup-filter-control {
+      display: grid;
+      gap: 0.3rem;
+      min-width: 0;
+    }
+
+    .lookup-filter-control>span,
+    .lookup-filter-control>label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--ink-2);
+    }
+
+    .lookup-filter-control select {
+      width: 100%;
+      min-width: 0;
+      text-overflow: ellipsis;
+    }
+
+    .group-multiselect {
+      position: relative;
+      width: 100%;
+      min-width: 0;
+    }
+
+    .group-multiselect-trigger {
+      width: 100%;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.5rem 0.7rem;
+      font-family: inherit;
+      font-size: 0.88rem;
+      font-weight: 500;
+      text-align: left;
+      background: var(--plane);
+      color: var(--ink);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      user-select: none;
+      box-sizing: border-box;
+    }
+
+    .group-multiselect-trigger:focus {
+      outline: 2px solid var(--series-1);
+      outline-offset: 1px;
+    }
+
+    .group-multiselect-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .group-multiselect-arrow {
+      font-size: 0.72rem;
+      color: var(--muted);
+      flex-shrink: 0;
+      transition: transform 0.18s ease;
+    }
+
+    .group-multiselect.open .group-multiselect-arrow {
+      transform: rotate(180deg);
+    }
+
+    .group-multiselect-dropdown {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      width: max(100%, 250px);
+      max-height: 320px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18), 0 1px 3px rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .group-multiselect-dropdown.hide {
+      display: none !important;
+    }
+
+    .group-multiselect-toolbar {
+      display: flex;
+      gap: 0.35rem;
+      padding: 0.45rem 0.6rem;
+      background: var(--plane);
+      border-bottom: 1px solid var(--border);
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .group-tool-btn {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.2rem 0.45rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink);
+      cursor: pointer;
+    }
+
+    .group-tool-btn:hover {
+      background: color-mix(in srgb, var(--series-1) 12%, var(--surface));
+      color: var(--series-1);
+      border-color: var(--series-1);
+    }
+
+    .group-multiselect-list {
+      max-height: 240px;
+      overflow-y: auto;
+      padding: 0.3rem 0;
+    }
+
+    .group-item {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      padding: 0.4rem 0.75rem;
+      cursor: pointer;
+      user-select: none;
+      font-size: 0.85rem;
+      color: var(--ink);
+      transition: background 0.1s ease;
+    }
+
+    .group-item:hover {
+      background: color-mix(in srgb, var(--series-1) 12%, transparent);
+    }
+
+    .group-item input[type="checkbox"] {
+      width: 15px;
+      height: 15px;
+      cursor: pointer;
+      accent-color: var(--series-1);
+      margin: 0;
+      flex-shrink: 0;
+    }
+
+    .group-item-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 500;
+    }
+
+    .group-item-id {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-family: monospace;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 110px;
+    }
+
+    .lookup-font-row {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      min-width: 0;
+    }
+
+    .lookup-font-row select {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .lookup-font-row #font-status {
+      font-size: 0.7rem;
+      overflow-wrap: anywhere;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    /* ---- mismatch counters: the headline of the page ---- */
+    .counts {
+      display: flex;
+      gap: 1.6rem;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+
+    .count .k {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .count .v {
+      font-size: 1.3rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .count.warn .v {
+      color: var(--warning);
+    }
+
+    .count.bad .v {
+      color: var(--critical);
+    }
+
+    .count button {
+      margin-top: 0.15rem;
+      padding: 0.15rem 0.45rem;
+      font-size: 0.7rem;
+    }
+
+    /* ---- results ---- */
+    .grid {
+      display: grid;
+      gap: 0.9rem;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      align-items: stretch;
+    }
+
+    .item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      transition: box-shadow .15s ease;
+    }
+
+    .item:hover {
+      box-shadow: var(--shadow);
+    }
+
+    .item.noimg {
+      border-style: dashed;
+      border-color: var(--warning);
+    }
+
+    .thumb {
+      width: 100%;
+      aspect-ratio: 3 / 4;
+      background: var(--plane);
+      display: block;
+      object-fit: contain;
+      cursor: zoom-in;
+    }
+
+    .thumb-missing {
+      width: 100%;
+      aspect-ratio: 3 / 4;
+      display: grid;
+      place-items: center;
+      background: repeating-linear-gradient(45deg, var(--grid), var(--grid) 7px,
+          var(--plane) 7px, var(--plane) 14px);
+      color: var(--ink-2);
+      font-size: 0.8rem;
+      text-align: center;
+      padding: 1rem;
+    }
+
+    .meta {
+      flex: 1;
+      min-width: 0;
+      padding: 0.65rem 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+
+    .gt,
+    .block,
+    .cjk,
+    textarea.cjk,
+    textarea.block-edit,
+    .diff-preview {
+      font-family: var(--han-font-family);
+    }
+
+    .gt {
+      font-size: 1rem;
+      line-height: 1.85;
+      white-space: pre-wrap;
+      height: 7.4rem;
+      overflow-y: auto;
+    }
+
+    .cap {
+      font-size: 0.82rem;
+      color: var(--ink-2);
+      line-height: 1.5;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+      min-height: 1.23rem;
+    }
+
+    .phonetic {
+      font-size: 0.82rem;
+      color: var(--series-1);
+      line-height: 1.45;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+      min-height: 1.2rem;
+      font-style: italic;
+    }
+
+    .thumb-missing code {
+      display: block;
+      max-width: 100%;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .foot {
+      display: flex;
+      gap: 0.4rem;
+      align-items: center;
+      flex-wrap: wrap;
+      min-width: 0;
+      overflow: visible;
+      margin-top: auto;
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+
+    .foot>span:not(.spacer),
+    .foot>a,
+    .foot>button {
+      flex: 0 0 auto;
+    }
+
+    .foot .spacer {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+
+    .foot .postlink {
+      max-width: 7rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .pill {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 0.05rem 0.4rem;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .pill.miss {
+      color: var(--warning);
+      border-color: var(--warning);
+    }
+
+    .user-row {
+      justify-content: flex-start;
+    }
+
+    .user-row .user-name {
+      min-width: 13rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .danger-user {
+      color: var(--critical);
+      border-color: var(--critical);
+    }
+
+    .group-tag {
+      flex: none;
+      max-width: 11rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--series-1);
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .group-tag:hover {
+      text-decoration: underline;
+    }
+
+    mark {
+      background: color-mix(in srgb, var(--series-2) 35%, transparent);
+      color: inherit;
+    }
+
+    /* ---- lightbox ---- */
+    .lb {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      background: rgba(0, 0, 0, 0.75);
+      padding: 1.2rem;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .lb.show {
+      display: flex;
+    }
+
+    .lb-inner {
+      background: var(--surface);
+      border-radius: 12px;
+      overflow: hidden;
+      max-width: 1500px;
+      width: 100%;
+      max-height: 94vh;
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(340px, 1fr);
+    }
+
+    @media (max-width: 900px) {
+      .lb-inner {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .lb-img {
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 240px;
+      max-height: 94vh;
+      overflow: auto;
+    }
+
+    .lb-img img {
+      max-width: 100%;
+      max-height: 94vh;
+      object-fit: contain;
+      display: block;
+    }
+
+    .lb-side {
+      padding: 1.1rem 1.25rem;
+      overflow-y: auto;
+      max-height: 94vh;
+    }
+
+    .lb-close {
+      position: absolute;
+      top: 1.2rem;
+      right: 1.2rem;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 96px 1fr;
+      gap: 0.3rem 0.7rem;
+      font-size: 0.78rem;
+    }
+
+    .kv dt {
+      color: var(--muted);
+    }
+
+    .kv dd {
+      word-break: break-all;
+    }
+
+    label.field {
+      display: block;
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 0.3rem;
+    }
+
+    .block {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.55rem 0.7rem;
+      background: var(--plane);
+      white-space: pre-wrap;
+    }
+
+    details.card>summary {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--muted);
+      cursor: pointer;
+      list-style: none;
+    }
+
+    details.card>summary::-webkit-details-marker {
+      display: none;
+    }
+
+    details.card>summary::before {
+      content: "▸ ";
+    }
+
+    details.card[open]>summary::before {
+      content: "▾ ";
+    }
+
+    details.card[open]>summary {
+      margin-bottom: 0.85rem;
+    }
+
+    .banner {
+      display: none;
+      padding: 0.75rem 0.95rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      border: 1px solid var(--warning);
+      font-size: 0.85rem;
+    }
+
+    .banner.show {
+      display: block;
+    }
+
+    .banner.crit {
+      border-color: var(--critical);
+    }
+
+    .banner b {
+      display: block;
+      margin-bottom: 0.2rem;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 2.5rem 1rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .filelist {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 0.3rem;
+      font-family: ui-monospace, monospace;
+      font-size: 0.75rem;
+    }
+
+    .hide {
+      display: none !important;
+    }
+
+    h3.sub {
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin: 1.1rem 0 0.3rem;
+    }
+
+    h3.sub:first-of-type {
+      margin-top: 0.2rem;
+    }
+
+    p.hint {
+      font-size: 0.76rem;
+      margin-bottom: 0.6rem;
+      line-height: 1.5;
+    }
+
+    label.inline {
+      font-size: 0.8rem;
+      color: var(--ink-2);
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .rowform {
+      display: grid;
+      gap: 0.5rem;
+      max-width: 620px;
+    }
+
+    .result {
+      font-size: 0.8rem;
+      margin-top: 0.5rem;
+      line-height: 1.6;
+    }
+
+    .result .ok {
+      color: var(--good-text);
+      font-weight: 600;
+    }
+
+    .result .warn {
+      color: var(--warning);
+      font-weight: 600;
+    }
+
+    .result ul {
+      margin: 0.3rem 0 0 1.1rem;
+    }
+
+    .result code {
+      font-family: ui-monospace, monospace;
+      font-size: 0.74rem;
+    }
+
+    a.postlink {
+      color: var(--series-1);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.78rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+
+    a.postlink:hover {
+      text-decoration: underline;
+    }
+
+    .lb-side a.postlink {
+      font-weight: 400;
+      word-break: break-all;
+      white-space: normal;
+    }
+
+    .qwen-box {
+      margin-top: 0.8rem;
+      border-top: 1px solid var(--border);
+      padding-top: 0.8rem;
+    }
+
+    .qwen-line {
+      padding: 0.45rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .qwen-line:last-child {
+      border-bottom: 0;
+    }
+
+    .qwen-source {
+      display: block;
+      margin-top: 0.2rem;
+      color: var(--series-1);
+      font-size: 0.75rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .qwen-reference {
+      display: block;
+      max-width: 100%;
+      max-height: 220px;
+      margin-top: 0.35rem;
+      object-fit: contain;
+      object-position: left;
+      border: 1px solid var(--border);
+      cursor: zoom-in;
+    }
+
+    .verified-tag {
+      color: var(--good-text);
+      border-color: var(--good-text);
+    }
+
+    .unverified-tag {
+      color: var(--warning);
+      border-color: var(--warning);
+    }
+
+    .click-tag {
+      cursor: pointer;
+    }
+
+    .click-tag:hover {
+      filter: brightness(0.9);
+    }
+
+    #results [data-open] {
+      cursor: pointer;
+    }
+
+    .verify-history {
+      margin-top: 0.45rem;
+      max-height: 8rem;
+      overflow-y: auto;
+      font-size: 0.74rem;
+      color: var(--ink-2);
+    }
+
+    .verify-history div {
+      padding: 0.2rem 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .diff-preview {
+      margin-top: 0.45rem;
+      padding: 0.55rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--plane);
+      white-space: pre-wrap;
+      font-family: var(--han-font-family);
+      line-height: 1.8;
+    }
+
+    .diff-preview .different {
+      color: var(--critical);
+      background: color-mix(in srgb, var(--critical) 16%, transparent);
+    }
+
+    .diff-preview .different {
+      cursor: pointer;
+      text-decoration: underline dotted;
+    }
+
+    .diff-preview .different:hover {
+      background: var(--critical);
+      color: #fff;
+    }
+
+    .similarity {
+      font-weight: 700;
+    }
+
+    .han-similarity {
+      font-size: 0.72rem;
+    }
+
+    .similarity.low {
+      color: var(--critical);
+    }
+
+    .similarity.high {
+      color: var(--good-text);
+    }
+
+    textarea.block-edit {
+      width: 100%;
+      box-sizing: border-box;
+      resize: vertical;
+      line-height: 1.7;
+    }
+
+    .pill.more {
+      cursor: pointer;
+      background: var(--plane);
+      color: var(--ink-2);
+      border: 1px solid var(--border);
+    }
+
+    .pill.more:hover {
+      border-color: var(--series-1);
+      color: var(--series-1);
+    }
+
+    .pill.warn-pill {
+      display: block;
+      margin: 0 0 0.7rem;
+      padding: 0.35rem 0.6rem;
+      background: var(--plane);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.72rem;
+      line-height: 1.5;
+      color: var(--ink-2);
+    }
+
+    .strip {
+      display: flex;
+      gap: 0.4rem;
+      margin-top: 0.5rem;
+      overflow-x: auto;
+      padding-bottom: 0.2rem;
+    }
+
+    .strip-thumb {
+      height: 56px;
+      width: auto;
+      flex: none;
+      cursor: pointer;
+      border-radius: 4px;
+      opacity: 0.55;
+      border: 2px solid transparent;
+      background: var(--plane);
+    }
+
+    .strip-thumb:hover {
+      opacity: 0.85;
+    }
+
+    .strip-thumb.on {
+      opacity: 1;
+      border-color: var(--series-1);
+    }
+
+    .results-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.9rem;
+    }
+
+    .results-toolbar .page-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--ink-2);
+    }
+
+    .results-toolbar input[type="number"] {
+      width: 5.2rem;
+      padding: 0.4rem 0.55rem;
+    }
+
+    .results-toolbar select {
+      padding: 0.4rem 0.55rem;
+    }
+
+    .load-status {
+      min-height: 1.35rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.55rem;
+      padding: 0.8rem;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .load-status button {
+      font-size: 0.78rem;
+      padding: 0.3rem 0.65rem;
+    }
+
+    .load-status.loading::before {
+      content: "";
+      width: 0.8rem;
+      height: 0.8rem;
+      border: 2px solid var(--grid);
+      border-top-color: var(--series-1);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+
+    .load-status.end {
+      padding-top: 1rem;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .load-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      background: rgba(0, 0, 0, 0.28);
+      align-items: center;
+      justify-content: center;
+    }
+
+    .load-modal.show {
+      display: flex;
+    }
+
+    .load-modal-card {
+      min-width: 230px;
+      padding: 1.2rem 1.4rem;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+
+    .load-spinner {
+      width: 1.5rem;
+      height: 1.5rem;
+      margin: 0 auto 0.7rem;
+      border: 3px solid var(--grid);
+      border-top-color: var(--series-1);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+
+    .load-modal-detail {
+      margin-top: 0.25rem;
+      color: var(--muted);
+      font-size: 0.76rem;
+    }
+
+    @media (max-width: 620px) {
+      body {
+        padding: 0.65rem;
+      }
+
+      .card {
+        padding: 0.8rem;
+      }
+
+      .lookup-search-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+      }
+
+      .lookup-search-row #q {
+        grid-column: 1 / -1;
+      }
+
+      .lookup-filter-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .lookup-font-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .results-toolbar {
+        align-items: stretch;
+      }
+
+      .results-toolbar .spacer {
+        display: none;
+      }
+
+      .results-toolbar .page-label {
+        width: 100%;
+      }
+
+      .grid {
+        grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+        gap: 0.65rem;
+      }
+    }
+
+    @media (max-width: 380px) {
+      .lookup-filter-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+  </style>
 </head>
+
 <body>
-<div class="wrap">
+  <div class="wrap">
 
-  <header>
-    <h1>Tra cứu Hán-Nôm</h1>
-    <span class="muted" id="whoami">…</span>
-    <div class="spacer"></div>
-    <span class="muted" id="corpus-line"></span>
-    <button id="btn-logout">Đăng xuất</button>
-  </header>
+    <header>
+      <h1>Tra cứu Hán-Nôm</h1>
+      <span class="muted" id="whoami">…</span>
+      <div class="spacer"></div>
+      <span class="muted" id="corpus-line"></span>
+      <button id="btn-logout">Đăng xuất</button>
+    </header>
 
-  <div class="banner" id="banner" role="alert">
-    <b id="banner-title"></b><span id="banner-body"></span>
-  </div>
+    <div class="banner" id="banner" role="alert">
+      <b id="banner-title"></b><span id="banner-body"></span>
+    </div>
 
-  <!-- ============ search ============ -->
-  <div class="card">
-    <div class="lookup-controls">
-      <div class="lookup-search-row">
-        <input type="search" id="q" placeholder="Dán link Facebook, post id, caption hoặc chữ trong ground truth…"
-               autocomplete="off" autofocus />
-        <select id="field" aria-label="Tìm trong trường">
-          <option value="all">Tất cả</option>
-          <option value="post">Link / Post ID</option>
-          <option value="caption">Caption</option>
-          <option value="ground_truth">Ground truth</option>
-          <option value="phonetic">Phiên âm</option>
-          <option value="image">Tên file ảnh</option>
-        </select>
-        <button id="btn-clear">Xoá</button>
-      </div>
-      <div class="lookup-filter-grid" aria-label="Bộ lọc kết quả">
-        <label class="lookup-filter-control" for="group-filter">
-          <span>Nhóm</span>
-          <select id="group-filter" aria-label="Lọc theo nhóm">
-            <option value="">Tất cả group</option>
-            <option value="group1">group1</option>
-            <option value="group2">group2</option>
-            <option value="hieu">hieu</option>
-            <option value="other">other</option>
+    <!-- ============ search ============ -->
+    <div class="card">
+      <div class="lookup-controls">
+        <div class="lookup-search-row">
+          <input type="search" id="q" placeholder="Dán link Facebook, post id, caption hoặc chữ trong ground truth…"
+            autocomplete="off" autofocus />
+          <select id="field" aria-label="Tìm trong trường">
+            <option value="all">Tất cả</option>
+            <option value="post">Link / Post ID</option>
+            <option value="caption">Caption</option>
+            <option value="ground_truth">Ground truth</option>
+            <option value="phonetic">Phiên âm</option>
+            <option value="image">Tên file ảnh</option>
           </select>
-        </label>
-        <label class="lookup-filter-control" for="verify-filter">
-          <span>Trạng thái verify</span>
-          <select id="verify-filter" aria-label="Lọc theo trạng thái verify">
-            <option value="">Tất cả trạng thái</option>
-            <option value="verified">Đã verify</option>
-            <option value="unverified">Chưa verify</option>
-          </select>
-        </label>
-        <label class="lookup-filter-control" for="han-similarity-filter">
-          <span>Độ giống caption</span>
-          <select id="han-similarity-filter" aria-label="Lọc caption theo độ tương đồng chữ Hán">
-            <option value="">Mọi độ tương đồng</option>
-            <option value="80">Gần ground truth ≥80%</option>
-          </select>
-        </label>
-        <label class="lookup-filter-control" for="sort-filter">
-          <span>Sắp xếp ngày DB</span>
-          <select id="sort-filter" aria-label="Sắp xếp theo ngày tạo hoặc cập nhật từ PostgreSQL">
-            <option value="display">Mặc định</option>
-            <option value="created_desc">Ngày tạo · mới nhất</option>
-            <option value="created_asc">Ngày tạo · cũ nhất</option>
-            <option value="updated_desc">Ngày cập nhật · mới nhất</option>
-            <option value="updated_asc">Ngày cập nhật · cũ nhất</option>
-          </select>
-        </label>
-        <div class="lookup-filter-control">
-          <label for="font-select">Font chữ Hán-Nôm</label>
-          <div class="lookup-font-row">
-            <select id="font-select" aria-label="Chọn font chữ Hán-Nôm">
-              <option value="default">Mặc định</option>
-            </select>
-            <span class="muted" id="font-status" aria-live="polite"></span>
+          <button id="btn-clear">Xoá</button>
+        </div>
+        <div class="lookup-filter-grid" aria-label="Bộ lọc kết quả">
+          <div class="lookup-filter-control" id="group-filter-container">
+            <span>Nhóm</span>
+            <div class="group-multiselect" id="group-multiselect">
+              <button type="button" class="group-multiselect-trigger" id="group-trigger" aria-haspopup="listbox"
+                aria-expanded="false" title="Chọn nhóm">
+                <span class="group-multiselect-label" id="group-trigger-label">data1, data2, data3</span>
+                <span class="group-multiselect-arrow">▾</span>
+              </button>
+              <div class="group-multiselect-dropdown hide" id="group-dropdown">
+                <div class="group-multiselect-toolbar">
+                  <button type="button" class="group-tool-btn" id="btn-group-all" title="Chọn tất cả nhóm">Tất
+                    cả</button>
+                  <button type="button" class="group-tool-btn" id="btn-group-default" title="data1, data2, data3">Mặc
+                    định</button>
+                  <button type="button" class="group-tool-btn" id="btn-group-clear" title="Bỏ chọn tất cả">Bỏ
+                    chọn</button>
+                </div>
+                <div class="group-multiselect-list" id="group-options-list"></div>
+              </div>
+            </div>
           </div>
+          <label class="lookup-filter-control" for="verify-filter">
+            <span>Trạng thái verify</span>
+            <select id="verify-filter" aria-label="Lọc theo trạng thái verify">
+              <option value="">Tất cả trạng thái</option>
+              <option value="verified">Đã verify</option>
+              <option value="unverified">Chưa verify</option>
+            </select>
+          </label>
+          <label class="lookup-filter-control" for="han-similarity-filter">
+            <span>Độ giống caption</span>
+            <select id="han-similarity-filter" aria-label="Lọc caption theo độ tương đồng chữ Hán">
+              <option value="">Mọi độ tương đồng</option>
+              <option value="80">Gần ground truth ≥80%</option>
+            </select>
+          </label>
+          <label class="lookup-filter-control" for="sort-filter">
+            <span>Sắp xếp ngày DB</span>
+            <select id="sort-filter" aria-label="Sắp xếp theo ngày tạo hoặc cập nhật từ PostgreSQL">
+              <option value="display">Mặc định</option>
+              <option value="created_desc">Ngày tạo · mới nhất</option>
+              <option value="created_asc">Ngày tạo · cũ nhất</option>
+              <option value="updated_desc">Ngày cập nhật · mới nhất</option>
+              <option value="updated_asc">Ngày cập nhật · cũ nhất</option>
+            </select>
+          </label>
+          <div class="lookup-filter-control">
+            <label for="font-select">Font chữ Hán-Nôm</label>
+            <div class="lookup-font-row">
+              <select id="font-select" aria-label="Chọn font chữ Hán-Nôm">
+                <option value="default">Mặc định</option>
+              </select>
+              <span class="muted" id="font-status" aria-live="polite"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="counts" style="margin-top:1rem">
+        <div class="count">
+          <div class="k">Kết quả</div>
+          <div class="v" id="c-results">—</div>
+        </div>
+        <div class="count">
+          <div class="k">Tổng số dòng</div>
+          <div class="v" id="c-rows">—</div>
+        </div>
+        <div class="count">
+          <div class="k">Khớp ảnh</div>
+          <div class="v" id="c-matched">—</div>
+        </div>
+        <div class="count">
+          <div class="k">Đã verify</div>
+          <div class="v" id="c-verified">—</div>
+        </div>
+        <div class="count warn">
+          <div class="k">Dòng thiếu ảnh</div>
+          <div class="v" id="c-missing">—</div>
+          <button id="btn-missing" class="hide">Chỉ xem nhóm này</button>
+        </div>
+        <div class="count bad">
+          <div class="k">Ảnh thừa</div>
+          <div class="v" id="c-orphans">—</div>
+          <button id="btn-orphans" class="hide">Xem danh sách</button>
+        </div>
+        <div class="spacer"></div>
+        <div class="row">
+          <button id="btn-rescan">Quét lại ảnh</button>
+          <span class="muted" id="rescan-status" style="font-size:0.78rem"></span>
         </div>
       </div>
     </div>
 
-    <div class="counts" style="margin-top:1rem">
-      <div class="count">
-        <div class="k">Kết quả</div>
-        <div class="v" id="c-results">—</div>
+    <!-- ============ results ============ -->
+    <div class="card">
+      <div class="results-toolbar">
+        <span class="muted" id="page-info"></span>
+        <span class="spacer"></span>
+        <label class="page-label" for="load-mode">Hiển thị</label>
+        <select id="load-mode" aria-label="Cách tải kết quả">
+          <option value="scroll">Cuộn để tải thêm</option>
+          <option value="pages">Phân trang</option>
+        </select>
+        <label class="page-label" for="page-size">Mỗi lần</label>
+        <select id="page-size" aria-label="Số ảnh mỗi lần">
+          <option value="20" selected>20 ảnh</option>
+          <option value="40">40 ảnh</option>
+          <option value="80">80 ảnh</option>
+        </select>
+        <label class="page-label hide" id="page-number-label" for="page-number">Trang</label>
+        <input class="hide" id="page-number" type="number" min="1" value="1" aria-label="Số trang" />
+        <button class="hide" id="btn-go-page">Đi</button>
       </div>
-      <div class="count">
-        <div class="k">Tổng số dòng</div>
-        <div class="v" id="c-rows">—</div>
+      <div class="grid" id="results"></div>
+      <div class="empty" id="results-empty" style="display:none"></div>
+      <div class="load-status" id="load-status" aria-live="polite"></div>
+      <div id="load-sentinel" aria-hidden="true"></div>
+    </div>
+
+    <details class="card" id="orphan-card">
+      <summary>Ảnh không có dòng dữ liệu nào</summary>
+      <p class="muted" style="font-size:0.78rem; margin-bottom:0.7rem">
+        Các file nằm trong thư mục ảnh nhưng không dòng nào trong dataset trỏ tới.
+        Thường là ảnh thừa, hoặc tên file trong dataset bị lệch.
+      </p>
+      <div class="filelist" id="orphan-list"></div>
+      <div class="row" style="margin-top:0.7rem">
+        <button id="btn-orphan-more" class="hide">Xem thêm</button>
+        <span class="muted" id="orphan-info" style="font-size:0.78rem"></span>
       </div>
-      <div class="count">
-        <div class="k">Khớp ảnh</div>
-        <div class="v" id="c-matched">—</div>
-      </div>
-      <div class="count">
-        <div class="k">Đã verify</div>
-        <div class="v" id="c-verified">—</div>
-      </div>
-      <div class="count warn">
-        <div class="k">Dòng thiếu ảnh</div>
-        <div class="v" id="c-missing">—</div>
-        <button id="btn-missing" class="hide">Chỉ xem nhóm này</button>
-      </div>
-      <div class="count bad">
-        <div class="k">Ảnh thừa</div>
-        <div class="v" id="c-orphans">—</div>
-        <button id="btn-orphans" class="hide">Xem danh sách</button>
-      </div>
-      <div class="spacer"></div>
+    </details>
+
+    <details class="card" id="data-card">
+      <summary>Thêm dữ liệu</summary>
+
+      <h3 class="sub">1 · Tải lên ảnh</h3>
+      <p class="muted hint">
+        Chọn nhiều ảnh, hoặc một file .zip. Ảnh trùng tên với ảnh đã có sẽ được
+        báo lại chứ không ghi đè — thay nhầm ảnh thì cả dòng đổi nghĩa mà không ai
+        biết.
+      </p>
       <div class="row">
-        <button id="btn-rescan">Quét lại ảnh</button>
-        <span class="muted" id="rescan-status" style="font-size:0.78rem"></span>
+        <input type="file" id="img-files" multiple accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff,.zip" />
+        <label class="inline"><input type="checkbox" id="img-overwrite" /> ghi đè ảnh trùng tên</label>
+        <button class="primary" id="btn-upload-img">Tải ảnh lên</button>
+        <span class="muted" id="img-status"></span>
       </div>
-    </div>
-  </div>
+      <div id="img-result" class="result"></div>
 
-  <!-- ============ results ============ -->
-  <div class="card">
-    <div class="results-toolbar">
-      <span class="muted" id="page-info"></span>
-      <span class="spacer"></span>
-      <label class="page-label" for="load-mode">Hiển thị</label>
-      <select id="load-mode" aria-label="Cách tải kết quả">
-        <option value="scroll">Cuộn để tải thêm</option>
-        <option value="pages">Phân trang</option>
-      </select>
-      <label class="page-label" for="page-size">Mỗi lần</label>
-      <select id="page-size" aria-label="Số ảnh mỗi lần">
-        <option value="20" selected>20 ảnh</option>
-        <option value="40">40 ảnh</option>
-        <option value="80">80 ảnh</option>
-      </select>
-      <label class="page-label hide" id="page-number-label" for="page-number">Trang</label>
-      <input class="hide" id="page-number" type="number" min="1" value="1"
-             aria-label="Số trang" />
-      <button class="hide" id="btn-go-page">Đi</button>
-    </div>
-    <div class="grid" id="results"></div>
-    <div class="empty" id="results-empty" style="display:none"></div>
-    <div class="load-status" id="load-status" aria-live="polite"></div>
-    <div id="load-sentinel" aria-hidden="true"></div>
-  </div>
-
-  <details class="card" id="orphan-card">
-    <summary>Ảnh không có dòng dữ liệu nào</summary>
-    <p class="muted" style="font-size:0.78rem; margin-bottom:0.7rem">
-      Các file nằm trong thư mục ảnh nhưng không dòng nào trong dataset trỏ tới.
-      Thường là ảnh thừa, hoặc tên file trong dataset bị lệch.
-    </p>
-    <div class="filelist" id="orphan-list"></div>
-    <div class="row" style="margin-top:0.7rem">
-      <button id="btn-orphan-more" class="hide">Xem thêm</button>
-      <span class="muted" id="orphan-info" style="font-size:0.78rem"></span>
-    </div>
-  </details>
-
-  <details class="card" id="data-card">
-    <summary>Thêm dữ liệu</summary>
-
-    <h3 class="sub">1 · Tải lên ảnh</h3>
-    <p class="muted hint">
-      Chọn nhiều ảnh, hoặc một file .zip. Ảnh trùng tên với ảnh đã có sẽ được
-      báo lại chứ không ghi đè — thay nhầm ảnh thì cả dòng đổi nghĩa mà không ai
-      biết.
-    </p>
-    <div class="row">
-      <input type="file" id="img-files" multiple accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff,.zip" />
-      <label class="inline"><input type="checkbox" id="img-overwrite" /> ghi đè ảnh trùng tên</label>
-      <button class="primary" id="btn-upload-img">Tải ảnh lên</button>
-      <span class="muted" id="img-status"></span>
-    </div>
-    <div id="img-result" class="result"></div>
-
-    <h3 class="sub">2 · Gộp thêm dataset</h3>
-    <p class="muted hint">
-      File .jsonl mới sẽ được <b>gộp vào</b> dữ liệu hiện có, không thay thế.
-      Dòng nào trùng tên ảnh thì được cập nhật tại chỗ; còn lại giữ nguyên.
-      Bản cũ luôn được sao lưu trước khi ghi.
-    </p>
-    <div class="row">
-      <input type="file" id="ds-file" accept=".jsonl,.json,.ndjson" />
-      <button id="btn-ds-preview">Xem trước</button>
-      <button class="primary hide" id="btn-ds-merge">Gộp vào</button>
-      <span class="muted" id="ds-status"></span>
-    </div>
-    <div id="ds-result" class="result"></div>
-
-    <h3 class="sub">3 · Thêm một dòng</h3>
-    <p class="muted hint">
-      Cho trường hợp lẻ. Có thể tải ảnh lên kèm, hoặc gõ tên một ảnh đã có sẵn
-      trong thư mục.
-    </p>
-    <div class="rowform">
-      <input id="r-image-name" placeholder="tên ảnh đã có (nếu không tải lên)" />
-      <input type="file" id="r-file" accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff" />
-      <input id="r-post" placeholder="link Facebook" />
-      <input id="r-caption" placeholder="caption" />
-      <textarea id="r-gt" rows="3" class="cjk" placeholder="ground truth"></textarea>
+      <h3 class="sub">2 · Gộp thêm dataset</h3>
+      <p class="muted hint">
+        File .jsonl mới sẽ được <b>gộp vào</b> dữ liệu hiện có, không thay thế.
+        Dòng nào trùng tên ảnh thì được cập nhật tại chỗ; còn lại giữ nguyên.
+        Bản cũ luôn được sao lưu trước khi ghi.
+      </p>
       <div class="row">
-        <button class="primary" id="btn-add-row">Thêm dòng</button>
-        <span class="muted" id="row-status"></span>
+        <input type="file" id="ds-file" accept=".jsonl,.json,.ndjson" />
+        <button id="btn-ds-preview">Xem trước</button>
+        <button class="primary hide" id="btn-ds-merge">Gộp vào</button>
+        <span class="muted" id="ds-status"></span>
       </div>
-    </div>
+      <div id="ds-result" class="result"></div>
 
-    <h3 class="sub">Bản sao lưu</h3>
-    <p class="muted hint">
-      Mỗi lần ghi dataset đều tạo một bản trước đó. Tải về để khôi phục thủ công
-      nếu gộp nhầm.
-    </p>
-    <div id="backups" class="filelist"></div>
-  </details>
+      <h3 class="sub">3 · Thêm một dòng</h3>
+      <p class="muted hint">
+        Cho trường hợp lẻ. Có thể tải ảnh lên kèm, hoặc gõ tên một ảnh đã có sẵn
+        trong thư mục.
+      </p>
+      <div class="rowform">
+        <input id="r-image-name" placeholder="tên ảnh đã có (nếu không tải lên)" />
+        <input type="file" id="r-file" accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff" />
+        <input id="r-post" placeholder="link Facebook" />
+        <input id="r-caption" placeholder="caption" />
+        <textarea id="r-gt" rows="3" class="cjk" placeholder="ground truth"></textarea>
+        <div class="row">
+          <button class="primary" id="btn-add-row">Thêm dòng</button>
+          <span class="muted" id="row-status"></span>
+        </div>
+      </div>
 
-  <details class="card" id="admin-card">
-    <summary>Quản trị — tài khoản</summary>
-    <div class="row" style="margin-bottom:0.6rem">
-      <input id="u-name" placeholder="tên đăng nhập" autocomplete="off" style="width:150px" />
-      <input id="u-display" placeholder="tên hiển thị" autocomplete="off" style="width:160px" />
-      <input id="u-pass" type="password" placeholder="mật khẩu (8+ ký tự)" autocomplete="new-password" style="width:190px" />
-      <select id="u-role"><option value="reviewer">Người dùng</option><option value="admin">Quản trị</option></select>
-      <button class="primary" id="btn-adduser">Thêm tài khoản</button>
-      <span class="muted" id="user-status"></span>
-    </div>
-    <div id="users"></div>
-  </details>
-</div>
+      <h3 class="sub">Bản sao lưu</h3>
+      <p class="muted hint">
+        Mỗi lần ghi dataset đều tạo một bản trước đó. Tải về để khôi phục thủ công
+        nếu gộp nhầm.
+      </p>
+      <div id="backups" class="filelist"></div>
+    </details>
 
-<div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Chi tiết">
-  <button class="lb-close" id="lb-close">Đóng</button>
-  <div class="lb-inner" id="lb-inner"></div>
-</div>
-<div class="load-modal" id="load-modal" role="status" aria-live="polite">
-  <div class="load-modal-card">
-    <div class="load-spinner"></div>
-    <b id="load-modal-title">Đang tải dữ liệu…</b>
-    <div class="load-modal-detail" id="load-modal-detail">Đang chuẩn bị danh sách</div>
+    <details class="card" id="admin-card">
+      <summary>Quản trị — tài khoản</summary>
+      <div class="row" style="margin-bottom:0.6rem">
+        <input id="u-name" placeholder="tên đăng nhập" autocomplete="off" style="width:150px" />
+        <input id="u-display" placeholder="tên hiển thị" autocomplete="off" style="width:160px" />
+        <input id="u-pass" type="password" placeholder="mật khẩu (8+ ký tự)" autocomplete="new-password"
+          style="width:190px" />
+        <select id="u-role">
+          <option value="reviewer">Người dùng</option>
+          <option value="admin">Quản trị</option>
+        </select>
+        <button class="primary" id="btn-adduser">Thêm tài khoản</button>
+        <span class="muted" id="user-status"></span>
+      </div>
+      <div id="users"></div>
+    </details>
   </div>
-</div>
 
-<script>
-"use strict";
-const $ = (id) => document.getElementById(id);
-const isAdmin = () => !!state.me && state.me.role === "admin";
-// Encode per segment: a picture filed as "<post id>/1.jpg" must stay two path
-// segments, and encodeURIComponent on the whole string would turn the slash
-// into %2F.
-// Special case: dataset rows that carry absolute filesystem paths from the
-// crawler (e.g. "/media/khtn/hdd/crawling/data1/xxx.jpg") are served by the
-// external web server at https://kimhannom.clc.hcmus.edu.vn — map those paths
-// directly to that public URL so the browser can load them without proxying
-// through the app. Adjust `PUBLIC_FS_PREFIX` / `PUBLIC_URL_BASE` if your setup
-// differs.
-const PUBLIC_FS_PREFIX = "/media/khtn/hdd/crawling";
-const PUBLIC_URL_BASE = "https://kimhannom.clc.hcmus.edu.vn/crawling";
-const imgSrc = (name) => {
-  const s = String(name || "").replaceAll('\\\\', '/');
-  if (!s) return "/img/";
-  if (s.startsWith(PUBLIC_FS_PREFIX)) {
-    const tail = s.substring(PUBLIC_FS_PREFIX.length);
-    // encode each segment to preserve slashes
-    return PUBLIC_URL_BASE + tail.split('/').map(encodeURIComponent).join('/');
-  }
-  return "/img/" + s.split("/").map(encodeURIComponent).join("/");
-};
+  <div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Chi tiết">
+    <button class="lb-close" id="lb-close">Đóng</button>
+    <div class="lb-inner" id="lb-inner"></div>
+  </div>
+  <div class="load-modal" id="load-modal" role="status" aria-live="polite">
+    <div class="load-modal-card">
+      <div class="load-spinner"></div>
+      <b id="load-modal-title">Đang tải dữ liệu…</b>
+      <div class="load-modal-detail" id="load-modal-detail">Đang chuẩn bị danh sách</div>
+    </div>
+  </div>
 
-const fontRegistry = {
-  default: {
-    label: "Mặc định",
-    family: "Noto Serif CJK TC",
-    fallback: '"Noto Serif CJK TC", "Source Han Serif", "MS Mincho", serif',
-    file: "",
-  },
-};
-const CJK_FALLBACK = '"Noto Serif TC", "Noto Sans TC", "Noto Serif CJK TC", "Source Han Serif", "MS Mincho", serif';
-
-const state = {
-  me: null, query: "", field: "all", group: "", verifyFilter: "", hanSimilarityFilter: "", sortOrder: "display", offset: 0, limit: 20,
-  mode: "scroll", page: 1, loading: false, fontKey: "default",
-  groupTags: {},
-  items: [], total: 0, hasMore: false, missingOnly: false,
-  current: null, orphanOffset: 0, renderToken: 0,
-};
-
-try {
-  const savedView = JSON.parse(localStorage.getItem("hannom.view") || "{}");
-  for (const key of ["query", "field", "group", "verifyFilter", "hanSimilarityFilter", "sortOrder", "missingOnly", "mode", "limit", "page", "offset", "fontKey"])
-    if (savedView[key] !== undefined) state[key] = savedView[key];
-} catch {}
-
-function persistView() {
-  try {
-    localStorage.setItem("hannom.view", JSON.stringify({
-      query: state.query, field: state.field, group: state.group, verifyFilter: state.verifyFilter,
-      hanSimilarityFilter: state.hanSimilarityFilter,
-      sortOrder: state.sortOrder,
-      missingOnly: state.missingOnly,
-      mode: state.mode, limit: state.limit, page: state.page, offset: state.offset,
-      fontKey: state.fontKey,
-    }));
-  } catch {}
-}
-
-function registerFontFaces(info) {
-  if (!info) return [];
-  const family = info.family || "Noto Serif CJK TC";
-  const files = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
-  const families = files.map((_, index) => `${family}-${index}`);
-
-  files.forEach((file, index) => {
-    const fontFamily = families[index];
-    const id = `han-font-${fontFamily.replace(/[^a-z0-9_-]/gi, "-")}`;
-    if (document.getElementById(id)) return;
-
-    const url = `/static/fonts/${file.split("/").map(encodeURIComponent).join("/")}`;
-    const style = document.createElement("style");
-    style.id = id;
-    style.textContent = `@font-face { font-family: "${fontFamily}"; src: url("${url}") format("truetype"); font-display: swap; }`;
-    document.head.appendChild(style);
-  });
-  return families;
-}
-
-/* ---- Canvas-based glyph detection ----
- * Nhiều font CJK trang trí (Thảo, Triện...) map ký tự vào glyph rỗng (blank).
- * Trình duyệt thấy font có glyph → không fallback → chữ "mất".
- * Giải pháp: vẽ ký tự lên canvas bằng font mới, nếu trống thì coi như font
- * không hỗ trợ ký tự đó → hiển thị bằng font gốc.
- */
-const _glyphCache = new Map();  // key: "fontStack|char" → boolean
-let _glyphCanvas = null;
-let _glyphCtx = null;
-
-function _getGlyphCtx() {
-  if (!_glyphCtx) {
-    _glyphCanvas = document.createElement("canvas");
-    _glyphCanvas.width = 64;
-    _glyphCanvas.height = 64;
-    _glyphCtx = _glyphCanvas.getContext("2d", { willReadFrequently: true });
-  }
-  return _glyphCtx;
-}
-
-function _hasVisibleGlyph(fontStack, char) {
-  const key = `${fontStack}|${char}`;
-  const cached = _glyphCache.get(key);
-  if (cached !== undefined) return cached;
-
-  const ctx = _getGlyphCtx();
-  ctx.clearRect(0, 0, 64, 64);
-  ctx.font = `48px ${fontStack}`;
-  ctx.fillStyle = "#000";
-  ctx.textBaseline = "middle";
-  ctx.fillText(char, 4, 36);
-
-  const data = ctx.getImageData(0, 0, 64, 64).data;
-  let hasPixels = false;
-  for (let i = 3; i < data.length; i += 4) {
-    if (data[i] > 10) { hasPixels = true; break; }
-  }
-  _glyphCache.set(key, hasPixels);
-  return hasPixels;
-}
-
-// Font stack hiện tại chỉ gồm font mới (KHÔNG kèm default), dùng để kiểm tra
-let _currentSelectedStack = "";
-// Font stack default, dùng để fallback
-let _currentDefaultStack = "";
-// Có đang dùng font khác default không?
-let _usingCustomFont = false;
-
-/**
- * Wrap từng ký tự Hán/Nôm: nếu font mới không render được thì bọc trong
- * <span> dùng font gốc. Gọi SAU khi esc() hoặc highlight() đã xử lý.
- * Hàm này nhận HTML string (đã escape) và trả về HTML string.
- */
-function wrapFallbackChars(html) {
-  if (!_usingCustomFont || !_currentSelectedStack || !_currentDefaultStack) return html;
-  // Tách HTML tags khỏi text để không vô tình wrap bên trong tag
-  return html.replace(/([^<]+)/g, (textSegment) => {
-    // Decode HTML entities tạm để kiểm tra ký tự thực
-    const tmp = document.createElement("span");
-    tmp.innerHTML = textSegment;
-    const plain = tmp.textContent || "";
-    if (!plain) return textSegment;
-
-    let result = "";
-    // Duyệt từng ký tự gốc, nhưng giữ nguyên HTML entity
-    let htmlPos = 0;
-    for (const char of plain) {
-      // Tìm vị trí ký tự trong textSegment (HTML encoded)
-      const encoded = textSegment.substring(htmlPos);
-      let charHtml;
-      if (encoded.startsWith("&")) {
-        const semiIdx = encoded.indexOf(";");
-        charHtml = semiIdx >= 0 ? encoded.substring(0, semiIdx + 1) : encoded.substring(0, 1);
-      } else {
-        charHtml = encoded.substring(0, char.length);
+  <script>
+    "use strict";
+    const $ = (id) => document.getElementById(id);
+    const isAdmin = () => !!state.me && state.me.role === "admin";
+    // Encode per segment: a picture filed as "<post id>/1.jpg" must stay two path
+    // segments, and encodeURIComponent on the whole string would turn the slash
+    // into %2F.
+    // Special case: dataset rows that carry absolute filesystem paths from the
+    // crawler (e.g. "/media/khtn/hdd/crawling/data1/xxx.jpg") are served by the
+    // external web server at https://kimhannom.clc.hcmus.edu.vn — map those paths
+    // directly to that public URL so the browser can load them without proxying
+    // through the app. Adjust `PUBLIC_FS_PREFIX` / `PUBLIC_URL_BASE` if your setup
+    // differs.
+    const PUBLIC_FS_PREFIX = "/media/khtn/hdd/crawling";
+    const PUBLIC_URL_BASE = "https://kimhannom.clc.hcmus.edu.vn/crawling";
+    const imgSrc = (name) => {
+      const s = String(name || "").replaceAll('\\\\', '/');
+      if (!s) return "/img/";
+      if (s.startsWith(PUBLIC_FS_PREFIX)) {
+        const tail = s.substring(PUBLIC_FS_PREFIX.length);
+        // encode each segment to preserve slashes
+        return PUBLIC_URL_BASE + tail.split('/').map(encodeURIComponent).join('/');
       }
-      htmlPos += charHtml.length;
-
-      // Chỉ kiểm tra ký tự CJK (Han/Nôm)
-      const cp = char.codePointAt(0);
-      const isCJK = (cp >= 0x2E80 && cp <= 0x9FFF)
-        || (cp >= 0xF900 && cp <= 0xFAFF)
-        || (cp >= 0x3400 && cp <= 0x4DBF)
-        || (cp >= 0x20000 && cp <= 0x3134F);
-
-      if (isCJK && !_hasVisibleGlyph(_currentSelectedStack, char)) {
-        result += `<span class="font-fb">${charHtml}</span>`;
-      } else {
-        result += charHtml;
-      }
-    }
-    return result;
-  });
-}
-
-async function loadFontRegistry() {
-  const select = $("font-select");
-  if (!select) return;
-  try {
-    const response = await fetch("/static/fonts/han-fonts.json");
-    if (!response.ok) throw new Error("font registry unavailable");
-    const data = await response.json();
-    Object.assign(fontRegistry, data || {});
-  } catch {
-    Object.assign(fontRegistry, { default: fontRegistry.default || {
-      label: "Mặc định",
-      family: "Noto Serif CJK TC",
-      fallback: CJK_FALLBACK,
-      file: "",
-    }});
-  }
-
-  // Đăng ký font-face cho font mặc định (font gốc) để sẵn sàng làm fallback
-  registerFontFaces(fontRegistry.default);
-
-  const order = Object.entries(fontRegistry);
-  select.innerHTML = order.map(([key, value]) =>
-    `<option value="${esc(key)}">${esc(value.label || key)}</option>`).join("");
-  const chosen = Object.prototype.hasOwnProperty.call(fontRegistry, state.fontKey)
-    ? state.fontKey : "default";
-  state.fontKey = chosen;
-  select.value = chosen;
-  select.onchange = async (event) => {
-    state.fontKey = event.target.value;
-    persistView();
-    await applySelectedFont(state.fontKey);
-  };
-  await applySelectedFont(chosen);
-}
-
-async function applySelectedFont(key) {
-  const defaultInfo = fontRegistry.default || {};
-  const defaultFamilies = registerFontFaces(defaultInfo);
-  const defaultStack = defaultFamilies.map((name) => `"${name}"`).join(", ");
-
-  const info = fontRegistry[key] || defaultInfo;
-  const isDefault = key === "default" || info === defaultInfo;
-  const selectedFamilies = isDefault ? defaultFamilies : registerFontFaces(info);
-  const selectedStack = selectedFamilies.map((name) => `"${name}"`).join(", ");
-
-  const fallback = info.fallback || defaultInfo.fallback || CJK_FALLBACK;
-
-  const composeFontFamily = (currentStack) => {
-    const list = [];
-    if (currentStack) list.push(currentStack);
-    if (!isDefault && defaultStack) list.push(defaultStack);
-    if (fallback) list.push(fallback);
-    return list.filter(Boolean).join(", ");
-  };
-
-  document.documentElement.style.setProperty(
-    "--han-font-family",
-    composeFontFamily(selectedStack) || fallback,
-  );
-
-  // Cập nhật CSS class .font-fb cho các ký tự fallback
-  let fbStyle = document.getElementById("font-fb-style");
-  if (!fbStyle) {
-    fbStyle = document.createElement("style");
-    fbStyle.id = "font-fb-style";
-    document.head.appendChild(fbStyle);
-  }
-  const defaultFontFamily = defaultStack
-    ? `${defaultStack}, ${fallback}` : fallback;
-  fbStyle.textContent = `.font-fb { font-family: ${defaultFontFamily} !important; }`;
-
-  const status = $("font-status");
-  const files = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
-  if (!files.length) {
-    _usingCustomFont = false;
-    _currentSelectedStack = "";
-    _currentDefaultStack = "";
-    if (status) status.textContent = "Font hệ thống";
-    return;
-  }
-  if (!document.fonts?.load) {
-    _usingCustomFont = false;
-    if (status) status.textContent = "Trình duyệt không hỗ trợ tải font chủ động";
-    return;
-  }
-
-  // Tải ngầm font gốc song song
-  if (!isDefault && defaultFamilies.length) {
-    await Promise.allSettled(
-      defaultFamilies.map((f) => document.fonts.load(`16px "${f}"`)),
-    );
-  }
-
-  if (status) status.textContent = `Đang tải ${files.length} font…`;
-  const results = await Promise.allSettled(
-    selectedFamilies.map((fontFamily) => document.fonts.load(`16px "${fontFamily}"`)),
-  );
-  if (state.fontKey !== key) return;
-
-  const successfulFamilies = selectedFamilies.filter((_, index) =>
-    results[index].status === "fulfilled" && results[index].value?.length > 0
-  );
-  const loaded = successfulFamilies.length;
-
-  const successfulStack = successfulFamilies.map((name) => `"${name}"`).join(", ");
-  document.documentElement.style.setProperty(
-    "--han-font-family",
-    composeFontFamily(successfulStack) || fallback,
-  );
-
-  // Cập nhật state cho glyph detection
-  _usingCustomFont = !isDefault && loaded > 0;
-  _currentSelectedStack = successfulStack;
-  _currentDefaultStack = defaultStack;
-  // Xoá cache glyph khi đổi font
-  _glyphCache.clear();
-
-  if (status) {
-    if (loaded === files.length) {
-      status.textContent = `Đã tải ${loaded} font`;
-    } else if (loaded > 0) {
-      status.textContent = `Tải được ${loaded}/${files.length} font (chữ thiếu hiển thị font gốc)`;
-    } else {
-      status.textContent = "Không tải được font mới, hiển thị font gốc";
-    }
-    status.title = results.map((result, index) =>
-      result.status === "rejected" || !result.value?.length ? files[index] : "")
-      .filter(Boolean).join("\n");
-  }
-
-  // Re-render kết quả với fallback detection
-  renderVisibleCards();
-}
-
-const pageCache = (() => {
-  let database;
-  function open() {
-    if (database) return database;
-    database = new Promise((resolve, reject) => {
-      const request = indexedDB.open("hannom-cache", 1);
-      request.onupgradeneeded = () => request.result.createObjectStore("pages");
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    return database;
-  }
-  return {
-    async get(key) {
-      try {
-        const db = await open();
-        return await new Promise((resolve, reject) => {
-          const request = db.transaction("pages").objectStore("pages").get(key);
-          request.onsuccess = () => resolve(request.result || null);
-          request.onerror = () => reject(request.error);
-        });
-      } catch { return null; }
-    },
-    async set(key, value) {
-      try {
-        const db = await open();
-        await new Promise((resolve, reject) => {
-          const request = db.transaction("pages", "readwrite").objectStore("pages").put(value, key);
-          request.onsuccess = resolve;
-          request.onerror = () => reject(request.error);
-        });
-      } catch {}
-    },
-  };
-})();
-
-function pageCacheKey(offset) {
-  return JSON.stringify({
-    q: state.query, field: state.field, group: state.group,
-    verified: state.verifyFilter, hanSimilarity: state.hanSimilarityFilter,
-    sort: state.sortOrder, missing: state.missingOnly,
-    offset, limit: state.limit,
-  });
-}
-
-function setLoadModal(show, title = "Đang tải dữ liệu…", detail = "Đang chuẩn bị danh sách") {
-  $("load-modal").classList.toggle("show", show);
-  $("load-modal-title").textContent = title;
-  $("load-modal-detail").textContent = detail;
-}
-
-function renderComparison(groundTruth, qwenText) {
-  const target = $("qwen-comparison");
-  if (!target) return;
-  const gt = groundTruth || "";
-  const qwen = qwenText || "";
-  if (!gt && !qwen) { target.innerHTML = ""; return; }
-  const matrix = Array.from({ length: gt.length + 1 }, (_, row) =>
-    Array.from({ length: qwen.length + 1 }, (_, column) =>
-      row === 0 ? column : column === 0 ? row : 0));
-  for (let row = 1; row <= gt.length; row++) {
-    for (let column = 1; column <= qwen.length; column++) {
-      matrix[row][column] = Math.min(
-        matrix[row - 1][column] + 1,
-        matrix[row][column - 1] + 1,
-        matrix[row - 1][column - 1] + (gt[row - 1] === qwen[column - 1] ? 0 : 1),
-      );
-    }
-  }
-  const distance = matrix[gt.length][qwen.length];
-  const similarity = Math.round((1 - distance / Math.max(gt.length, qwen.length, 1)) * 100);
-  const cls = similarity >= 90 ? "high" : similarity < 70 ? "low" : "";
-  const differentIndexes = new Set();
-  const replacements = new Map();
-  let row = gt.length;
-  let column = qwen.length;
-  while (row || column) {
-    if (row && column && gt[row - 1] === qwen[column - 1] &&
-        matrix[row][column] === matrix[row - 1][column - 1]) {
-      row--; column--;
-    } else if (row && column && matrix[row][column] === matrix[row - 1][column - 1] + 1) {
-      differentIndexes.add(row - 1);
-      replacements.set(row - 1, qwen[column - 1]);
-      row--; column--;
-    } else if (row && matrix[row][column] === matrix[row - 1][column] + 1) {
-      differentIndexes.add(row - 1); row--;
-    } else {
-      column--;
-    }
-  }
-  let html = "";
-  for (let index = 0; index < gt.length; index++) {
-    const different = differentIndexes.has(index);
-    html += different
-      ? `<span class="different" data-diff-index="${index}" title="Bấm để thay bằng ký tự Qwen">${esc(gt[index])}</span>`
-      : esc(gt[index]);
-  }
-  target.innerHTML = `<div class="similarity ${cls}">Khớp Qwen: ${similarity}%</div>` +
-    `<div>${html || "(Ground truth trống)"}</div>` +
-    (qwen.length > gt.length ? `<div class="muted">Qwen có thêm: ${esc(qwen.slice(gt.length))}</div>` : "");
-  target.querySelectorAll("[data-diff-index]").forEach((element) => {
-    element.onclick = () => {
-      const index = Number(element.dataset.diffIndex);
-      const replacement = replacements.get(index);
-      if (replacement === undefined) return;
-      const update = (box) => {
-        const chars = Array.from(box.value);
-        chars[index] = replacement;
-        box.value = chars.join("");
-        box.dispatchEvent(new Event("input"));
-        box.focus();
-      };
-      if (!$("gt-edit")) {
-        const qwenValue = $("qwen-text")?.value || qwen;
-        const currentIndex = state.current?.index;
-        if (currentIndex !== undefined) openDetail(currentIndex, true);
-        if ($("qwen-text")) $("qwen-text").value = qwenValue;
-      }
-      if ($("gt-edit")) update($("gt-edit"));
+      return "/img/" + s.split("/").map(encodeURIComponent).join("/");
     };
-  });
-}
 
-const fmt = (n) => (n === null || n === undefined) ? "—" : Number(n).toLocaleString("vi-VN");
-const esc = (s) => { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; };
+    const fontRegistry = {
+      default: {
+        label: "Mặc định",
+        family: "Noto Serif CJK TC",
+        fallback: '"Noto Serif CJK TC", "Source Han Serif", "MS Mincho", serif',
+        file: "",
+      },
+    };
+    const CJK_FALLBACK = '"Noto Serif TC", "Noto Sans TC", "Noto Serif CJK TC", "Source Han Serif", "MS Mincho", serif';
 
-function errorText(body, res) {
-  const d = body.detail;
-  if (typeof d === "string" && d) return d;
-  if (Array.isArray(d) && d.length) {
-    return d.map((e) => {
-      const f = Array.isArray(e.loc) ? e.loc[e.loc.length - 1] : "";
-      return f ? `${f}: ${e.msg}` : e.msg;
-    }).join("; ");
-  }
-  return `${res.status} ${res.statusText}`;
-}
+    const DEFAULT_GROUP_NAMES = ["data1", "data2", "data2", "data3"];
 
-async function api(path, opts) {
-  const res = await fetch(path, opts);
-  if (res.status === 401) { window.location.reload(); throw new Error("chưa đăng nhập"); }
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(errorText(body, res));
-  }
-  return res.status === 204 ? null : res.json();
-}
+    function getDefaultGroups() {
+      const available = Object.keys(state.groupTags);
+      if (!available.length) return [...DEFAULT_GROUP_NAMES];
+      const matched = available.filter((g) => DEFAULT_GROUP_NAMES.includes(g));
+      return matched.length ? matched : [...DEFAULT_GROUP_NAMES];
+    }
 
-function banner(title, body, critical) {
-  $("banner-title").textContent = title;
-  $("banner-body").textContent = body;
-  $("banner").classList.toggle("crit", !!critical);
-  $("banner").classList.add("show");
-}
-function clearBanner() { $("banner").classList.remove("show"); }
+    const state = {
+      me: null, query: "", field: "all", groups: [...DEFAULT_GROUP_NAMES], verifyFilter: "", hanSimilarityFilter: "", sortOrder: "display", offset: 0, limit: 20,
+      mode: "scroll", page: 1, loading: false, fontKey: "default",
+      groupTags: {},
+      items: [], total: 0, hasMore: false, missingOnly: false,
+      current: null, orphanOffset: 0, renderToken: 0,
+    };
 
-/* Highlight the query inside a rendered field, so a hit in a long poem is
-   findable by eye rather than by re-reading it. */
-function highlight(text, needle) {
-  const safe = esc(text);
-  if (!needle) return safe;
-  const escaped = esc(needle).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  try {
-    return safe.replace(new RegExp(escaped, "gi"), (m) => `<mark>${m}</mark>`);
-  } catch { return safe; }
-}
+    try {
+      const savedView = JSON.parse(localStorage.getItem("hannom.view") || "{}");
+      for (const key of ["query", "field", "verifyFilter", "hanSimilarityFilter", "sortOrder", "missingOnly", "mode", "limit", "page", "offset", "fontKey"])
+        if (savedView[key] !== undefined) state[key] = savedView[key];
+      if (Array.isArray(savedView.groups)) {
+        state.groups = savedView.groups;
+      } else if (typeof savedView.group === "string" && savedView.group) {
+        state.groups = [savedView.group];
+      }
+    } catch { }
 
-/* ---------------- search ---------------- */
-function renderLookupData(data, append, requestOffset) {
-  state.offset = requestOffset;
-  persistView();
-  state.groupTags = data.group_tags || state.groupTags;
-  updateGroupFilter();
-  state.items = append ? [...state.items, ...data.items] : data.items;
-  state.total = data.total;
-  state.hasMore = data.has_more;
+    function persistView() {
+      try {
+        localStorage.setItem("hannom.view", JSON.stringify({
+          query: state.query, field: state.field, groups: state.groups, verifyFilter: state.verifyFilter,
+          hanSimilarityFilter: state.hanSimilarityFilter,
+          sortOrder: state.sortOrder,
+          missingOnly: state.missingOnly,
+          mode: state.mode, limit: state.limit, page: state.page, offset: state.offset,
+          fontKey: state.fontKey,
+        }));
+      } catch { }
+    }
 
-  const grid = $("results"), empty = $("results-empty");
-  state.renderToken++;
-  if (!state.items.length) {
-    grid.innerHTML = "";
-    empty.style.display = "block";
-    empty.textContent = state.query
-      ? `Không tìm thấy kết quả nào cho “${state.query}”.`
-      : state.missingOnly
-        ? "Không có dòng nào thiếu ảnh."
-        : "Dataset đang trống. Hãy mount file dataset.jsonl vào container.";
-  } else {
-    empty.style.display = "none";
-    renderCardsProgressively(grid, data.items, append,
-      state.items.length - data.items.length);
-  }
+    function registerFontFaces(info) {
+      if (!info) return [];
+      const family = info.family || "Noto Serif CJK TC";
+      const files = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
+      const families = files.map((_, index) => `${family}-${index}`);
 
-  $("c-results").textContent = fmt(data.total);
-  const from = data.total ? (state.mode === "scroll" ? 1 : requestOffset + 1) : 0;
-  const to = state.mode === "scroll" ? state.items.length : requestOffset + data.items.length;
-  $("page-info").textContent =
-    `${fmt(from)}–${fmt(to)} trên ${fmt(data.total)}` +
-    (state.missingOnly ? " · chỉ dòng thiếu ảnh" : "");
-  $("page-number").value = state.page;
-  updateLoadControls();
-}
+      files.forEach((file, index) => {
+        const fontFamily = families[index];
+        const id = `han-font-${fontFamily.replace(/[^a-z0-9_-]/gi, "-")}`;
+        if (document.getElementById(id)) return;
 
-function renderCardsProgressively(grid, items, append, startIndex) {
-  const token = ++state.renderToken;
-  if (!append) grid.innerHTML = "";
-  let cursor = 0;
-  const chunkSize = 4;
-  const paint = () => {
-    if (token !== state.renderToken) return;
-    const chunk = items.slice(cursor, cursor + chunkSize);
-    if (chunk.length) {
-      grid.insertAdjacentHTML("beforeend", chunk.map((item, index) =>
-        card(item, startIndex + cursor + index)).join(""));
-      bindCards(grid);
-      cursor += chunk.length;
+        const url = `/static/fonts/${file.split("/").map(encodeURIComponent).join("/")}`;
+        const style = document.createElement("style");
+        style.id = id;
+        style.textContent = `@font-face { font-family: "${fontFamily}"; src: url("${url}") format("truetype"); font-display: swap; }`;
+        document.head.appendChild(style);
+      });
+      return families;
+    }
+
+    /* ---- Canvas-based glyph detection ----
+     * Nhiều font CJK trang trí (Thảo, Triện...) map ký tự vào glyph rỗng (blank).
+     * Trình duyệt thấy font có glyph → không fallback → chữ "mất".
+     * Giải pháp: vẽ ký tự lên canvas bằng font mới, nếu trống thì coi như font
+     * không hỗ trợ ký tự đó → hiển thị bằng font gốc.
+     */
+    const _glyphCache = new Map();  // key: "fontStack|char" → boolean
+    let _glyphCanvas = null;
+    let _glyphCtx = null;
+
+    function _getGlyphCtx() {
+      if (!_glyphCtx) {
+        _glyphCanvas = document.createElement("canvas");
+        _glyphCanvas.width = 64;
+        _glyphCanvas.height = 64;
+        _glyphCtx = _glyphCanvas.getContext("2d", { willReadFrequently: true });
+      }
+      return _glyphCtx;
+    }
+
+    function _hasVisibleGlyph(fontStack, char) {
+      const key = `${fontStack}|${char}`;
+      const cached = _glyphCache.get(key);
+      if (cached !== undefined) return cached;
+
+      const ctx = _getGlyphCtx();
+      ctx.clearRect(0, 0, 64, 64);
+      ctx.font = `48px ${fontStack}`;
+      ctx.fillStyle = "#000";
+      ctx.textBaseline = "middle";
+      ctx.fillText(char, 4, 36);
+
+      const data = ctx.getImageData(0, 0, 64, 64).data;
+      let hasPixels = false;
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i] > 10) { hasPixels = true; break; }
+      }
+      _glyphCache.set(key, hasPixels);
+      return hasPixels;
+    }
+
+    // Font stack hiện tại chỉ gồm font mới (KHÔNG kèm default), dùng để kiểm tra
+    let _currentSelectedStack = "";
+    // Font stack default, dùng để fallback
+    let _currentDefaultStack = "";
+    // Có đang dùng font khác default không?
+    let _usingCustomFont = false;
+
+    /**
+     * Wrap từng ký tự Hán/Nôm: nếu font mới không render được thì bọc trong
+     * <span> dùng font gốc. Gọi SAU khi esc() hoặc highlight() đã xử lý.
+     * Hàm này nhận HTML string (đã escape) và trả về HTML string.
+     */
+    function wrapFallbackChars(html) {
+      if (!_usingCustomFont || !_currentSelectedStack || !_currentDefaultStack) return html;
+      // Tách HTML tags khỏi text để không vô tình wrap bên trong tag
+      return html.replace(/([^<]+)/g, (textSegment) => {
+        // Decode HTML entities tạm để kiểm tra ký tự thực
+        const tmp = document.createElement("span");
+        tmp.innerHTML = textSegment;
+        const plain = tmp.textContent || "";
+        if (!plain) return textSegment;
+
+        let result = "";
+        // Duyệt từng ký tự gốc, nhưng giữ nguyên HTML entity
+        let htmlPos = 0;
+        for (const char of plain) {
+          // Tìm vị trí ký tự trong textSegment (HTML encoded)
+          const encoded = textSegment.substring(htmlPos);
+          let charHtml;
+          if (encoded.startsWith("&")) {
+            const semiIdx = encoded.indexOf(";");
+            charHtml = semiIdx >= 0 ? encoded.substring(0, semiIdx + 1) : encoded.substring(0, 1);
+          } else {
+            charHtml = encoded.substring(0, char.length);
+          }
+          htmlPos += charHtml.length;
+
+          // Chỉ kiểm tra ký tự CJK (Han/Nôm)
+          const cp = char.codePointAt(0);
+          const isCJK = (cp >= 0x2E80 && cp <= 0x9FFF)
+            || (cp >= 0xF900 && cp <= 0xFAFF)
+            || (cp >= 0x3400 && cp <= 0x4DBF)
+            || (cp >= 0x20000 && cp <= 0x3134F);
+
+          if (isCJK && !_hasVisibleGlyph(_currentSelectedStack, char)) {
+            result += `<span class="font-fb">${charHtml}</span>`;
+          } else {
+            result += charHtml;
+          }
+        }
+        return result;
+      });
+    }
+
+    async function loadFontRegistry() {
+      const select = $("font-select");
+      if (!select) return;
+      try {
+        const response = await fetch("/static/fonts/han-fonts.json");
+        if (!response.ok) throw new Error("font registry unavailable");
+        const data = await response.json();
+        Object.assign(fontRegistry, data || {});
+      } catch {
+        Object.assign(fontRegistry, {
+          default: fontRegistry.default || {
+            label: "Mặc định",
+            family: "Noto Serif CJK TC",
+            fallback: CJK_FALLBACK,
+            file: "",
+          }
+        });
+      }
+
+      // Đăng ký font-face cho font mặc định (font gốc) để sẵn sàng làm fallback
+      registerFontFaces(fontRegistry.default);
+
+      const order = Object.entries(fontRegistry);
+      select.innerHTML = order.map(([key, value]) =>
+        `<option value="${esc(key)}">${esc(value.label || key)}</option>`).join("");
+      const chosen = Object.prototype.hasOwnProperty.call(fontRegistry, state.fontKey)
+        ? state.fontKey : "default";
+      state.fontKey = chosen;
+      select.value = chosen;
+      select.onchange = async (event) => {
+        state.fontKey = event.target.value;
+        persistView();
+        await applySelectedFont(state.fontKey);
+      };
+      await applySelectedFont(chosen);
+    }
+
+    async function applySelectedFont(key) {
+      const defaultInfo = fontRegistry.default || {};
+      const defaultFamilies = registerFontFaces(defaultInfo);
+      const defaultStack = defaultFamilies.map((name) => `"${name}"`).join(", ");
+
+      const info = fontRegistry[key] || defaultInfo;
+      const isDefault = key === "default" || info === defaultInfo;
+      const selectedFamilies = isDefault ? defaultFamilies : registerFontFaces(info);
+      const selectedStack = selectedFamilies.map((name) => `"${name}"`).join(", ");
+
+      const fallback = info.fallback || defaultInfo.fallback || CJK_FALLBACK;
+
+      const composeFontFamily = (currentStack) => {
+        const list = [];
+        if (currentStack) list.push(currentStack);
+        if (!isDefault && defaultStack) list.push(defaultStack);
+        if (fallback) list.push(fallback);
+        return list.filter(Boolean).join(", ");
+      };
+
+      document.documentElement.style.setProperty(
+        "--han-font-family",
+        composeFontFamily(selectedStack) || fallback,
+      );
+
+      // Cập nhật CSS class .font-fb cho các ký tự fallback
+      let fbStyle = document.getElementById("font-fb-style");
+      if (!fbStyle) {
+        fbStyle = document.createElement("style");
+        fbStyle.id = "font-fb-style";
+        document.head.appendChild(fbStyle);
+      }
+      const defaultFontFamily = defaultStack
+        ? `${defaultStack}, ${fallback}` : fallback;
+      fbStyle.textContent = `.font-fb { font-family: ${defaultFontFamily} !important; }`;
+
+      const status = $("font-status");
+      const files = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
+      if (!files.length) {
+        _usingCustomFont = false;
+        _currentSelectedStack = "";
+        _currentDefaultStack = "";
+        if (status) status.textContent = "Font hệ thống";
+        return;
+      }
+      if (!document.fonts?.load) {
+        _usingCustomFont = false;
+        if (status) status.textContent = "Trình duyệt không hỗ trợ tải font chủ động";
+        return;
+      }
+
+      // Tải ngầm font gốc song song
+      if (!isDefault && defaultFamilies.length) {
+        await Promise.allSettled(
+          defaultFamilies.map((f) => document.fonts.load(`16px "${f}"`)),
+        );
+      }
+
+      if (status) status.textContent = `Đang tải ${files.length} font…`;
+      const results = await Promise.allSettled(
+        selectedFamilies.map((fontFamily) => document.fonts.load(`16px "${fontFamily}"`)),
+      );
+      if (state.fontKey !== key) return;
+
+      const successfulFamilies = selectedFamilies.filter((_, index) =>
+        results[index].status === "fulfilled" && results[index].value?.length > 0
+      );
+      const loaded = successfulFamilies.length;
+
+      const successfulStack = successfulFamilies.map((name) => `"${name}"`).join(", ");
+      document.documentElement.style.setProperty(
+        "--han-font-family",
+        composeFontFamily(successfulStack) || fallback,
+      );
+
+      // Cập nhật state cho glyph detection
+      _usingCustomFont = !isDefault && loaded > 0;
+      _currentSelectedStack = successfulStack;
+      _currentDefaultStack = defaultStack;
+      // Xoá cache glyph khi đổi font
+      _glyphCache.clear();
+
+      if (status) {
+        if (loaded === files.length) {
+          status.textContent = `Đã tải ${loaded} font`;
+        } else if (loaded > 0) {
+          status.textContent = `Tải được ${loaded}/${files.length} font (chữ thiếu hiển thị font gốc)`;
+        } else {
+          status.textContent = "Không tải được font mới, hiển thị font gốc";
+        }
+        status.title = results.map((result, index) =>
+          result.status === "rejected" || !result.value?.length ? files[index] : "")
+          .filter(Boolean).join("\n");
+      }
+
+      // Re-render kết quả với fallback detection
+      renderVisibleCards();
+    }
+
+    const pageCache = (() => {
+      let database;
+      function open() {
+        if (database) return database;
+        database = new Promise((resolve, reject) => {
+          const request = indexedDB.open("hannom-cache", 1);
+          request.onupgradeneeded = () => request.result.createObjectStore("pages");
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        return database;
+      }
+      return {
+        async get(key) {
+          try {
+            const db = await open();
+            return await new Promise((resolve, reject) => {
+              const request = db.transaction("pages").objectStore("pages").get(key);
+              request.onsuccess = () => resolve(request.result || null);
+              request.onerror = () => reject(request.error);
+            });
+          } catch { return null; }
+        },
+        async set(key, value) {
+          try {
+            const db = await open();
+            await new Promise((resolve, reject) => {
+              const request = db.transaction("pages", "readwrite").objectStore("pages").put(value, key);
+              request.onsuccess = resolve;
+              request.onerror = () => reject(request.error);
+            });
+          } catch { }
+        },
+      };
+    })();
+
+    function pageCacheKey(offset) {
+      return JSON.stringify({
+        q: state.query, field: state.field,
+        groups: (state.groups || []).slice().sort(),
+        verified: state.verifyFilter, hanSimilarity: state.hanSimilarityFilter,
+        sort: state.sortOrder, missing: state.missingOnly,
+        offset, limit: state.limit,
+      });
+    }
+
+    function setLoadModal(show, title = "Đang tải dữ liệu…", detail = "Đang chuẩn bị danh sách") {
+      $("load-modal").classList.toggle("show", show);
+      $("load-modal-title").textContent = title;
+      $("load-modal-detail").textContent = detail;
+    }
+
+    function renderComparison(groundTruth, qwenText) {
+      const target = $("qwen-comparison");
+      if (!target) return;
+      const gt = groundTruth || "";
+      const qwen = qwenText || "";
+      if (!gt && !qwen) { target.innerHTML = ""; return; }
+      const matrix = Array.from({ length: gt.length + 1 }, (_, row) =>
+        Array.from({ length: qwen.length + 1 }, (_, column) =>
+          row === 0 ? column : column === 0 ? row : 0));
+      for (let row = 1; row <= gt.length; row++) {
+        for (let column = 1; column <= qwen.length; column++) {
+          matrix[row][column] = Math.min(
+            matrix[row - 1][column] + 1,
+            matrix[row][column - 1] + 1,
+            matrix[row - 1][column - 1] + (gt[row - 1] === qwen[column - 1] ? 0 : 1),
+          );
+        }
+      }
+      const distance = matrix[gt.length][qwen.length];
+      const similarity = Math.round((1 - distance / Math.max(gt.length, qwen.length, 1)) * 100);
+      const cls = similarity >= 90 ? "high" : similarity < 70 ? "low" : "";
+      const differentIndexes = new Set();
+      const replacements = new Map();
+      let row = gt.length;
+      let column = qwen.length;
+      while (row || column) {
+        if (row && column && gt[row - 1] === qwen[column - 1] &&
+          matrix[row][column] === matrix[row - 1][column - 1]) {
+          row--; column--;
+        } else if (row && column && matrix[row][column] === matrix[row - 1][column - 1] + 1) {
+          differentIndexes.add(row - 1);
+          replacements.set(row - 1, qwen[column - 1]);
+          row--; column--;
+        } else if (row && matrix[row][column] === matrix[row - 1][column] + 1) {
+          differentIndexes.add(row - 1); row--;
+        } else {
+          column--;
+        }
+      }
+      let html = "";
+      for (let index = 0; index < gt.length; index++) {
+        const different = differentIndexes.has(index);
+        html += different
+          ? `<span class="different" data-diff-index="${index}" title="Bấm để thay bằng ký tự Qwen">${esc(gt[index])}</span>`
+          : esc(gt[index]);
+      }
+      target.innerHTML = `<div class="similarity ${cls}">Khớp Qwen: ${similarity}%</div>` +
+        `<div>${html || "(Ground truth trống)"}</div>` +
+        (qwen.length > gt.length ? `<div class="muted">Qwen có thêm: ${esc(qwen.slice(gt.length))}</div>` : "");
+      target.querySelectorAll("[data-diff-index]").forEach((element) => {
+        element.onclick = () => {
+          const index = Number(element.dataset.diffIndex);
+          const replacement = replacements.get(index);
+          if (replacement === undefined) return;
+          const update = (box) => {
+            const chars = Array.from(box.value);
+            chars[index] = replacement;
+            box.value = chars.join("");
+            box.dispatchEvent(new Event("input"));
+            box.focus();
+          };
+          if (!$("gt-edit")) {
+            const qwenValue = $("qwen-text")?.value || qwen;
+            const currentIndex = state.current?.index;
+            if (currentIndex !== undefined) openDetail(currentIndex, true);
+            if ($("qwen-text")) $("qwen-text").value = qwenValue;
+          }
+          if ($("gt-edit")) update($("gt-edit"));
+        };
+      });
+    }
+
+    const fmt = (n) => (n === null || n === undefined) ? "—" : Number(n).toLocaleString("vi-VN");
+    const esc = (s) => { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; };
+
+    function errorText(body, res) {
+      const d = body.detail;
+      if (typeof d === "string" && d) return d;
+      if (Array.isArray(d) && d.length) {
+        return d.map((e) => {
+          const f = Array.isArray(e.loc) ? e.loc[e.loc.length - 1] : "";
+          return f ? `${f}: ${e.msg}` : e.msg;
+        }).join("; ");
+      }
+      return `${res.status} ${res.statusText}`;
+    }
+
+    async function api(path, opts) {
+      const res = await fetch(path, opts);
+      if (res.status === 401) { window.location.reload(); throw new Error("chưa đăng nhập"); }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(errorText(body, res));
+      }
+      return res.status === 204 ? null : res.json();
+    }
+
+    function banner(title, body, critical) {
+      $("banner-title").textContent = title;
+      $("banner-body").textContent = body;
+      $("banner").classList.toggle("crit", !!critical);
+      $("banner").classList.add("show");
+    }
+    function clearBanner() { $("banner").classList.remove("show"); }
+
+    /* Highlight the query inside a rendered field, so a hit in a long poem is
+       findable by eye rather than by re-reading it. */
+    function highlight(text, needle) {
+      const safe = esc(text);
+      if (!needle) return safe;
+      const escaped = esc(needle).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      try {
+        return safe.replace(new RegExp(escaped, "gi"), (m) => `<mark>${m}</mark>`);
+      } catch { return safe; }
+    }
+
+    /* ---------------- search ---------------- */
+    function renderLookupData(data, append, requestOffset) {
+      state.offset = requestOffset;
+      persistView();
+      state.groupTags = data.group_tags || state.groupTags;
+      updateGroupFilter();
+      state.items = append ? [...state.items, ...data.items] : data.items;
+      state.total = data.total;
+      state.hasMore = data.has_more;
+
+      const grid = $("results"), empty = $("results-empty");
+      state.renderToken++;
+      if (!state.items.length) {
+        grid.innerHTML = "";
+        empty.style.display = "block";
+        empty.textContent = state.query
+          ? `Không tìm thấy kết quả nào cho “${state.query}”.`
+          : state.missingOnly
+            ? "Không có dòng nào thiếu ảnh."
+            : "Dataset đang trống. Hãy mount file dataset.jsonl vào container.";
+      } else {
+        empty.style.display = "none";
+        renderCardsProgressively(grid, data.items, append,
+          state.items.length - data.items.length);
+      }
+
+      $("c-results").textContent = fmt(data.total);
+      const from = data.total ? (state.mode === "scroll" ? 1 : requestOffset + 1) : 0;
+      const to = state.mode === "scroll" ? state.items.length : requestOffset + data.items.length;
+      $("page-info").textContent =
+        `${fmt(from)}–${fmt(to)} trên ${fmt(data.total)}` +
+        (state.missingOnly ? " · chỉ dòng thiếu ảnh" : "");
+      $("page-number").value = state.page;
+      updateLoadControls();
+    }
+
+    function renderCardsProgressively(grid, items, append, startIndex) {
+      const token = ++state.renderToken;
+      if (!append) grid.innerHTML = "";
+      let cursor = 0;
+      const chunkSize = 4;
+      const paint = () => {
+        if (token !== state.renderToken) return;
+        const chunk = items.slice(cursor, cursor + chunkSize);
+        if (chunk.length) {
+          grid.insertAdjacentHTML("beforeend", chunk.map((item, index) =>
+            card(item, startIndex + cursor + index)).join(""));
+          bindCards(grid);
+          cursor += chunk.length;
+          requestAnimationFrame(paint);
+        }
+      };
       requestAnimationFrame(paint);
     }
-  };
-  requestAnimationFrame(paint);
-}
 
-async function search() {
-  if (state.loading) return;
-  state.loading = true;
-  const append = state.mode === "scroll" && state.offset > 0;
-  const requestOffset = state.mode === "pages"
-    ? (state.page - 1) * state.limit : state.offset;
-  const cacheKey = pageCacheKey(requestOffset);
-  const cached = await pageCache.get(cacheKey);
-  if (!cached) setLoadModal(true, "Đang tải dữ liệu…", "Đang lấy danh sách ảnh");
-  if (cached) {
-    renderLookupData(cached, append, requestOffset);
-    state.loading = false;
-  }
-  const params = new URLSearchParams({
-    q: state.query, field: state.field, group: state.group, verified: state.verifyFilter,
-    sort: state.sortOrder, offset: requestOffset, limit: state.limit,
-  });
-  if (state.hanSimilarityFilter) params.set("min_han_similarity", state.hanSimilarityFilter);
-  if (state.missingOnly) params.set("missing_only", "true");
+    async function search() {
+      if (state.loading) return;
+      state.loading = true;
+      const append = state.mode === "scroll" && state.offset > 0;
+      const requestOffset = state.mode === "pages"
+        ? (state.page - 1) * state.limit : state.offset;
+      const cacheKey = pageCacheKey(requestOffset);
+      const cached = await pageCache.get(cacheKey);
+      if (!cached) setLoadModal(true, "Đang tải dữ liệu…", "Đang lấy danh sách ảnh");
+      if (cached) {
+        renderLookupData(cached, append, requestOffset);
+        state.loading = false;
+      }
+      const params = new URLSearchParams({
+        q: state.query, field: state.field, verified: state.verifyFilter,
+        sort: state.sortOrder, offset: requestOffset, limit: state.limit,
+      });
+      if (state.groups) {
+        if (state.groups.length === 0) {
+          params.set("groups", "__none__");
+        } else {
+          params.set("groups", state.groups.join(","));
+        }
+      }
+      if (state.hanSimilarityFilter) params.set("min_han_similarity", state.hanSimilarityFilter);
+      if (state.missingOnly) params.set("missing_only", "true");
 
-  let data;
-  try { data = await api(`/api/lookup?${params}`); }
-  catch { setLoadModal(false); state.loading = false; return; }
-  await pageCache.set(cacheKey, data);
-  renderLookupData(data, append, requestOffset);
-  setLoadModal(false);
-  state.loading = false;
-}
+      let data;
+      try { data = await api(`/api/lookup?${params}`); }
+      catch { setLoadModal(false); state.loading = false; return; }
+      await pageCache.set(cacheKey, data);
+      renderLookupData(data, append, requestOffset);
+      setLoadModal(false);
+      state.loading = false;
+    }
 
-function updateGroupFilter() {
-  const select = $("group-filter");
-  const selected = state.group;
-  select.innerHTML = `<option value="">Tất cả group</option>` +
-    Object.keys(state.groupTags).sort().map((name) =>
-      `<option value="${esc(name)}">${esc(name)}</option>`).join("") +
-    `<option value="other">other</option>`;
-  select.value = selected;
-}
+    function updateGroupTriggerLabel() {
+      const labelEl = $("group-trigger-label");
+      const triggerBtn = $("group-trigger");
+      if (!labelEl || !triggerBtn) return;
+      const allKeys = [...Object.keys(state.groupTags).sort(), "other"];
+      const totalAvailable = allKeys.length;
+      const count = (state.groups || []).length;
 
-function bindCards(grid) {
-  grid.onclick = (event) => {
-    const target = event.target.closest("[data-open]");
-    if (!target || target.closest("a")) return;
-    event.preventDefault();
-    event.stopPropagation();
-    openDetail(Number(target.dataset.open));
-  };
-  grid.querySelectorAll("[data-open]").forEach((el) => {
-    el.onclick = null;
-  });
-  grid.querySelectorAll("[data-edit]").forEach((el) => {
-    el.onclick = () => openDetail(+el.dataset.edit, true);
-  });
-  grid.querySelectorAll("[data-delete]").forEach((el) => {
-    el.onclick = () => deletePost(state.items[+el.dataset.delete]);
-  });
-}
+      if (count === 0) {
+        labelEl.textContent = "Chưa chọn nhóm (0)";
+        triggerBtn.title = "Chưa chọn nhóm";
+      } else if (totalAvailable > 0 && count === totalAvailable) {
+        labelEl.textContent = `Tất cả nhóm (${count})`;
+        triggerBtn.title = "Tất cả nhóm";
+      } else if (count <= 3) {
+        const text = state.groups.join(", ");
+        labelEl.textContent = text;
+        triggerBtn.title = text;
+      } else {
+        labelEl.textContent = `${count} nhóm đã chọn`;
+        triggerBtn.title = state.groups.join(", ");
+      }
+    }
 
-function renderVisibleCards() {
-  const grid = $("results");
-  if (!grid || !state.items.length) return;
-  grid.innerHTML = state.items.map((item, index) => card(item, index)).join("");
-  bindCards(grid);
-}
+    function updateGroupFilter() {
+      const list = $("group-options-list");
+      if (!list) return;
+      const sortedNames = Object.keys(state.groupTags).sort();
+      const allItems = [...sortedNames.map((name) => ({ name, id: state.groupTags[name] || "" })), { name: "other", id: "" }];
 
-function updateLoadControls() {
-  const pages = state.mode === "pages";
-  $("page-number-label").classList.toggle("hide", !pages);
-  $("page-number").classList.toggle("hide", !pages);
-  $("btn-go-page").classList.toggle("hide", !pages);
-  const status = $("load-status");
-  status.className = "load-status";
-  if (state.loading) {
-    status.classList.add("loading");
-    status.textContent = "Đang tải ảnh…";
-  } else if (state.mode === "scroll") {
-    status.innerHTML = state.hasMore
-      ? `<button id="btn-load-more">Tải thêm ảnh</button>`
-      : "Đã tải hết kết quả";
-    if (!state.hasMore && state.items.length) status.classList.add("end");
-    const loadMore = $("btn-load-more");
-    if (loadMore) loadMore.onclick = loadMoreItems;
-  } else {
-    const lastPage = Math.max(1, Math.ceil(state.total / state.limit));
-    status.innerHTML = `<button id="btn-page-prev" ${state.page <= 1 ? "disabled" : ""}>Trước</button>
+      list.innerHTML = allItems.map((item) => {
+        const checked = (state.groups || []).includes(item.name) ? "checked" : "";
+        return `
+          <label class="group-item" title="${esc(item.name + (item.id ? ": " + item.id : ""))}">
+            <input type="checkbox" value="${esc(item.name)}" ${checked} />
+            <span class="group-item-name">${esc(item.name)}</span>
+            ${item.id ? `<span class="group-item-id">${esc(item.id)}</span>` : ""}
+          </label>
+        `;
+      }).join("");
+
+      list.querySelectorAll("input[type='checkbox']").forEach((cb) => {
+        cb.onchange = () => {
+          const val = cb.value;
+          if (cb.checked) {
+            if (!state.groups.includes(val)) state.groups.push(val);
+          } else {
+            state.groups = state.groups.filter((g) => g !== val);
+          }
+          updateGroupTriggerLabel();
+          persistView();
+          resetResults();
+        };
+      });
+
+      updateGroupTriggerLabel();
+    }
+
+    function bindCards(grid) {
+      grid.onclick = (event) => {
+        const target = event.target.closest("[data-open]");
+        if (!target || target.closest("a")) return;
+        event.preventDefault();
+        event.stopPropagation();
+        openDetail(Number(target.dataset.open));
+      };
+      grid.querySelectorAll("[data-open]").forEach((el) => {
+        el.onclick = null;
+      });
+      grid.querySelectorAll("[data-edit]").forEach((el) => {
+        el.onclick = () => openDetail(+el.dataset.edit, true);
+      });
+      grid.querySelectorAll("[data-delete]").forEach((el) => {
+        el.onclick = () => deletePost(state.items[+el.dataset.delete]);
+      });
+    }
+
+    function renderVisibleCards() {
+      const grid = $("results");
+      if (!grid || !state.items.length) return;
+      grid.innerHTML = state.items.map((item, index) => card(item, index)).join("");
+      bindCards(grid);
+    }
+
+    function updateLoadControls() {
+      const pages = state.mode === "pages";
+      $("page-number-label").classList.toggle("hide", !pages);
+      $("page-number").classList.toggle("hide", !pages);
+      $("btn-go-page").classList.toggle("hide", !pages);
+      const status = $("load-status");
+      status.className = "load-status";
+      if (state.loading) {
+        status.classList.add("loading");
+        status.textContent = "Đang tải ảnh…";
+      } else if (state.mode === "scroll") {
+        status.innerHTML = state.hasMore
+          ? `<button id="btn-load-more">Tải thêm ảnh</button>`
+          : "Đã tải hết kết quả";
+        if (!state.hasMore && state.items.length) status.classList.add("end");
+        const loadMore = $("btn-load-more");
+        if (loadMore) loadMore.onclick = loadMoreItems;
+      } else {
+        const lastPage = Math.max(1, Math.ceil(state.total / state.limit));
+        status.innerHTML = `<button id="btn-page-prev" ${state.page <= 1 ? "disabled" : ""}>Trước</button>
       <span>Trang ${fmt(state.page)} / ${fmt(lastPage)}</span>
       <button id="btn-page-next" ${state.page >= lastPage ? "disabled" : ""}>Sau</button>`;
-    $("btn-page-prev").onclick = () => goToPage(state.page - 1);
-    $("btn-page-next").onclick = () => goToPage(state.page + 1);
-  }
-}
+        $("btn-page-prev").onclick = () => goToPage(state.page - 1);
+        $("btn-page-next").onclick = () => goToPage(state.page + 1);
+      }
+    }
 
-function loadMoreItems() {
-  if (state.loading || !state.hasMore) return;
-  state.offset = state.items.length;
-  search();
-}
+    function loadMoreItems() {
+      if (state.loading || !state.hasMore) return;
+      state.offset = state.items.length;
+      search();
+    }
 
-function resetResults() {
-  state.offset = 0;
-  state.page = 1;
-  state.items = [];
-  persistView();
-  $("results").innerHTML = "";
-  search();
-}
+    function resetResults() {
+      state.offset = 0;
+      state.page = 1;
+      state.items = [];
+      persistView();
+      $("results").innerHTML = "";
+      search();
+    }
 
-function goToPage(page) {
-  const lastPage = Math.max(1, Math.ceil(state.total / state.limit));
-  state.page = Math.max(1, Math.min(page, lastPage));
-  state.offset = (state.page - 1) * state.limit;
-  persistView();
-  search();
-}
+    function goToPage(page) {
+      const lastPage = Math.max(1, Math.ceil(state.total / state.limit));
+      state.page = Math.max(1, Math.min(page, lastPage));
+      state.offset = (state.page - 1) * state.limit;
+      persistView();
+      search();
+    }
 
-function card(item, i) {
-  const q = state.query;
-  const gt = item.ground_truth
-    ? `<div class="gt">${wrapFallbackChars(highlight(item.ground_truth, q))}</div>` : "";
-  const phon = item.phonetic
-    ? `<div class="phonetic" title="${esc(item.phonetic)}">${highlight(item.phonetic, q)}</div>` : "";
-  const cap = item.caption
-    ? `<div class="cap">${highlight(item.caption, q)}</div>` : "";
-  const hanMatch = renderHanSimilarity(item.caption, item.ground_truth);
-  const thumb = item.has_image
-    ? `<img class="thumb" loading="lazy" decoding="async" fetchpriority="low" data-open="${i}"
+    function card(item, i) {
+      const q = state.query;
+      const gt = item.ground_truth
+        ? `<div class="gt">${wrapFallbackChars(highlight(item.ground_truth, q))}</div>` : "";
+      const phon = item.phonetic
+        ? `<div class="phonetic" title="${esc(item.phonetic)}">${highlight(item.phonetic, q)}</div>` : "";
+      const cap = item.caption
+        ? `<div class="cap">${highlight(item.caption, q)}</div>` : "";
+      const hanMatch = renderHanSimilarity(item.caption, item.ground_truth);
+      const thumb = item.has_image
+        ? `<img class="thumb" loading="lazy" decoding="async" fetchpriority="low" data-open="${i}"
             src="${imgSrc(item.image_name)}" alt="" />`
-    : `<div class="thumb-missing" data-open="${i}">Không tìm thấy file ảnh<br>
+        : `<div class="thumb-missing" data-open="${i}">Không tìm thấy file ảnh<br>
          <code style="font-size:0.72rem">${esc(item.image || "(trống)")}</code></div>`;
-  const imagePath = String(item.image || "").replaceAll("\\", "/");
-  const groupKey = Object.keys(state.groupTags).sort((a, b) => b.length - a.length)
-    .find((key) => imagePath.includes(`/${key}/`));
-  const groupId = groupKey ? state.groupTags[groupKey] : "";
-  const groupTag = groupKey && groupId
-    ? `<a class="group-tag" href="https://www.facebook.com/groups/${encodeURIComponent(groupId)}/"
+      const imagePath = String(item.image || "").replaceAll("\\", "/");
+      const groupKey = Object.keys(state.groupTags).sort((a, b) => b.length - a.length)
+        .find((key) => imagePath.includes(`/${key}/`));
+      const groupId = groupKey ? state.groupTags[groupKey] : "";
+      const groupTag = groupKey && groupId
+        ? `<a class="group-tag" href="https://www.facebook.com/groups/${encodeURIComponent(groupId)}/"
          target="_blank" rel="noopener" title="${esc(groupKey + ":" + groupId)}">${esc(groupKey + ":" + groupId)}</a>`
-    : `<span class="pill click-tag" data-open="${i}">other</span>`;
+        : `<span class="pill click-tag" data-open="${i}">other</span>`;
 
-  return `
+      return `
     <div class="item ${item.has_image ? "" : "noimg"}">
       ${thumb}
       <div class="meta">
@@ -1232,95 +2162,94 @@ function card(item, i) {
         <div class="foot">
           ${item.has_image ? "" : `<span class="pill miss">thiếu ảnh</span>`}
           ${item.verified
-            ? `<span class="pill click-tag verified-tag" data-open="${i}" title="${esc(item.verified_at || "")}">
+          ? `<span class="pill click-tag verified-tag" data-open="${i}" title="${esc(item.verified_at || "")}">
                  Đã verify${item.verified_by ? ` · ${esc(item.verified_by)}` : ""}
                </span>`
-            : `<span class="pill click-tag unverified-tag" data-open="${i}">Chưa verify</span>`}
+          : `<span class="pill click-tag unverified-tag" data-open="${i}">Chưa verify</span>`}
           ${item.siblings && item.siblings.length
-            ? `<span class="pill more" data-open="${i}"
-                     title="Post này còn ${item.siblings.length} ảnh nữa">+${
-                       item.siblings.length} ảnh</span>` : ""}
+          ? `<span class="pill more" data-open="${i}"
+                     title="Post này còn ${item.siblings.length} ảnh nữa">+${item.siblings.length} ảnh</span>` : ""}
           <span>#${item.index + 1}</span>
           ${groupTag}
           <span class="spacer"></span>
           ${item.post_url
-            ? `<a class="postlink" href="${esc(item.post_url)}" target="_blank"
+          ? `<a class="postlink" href="${esc(item.post_url)}" target="_blank"
                   rel="noopener" title="${esc(item.post_url)}">Bài post ↗</a>`
-            : `<span class="pill">không có link</span>`}
+          : `<span class="pill">không có link</span>`}
           ${isAdmin()
-            ? `<button class="primary" data-edit="${i}">Chỉnh ground truth</button>
+          ? `<button class="primary" data-edit="${i}">Chỉnh ground truth</button>
                <button class="danger-user" data-delete="${i}">Xoá post</button>`
-            : ""}
+          : ""}
         </div>
       </div>
     </div>`;
-}
+    }
 
-function renderHanSimilarity(caption, groundTruth) {
-  if (!isAdmin()) return "";
-  const similarity = hanSimilarity(caption, groundTruth);
-  if (similarity === null) return "";
-  const tone = similarity >= 90 ? "high" : similarity < 70 ? "low" : "";
-  return `<div class="similarity han-similarity ${tone}"
+    function renderHanSimilarity(caption, groundTruth) {
+      if (!isAdmin()) return "";
+      const similarity = hanSimilarity(caption, groundTruth);
+      if (similarity === null) return "";
+      const tone = similarity >= 90 ? "high" : similarity < 70 ? "low" : "";
+      return `<div class="similarity han-similarity ${tone}"
                title="Chỉ so sánh chữ Hán; bỏ qua dấu câu và ký tự khác">
             Độ tương đồng chữ Hán: ${similarity}%
           </div>`;
-}
-
-function hanSimilarity(first, second) {
-  const hanChars = (text) => Array.from(
-    String(text || "").normalize("NFC").matchAll(/\p{Script=Han}/gu),
-    (match) => match[0],
-  );
-  const left = hanChars(first);
-  const right = hanChars(second);
-  if (!left.length || !right.length) return null;
-
-  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
-  for (let row = 1; row <= left.length; row++) {
-    const current = [row];
-    for (let column = 1; column <= right.length; column++) {
-      current[column] = Math.min(
-        current[column - 1] + 1,
-        previous[column] + 1,
-        previous[column - 1] + (left[row - 1] === right[column - 1] ? 0 : 1),
-      );
     }
-    previous = current;
-  }
 
-  const distance = previous[right.length];
-  return Math.round((1 - distance / Math.max(left.length, right.length)) * 100);
-}
+    function hanSimilarity(first, second) {
+      const hanChars = (text) => Array.from(
+        String(text || "").normalize("NFC").matchAll(/\p{Script=Han}/gu),
+        (match) => match[0],
+      );
+      const left = hanChars(first);
+      const right = hanChars(second);
+      if (!left.length || !right.length) return null;
 
-/* ---------------- detail ---------------- */
-// Natural order, so 10.jpg follows 9.jpg instead of 1.jpg.
-const byNumber = (a, b) => a.localeCompare(b, undefined, { numeric: true });
+      let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+      for (let row = 1; row <= left.length; row++) {
+        const current = [row];
+        for (let column = 1; column <= right.length; column++) {
+          current[column] = Math.min(
+            current[column - 1] + 1,
+            previous[column] + 1,
+            previous[column - 1] + (left[row - 1] === right[column - 1] ? 0 : 1),
+          );
+        }
+        previous = current;
+      }
 
-function openDetail(i, editing = isAdmin(), showing = null) {
-  const item = state.items[i];
-  console.log(item);
-  if (!item) return;
-  // Every picture in this post's folder, the row's own one included. The row
-  // describes only its own; the rest are shown, not captioned.
-  const gallery = item.has_image
-    ? [item.image_name, ...(item.siblings || [])].sort(byNumber) : [];
-  const shown = gallery.includes(showing) ? showing : item.image_name;
-  state.current = { item, index: i };
-  try {
-    localStorage.setItem("hannom.popup", JSON.stringify({
-      open: true, itemIndex: item.index, editing, showing,
-    }));
-  } catch {}
+      const distance = previous[right.length];
+      return Math.round((1 - distance / Math.max(left.length, right.length)) * 100);
+    }
 
-  $("lb-inner").innerHTML = `
+    /* ---------------- detail ---------------- */
+    // Natural order, so 10.jpg follows 9.jpg instead of 1.jpg.
+    const byNumber = (a, b) => a.localeCompare(b, undefined, { numeric: true });
+
+    function openDetail(i, editing = isAdmin(), showing = null) {
+      const item = state.items[i];
+      console.log(item);
+      if (!item) return;
+      // Every picture in this post's folder, the row's own one included. The row
+      // describes only its own; the rest are shown, not captioned.
+      const gallery = item.has_image
+        ? [item.image_name, ...(item.siblings || [])].sort(byNumber) : [];
+      const shown = gallery.includes(showing) ? showing : item.image_name;
+      state.current = { item, index: i };
+      try {
+        localStorage.setItem("hannom.popup", JSON.stringify({
+          open: true, itemIndex: item.index, editing, showing,
+        }));
+      } catch { }
+
+      $("lb-inner").innerHTML = `
     <div class="lb-img">
       ${item.has_image
-        ? `<img src="${imgSrc(shown)}" alt="" />`
-        : `<div class="empty" style="color:#ccc">Không tìm thấy file ảnh<br>
+          ? `<img src="${imgSrc(shown)}" alt="" />`
+          : `<div class="empty" style="color:#ccc">Không tìm thấy file ảnh<br>
              <code>${esc(item.image || "(trống)")}</code></div>`}
       ${gallery.length > 1
-        ? `<div class="strip">${gallery.map((name) => `
+          ? `<div class="strip">${gallery.map((name) => `
              <img class="strip-thumb ${name === shown ? "on" : ""}"
                   data-show="${esc(name)}" loading="lazy"
                   title="${esc(name)}" src="${imgSrc(name)}" alt="" />`).join("")}
@@ -1328,21 +2257,19 @@ function openDetail(i, editing = isAdmin(), showing = null) {
     </div>
     <div class="lb-side">
       ${gallery.length > 1 && shown !== item.image_name
-        ? `<p class="pill warn-pill">Đang xem ${esc(shown.split("/").pop())} —
+          ? `<p class="pill warn-pill">Đang xem ${esc(shown.split("/").pop())} —
              ground truth bên dưới là của ${esc(item.image_name.split("/").pop())}</p>`
-        : ""}
+          : ""}
       <div style="margin-bottom:0.8rem">
         <label class="field">Ground truth</label>
         ${editing
-          ? `<textarea id="gt-edit" class="cjk block-edit" rows="8">${
-               esc(item.ground_truth || "")}</textarea>
+          ? `<textarea id="gt-edit" class="cjk block-edit" rows="8">${esc(item.ground_truth || "")}</textarea>
              <div class="row" style="margin-top:0.4rem">
                <button class="primary" id="gt-save">Lưu</button>
                <button id="gt-cancel">Huỷ</button>
                <span class="muted" id="gt-status"></span>
              </div>`
-          : `<div class="block gt">${
-               wrapFallbackChars(highlight(item.ground_truth || "(trống)", state.query))}</div>`}
+          : `<div class="block gt">${wrapFallbackChars(highlight(item.ground_truth || "(trống)", state.query))}</div>`}
       </div>
       <div style="margin-bottom:0.8rem">
         <label class="field">Phiên âm / Phonetic</label>
@@ -1363,24 +2290,22 @@ function openDetail(i, editing = isAdmin(), showing = null) {
         <dt>Dòng số</dt><dd>${item.index + 1}</dd>
         <dt>Kết quả cuối</dt><dd><span class="pill ${item.verified ? "verified-tag" : "unverified-tag"}">
           ${item.verified
-            ? `Đã verify bởi ${esc(item.verified_by || "không rõ")}${item.verified_at ? ` · ${esc(item.verified_at)}` : ""}`
-            : `Chưa verify${item.verified_by ? ` · lần cuối bởi ${esc(item.verified_by)}` : ""}`}
+          ? `Đã verify bởi ${esc(item.verified_by || "không rõ")}${item.verified_at ? ` · ${esc(item.verified_at)}` : ""}`
+          : `Chưa verify${item.verified_by ? ` · lần cuối bởi ${esc(item.verified_by)}` : ""}`}
         </span></dd>
         <dt>Lịch sử verify</dt><dd><div class="verify-history">
           ${(item.verify_history || []).length
-            ? item.verify_history.slice().reverse().map((entry) => `
+          ? item.verify_history.slice().reverse().map((entry) => `
                 <div><span class="pill ${entry.verified ? "verified-tag" : "unverified-tag"}">
                   ${entry.verified ? "Verify" : "Bỏ verify"}
                 </span> ${esc(entry.username || "?")} · ${esc(entry.at || "")}</div>
               `).join("")
-            : "Chưa có lịch sử"}
+          : "Chưa có lịch sử"}
         </div></dd>
         ${gallery.length > 1
-          ? `<dt>Ảnh của post</dt><dd>${gallery.length} tấm: ${
-               gallery.map((n) => esc(n.split("/").pop())).join(", ")}</dd>` : ""}
-        <dt>File ảnh</dt><dd>${esc(item.image || "—")}${
-          item.has_image && item.image_name !== item.image
-            ? ` <span class="pill">khớp với ${esc(item.image_name)}</span>` : ""}</dd>
+          ? `<dt>Ảnh của post</dt><dd>${gallery.length} tấm: ${gallery.map((n) => esc(n.split("/").pop())).join(", ")}</dd>` : ""}
+        <dt>File ảnh</dt><dd>${esc(item.image || "—")}${item.has_image && item.image_name !== item.image
+          ? ` <span class="pill">khớp với ${esc(item.image_name)}</span>` : ""}</dd>
         <dt>Post ID</dt><dd>${esc(item.post_id || "—")}</dd>
         <dt>Link bài post</dt><dd>${item.post_url
           ? `<a class="postlink" href="${esc(item.post_url)}" target="_blank"
@@ -1416,686 +2341,741 @@ function openDetail(i, editing = isAdmin(), showing = null) {
       <p class="muted" style="font-size:0.72rem; margin-top:0.7rem">← → chuyển ảnh · Esc đóng</p>
     </div>`;
 
-  $("lb").classList.add("show");
-  const copy = $("lb-copy");
-  if (copy) copy.onclick = async () => {
-    try { await navigator.clipboard.writeText(item.ground_truth || ""); copy.textContent = "Đã chép"; }
-    catch { copy.textContent = "Không chép được"; }
-    setTimeout(() => { copy.textContent = "Chép ground truth"; }, 1500);
-  };
+      $("lb").classList.add("show");
+      const copy = $("lb-copy");
+      if (copy) copy.onclick = async () => {
+        try { await navigator.clipboard.writeText(item.ground_truth || ""); copy.textContent = "Đã chép"; }
+        catch { copy.textContent = "Không chép được"; }
+        setTimeout(() => { copy.textContent = "Chép ground truth"; }, 1500);
+      };
 
-  const qwenCopy = $("qwen-copy");
-  if (qwenCopy) qwenCopy.onclick = async () => {
-    try {
-      await navigator.clipboard.writeText($("qwen-text").value);
-      qwenCopy.textContent = "Đã copy";
-    } catch { qwenCopy.textContent = "Không copy được"; }
-    setTimeout(() => { qwenCopy.textContent = "Copy kết quả Qwen"; }, 1500);
-  };
+      const qwenCopy = $("qwen-copy");
+      if (qwenCopy) qwenCopy.onclick = async () => {
+        try {
+          await navigator.clipboard.writeText($("qwen-text").value);
+          qwenCopy.textContent = "Đã copy";
+        } catch { qwenCopy.textContent = "Không copy được"; }
+        setTimeout(() => { qwenCopy.textContent = "Copy kết quả Qwen"; }, 1500);
+      };
 
-  const qwenTextBox = $("qwen-text");
-  if (qwenTextBox) qwenTextBox.oninput = () => {
-    renderComparison($("gt-edit")?.value || item.ground_truth, qwenTextBox.value);
-  };
+      const qwenTextBox = $("qwen-text");
+      if (qwenTextBox) qwenTextBox.oninput = () => {
+        renderComparison($("gt-edit")?.value || item.ground_truth, qwenTextBox.value);
+      };
 
-  const applyQwen = $("qwen-apply");
-  if (applyQwen) applyQwen.onclick = () => {
-    const currentQwenText = $("qwen-text").value.trim();
-    if (!$('gt-edit')) {
-      openDetail(state.items.findIndex((row) => row.index === item.index), true);
-    }
-    if ($('gt-edit')) {
-      $('gt-edit').value = currentQwenText;
-      if ($('qwen-text')) $('qwen-text').value = currentQwenText;
-      renderComparison($('gt-edit').value, currentQwenText);
-      $('gt-edit').focus();
-      if ($('qwen-apply')) $('qwen-apply').textContent = "Đã autofill, bấm Lưu để ghi";
-    }
-  };
+      const applyQwen = $("qwen-apply");
+      if (applyQwen) applyQwen.onclick = () => {
+        const currentQwenText = $("qwen-text").value.trim();
+        if (!$('gt-edit')) {
+          openDetail(state.items.findIndex((row) => row.index === item.index), true);
+        }
+        if ($('gt-edit')) {
+          $('gt-edit').value = currentQwenText;
+          if ($('qwen-text')) $('qwen-text').value = currentQwenText;
+          renderComparison($('gt-edit').value, currentQwenText);
+          $('gt-edit').focus();
+          if ($('qwen-apply')) $('qwen-apply').textContent = "Đã autofill, bấm Lưu để ghi";
+        }
+      };
 
-  $("qwen-analyze").onclick = async () => {
-    const button = $("qwen-analyze");
-    button.disabled = true;
-    $("qwen-status").textContent = "Đang nhận diện và tìm nguồn…";
-    try {
-      const result = await api("/api/qwen/analyze", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ index: item.index }),
-      });
-      if (!result.enabled) {
-        $("qwen-status").textContent = result.message;
-      } else {
-        $("qwen-status").textContent = `${result.lines.length} dòng được nhận diện`;
-        const qwenText = result.lines.map((line) => line.text || "").filter(Boolean).join("\n");
-        $("qwen-text").value = qwenText;
-        renderComparison($("gt-edit")?.value || item.ground_truth, qwenText);
-        $("qwen-results").innerHTML = result.lines.length
-          ? result.lines.map((line) => `
+      $("qwen-analyze").onclick = async () => {
+        const button = $("qwen-analyze");
+        button.disabled = true;
+        $("qwen-status").textContent = "Đang nhận diện và tìm nguồn…";
+        try {
+          const result = await api("/api/qwen/analyze", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ index: item.index }),
+          });
+          if (!result.enabled) {
+            $("qwen-status").textContent = result.message;
+          } else {
+            $("qwen-status").textContent = `${result.lines.length} dòng được nhận diện`;
+            const qwenText = result.lines.map((line) => line.text || "").filter(Boolean).join("\n");
+            $("qwen-text").value = qwenText;
+            renderComparison($("gt-edit")?.value || item.ground_truth, qwenText);
+            $("qwen-results").innerHTML = result.lines.length
+              ? result.lines.map((line) => `
               <div class="qwen-line">
                 <div class="gt">${wrapFallbackChars(esc(line.text || ""))}</div>
                 <span class="muted">Vị trí: ${esc(JSON.stringify(line.bounding_box || []))}</span>
                 ${(line.sources || []).map((source) =>
-                  `<a class="qwen-source" href="${esc(source.url)}" target="_blank"
+                `<a class="qwen-source" href="${esc(source.url)}" target="_blank"
                     rel="noopener" title="Mở ảnh nguồn trực tiếp">↗ ${esc(source.title || "Mở ảnh nguồn")}</a>
                    <a href="${esc(source.url)}" target="_blank" rel="noopener">
                      <img class="qwen-reference" src="${esc(source.image_url || source.url)}" loading="lazy" alt="Ảnh tham khảo" />
                    </a>`
-                ).join("") || `<span class="muted">Không tìm thấy nguồn tham khảo.</span>`}
+              ).join("") || `<span class="muted">Không tìm thấy nguồn tham khảo.</span>`}
               </div>`).join("")
-          : `<span class="muted">Qwen không nhận diện được dòng chữ.</span>`;
+              : `<span class="muted">Qwen không nhận diện được dòng chữ.</span>`;
+          }
+        } catch (error) { $("qwen-status").textContent = error.message; }
+        button.disabled = false;
+      };
+
+      const verify = $("verify-row");
+      if (verify) verify.onclick = async () => {
+        const form = new FormData();
+        form.append("index", String(item.index));
+        form.append("expect_image", item.image || "");
+        form.append("verified", item.verified ? "false" : "true");
+        verify.disabled = true;
+        const previous = {
+          verified: item.verified, verified_by: item.verified_by, verified_at: item.verified_at,
+          verify_history: item.verify_history,
+        };
+        item.verified = !item.verified;
+        item.verified_by = state.me.username;
+        item.verified_at = new Date().toISOString();
+        item.verify_history = [...(item.verify_history || []), {
+          verified: item.verified, username: state.me.username, at: item.verified_at,
+        }];
+        renderVisibleCards();
+        try {
+          const result = await api("/api/data/verify", { method: "POST", body: form });
+          item.verified = result.verified;
+          item.verified_by = result.verified_by;
+          item.verified_at = result.verified_at;
+          item.verify_history = result.verify_history || item.verify_history || [];
+          await loadStats();
+          openDetail(i, editing, shown);
+        } catch (error) {
+          Object.assign(item, previous);
+          renderVisibleCards();
+          verify.disabled = false; verify.textContent = error.message;
+        }
+      };
+
+      const deleteButton = $("delete-post");
+      if (deleteButton) deleteButton.onclick = () => deletePost(item);
+
+      // Notify Telegram when a post link is clicked, or when detail is opened.
+      const postLinkEl = $("postlink-" + i);
+      if (postLinkEl) {
+        postLinkEl.onclick = async (e) => {
+          try {
+            await fetch("/api/data/notify/telegram", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ index: item.index, action: "open_post_link", post_url: item.post_url, image: imgSrc(item.image), ground_truth: item.ground_truth, post_id: item.post_id })
+            });
+          } catch { }
+        };
       }
-    } catch (error) { $("qwen-status").textContent = error.message; }
-    button.disabled = false;
-  };
-
-  const verify = $("verify-row");
-  if (verify) verify.onclick = async () => {
-    const form = new FormData();
-    form.append("index", String(item.index));
-    form.append("expect_image", item.image || "");
-    form.append("verified", item.verified ? "false" : "true");
-    verify.disabled = true;
-    const previous = {
-      verified: item.verified, verified_by: item.verified_by, verified_at: item.verified_at,
-      verify_history: item.verify_history,
-    };
-    item.verified = !item.verified;
-    item.verified_by = state.me.username;
-    item.verified_at = new Date().toISOString();
-    item.verify_history = [...(item.verify_history || []), {
-      verified: item.verified, username: state.me.username, at: item.verified_at,
-    }];
-    renderVisibleCards();
-    try {
-      const result = await api("/api/data/verify", { method: "POST", body: form });
-      item.verified = result.verified;
-      item.verified_by = result.verified_by;
-      item.verified_at = result.verified_at;
-      item.verify_history = result.verify_history || item.verify_history || [];
-      await loadStats();
-      openDetail(i, editing, shown);
-    } catch (error) {
-      Object.assign(item, previous);
-      renderVisibleCards();
-      verify.disabled = false; verify.textContent = error.message;
-    }
-  };
-
-  const deleteButton = $("delete-post");
-  if (deleteButton) deleteButton.onclick = () => deletePost(item);
-
-  // Notify Telegram when a post link is clicked, or when detail is opened.
-  const postLinkEl = $("postlink-" + i);
-  if (postLinkEl) {
-    postLinkEl.onclick = async (e) => {
+      // Also notify when the detail is opened (view action)
       try {
-        await fetch("/api/data/notify/telegram", {
+        fetch("/api/data/notify/telegram", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ index: item.index, action: "open_post_link", post_url: item.post_url, image: imgSrc(item.image), ground_truth: item.ground_truth, post_id: item.post_id  })
+          body: JSON.stringify({ index: item.index, action: "open_detail", post_url: item.post_url, image: imgSrc(item.image), ground_truth: item.ground_truth, post_id: item.post_id })
         });
-      } catch {}
-    };
-  }
-  // Also notify when the detail is opened (view action)
-  try {
-    fetch("/api/data/notify/telegram", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ index: item.index, action: "open_detail", post_url: item.post_url, image: imgSrc(item.image), ground_truth: item.ground_truth, post_id: item.post_id })
-    });
-  } catch {}
+      } catch { }
 
-  $("lb-inner").querySelectorAll("[data-show]").forEach((el) => {
-    el.onclick = () => openDetail(i, editing, el.dataset.show);
-  });
+      $("lb-inner").querySelectorAll("[data-show]").forEach((el) => {
+        el.onclick = () => openDetail(i, editing, el.dataset.show);
+      });
 
-  const open = $("gt-open");
-  if (open) open.onclick = () => openDetail(i, true);
-  const cancel = $("gt-cancel");
-  if (cancel) cancel.onclick = () => openDetail(i, false, shown);
+      const open = $("gt-open");
+      if (open) open.onclick = () => openDetail(i, true);
+      const cancel = $("gt-cancel");
+      if (cancel) cancel.onclick = () => openDetail(i, false, shown);
 
-  const box = $("gt-edit");
-  if (box) {
-    box.focus();
-    box.setSelectionRange(box.value.length, box.value.length);
-    box.oninput = () => renderComparison(box.value, $("qwen-text")?.value || "");
-    // Ctrl/Cmd+Enter saves, so a long correction does not need the mouse.
-    box.onkeydown = (e) => {
-      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save(); }
-      // The lightbox uses the arrows to change picture; inside a textarea
-      // they have to move the caret instead. Escape still closes.
-      if (e.key !== "Escape") e.stopPropagation();
-    };
-  }
-
-  const save = async () => {
-    const form = new FormData();
-    form.append("index", String(item.index));
-    form.append("ground_truth", $("gt-edit").value);
-    // What this page believed was on that row. The server refuses the write
-    // if a merge moved things underneath us.
-    form.append("expect_image", item.image || "");
-
-    $("gt-save").disabled = true;
-    $("gt-status").textContent = "Đang lưu…";
-    try {
-      const pEdit = $("phonetic-edit");
-      if (pEdit && pEdit.value !== (item.phonetic || "")) {
-        const pForm = new FormData();
-        pForm.append("index", String(item.index));
-        pForm.append("phonetic", pEdit.value);
-        pForm.append("expect_image", item.image || "");
-        const pBody = await api("/api/data/phonetic", { method: "POST", body: pForm });
-        item.phonetic = pBody.phonetic;
+      const box = $("gt-edit");
+      if (box) {
+        box.focus();
+        box.setSelectionRange(box.value.length, box.value.length);
+        box.oninput = () => renderComparison(box.value, $("qwen-text")?.value || "");
+        // Ctrl/Cmd+Enter saves, so a long correction does not need the mouse.
+        box.onkeydown = (e) => {
+          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save(); }
+          // The lightbox uses the arrows to change picture; inside a textarea
+          // they have to move the caret instead. Escape still closes.
+          if (e.key !== "Escape") e.stopPropagation();
+        };
       }
-      const body = await api("/api/data/ground-truth", { method: "POST", body: form });
-      item.ground_truth = body.ground_truth;
-      await Promise.all([search(), loadStats(), loadBackups()]);
-      // search() rebuilds state.items, so re-resolve this row before redrawing.
-      const again = state.items.findIndex((x) => x.index === item.index);
-      openDetail(again >= 0 ? again : i, false, shown);
-    } catch (e) {
-      $("gt-status").textContent = e.message;
-      $("gt-save").disabled = false;
-    }
-  };
-  const saveButton = $("gt-save");
-  if (saveButton) saveButton.onclick = save;
 
-  const savePhonetic = async () => {
-    const form = new FormData();
-    form.append("index", String(item.index));
-    form.append("phonetic", $("phonetic-edit").value);
-    form.append("expect_image", item.image || "");
-    $("phonetic-save").disabled = true;
-    $("phonetic-status").textContent = "Đang lưu…";
-    try {
-      const body = await api("/api/data/phonetic", { method: "POST", body: form });
-      item.phonetic = body.phonetic;
-      await Promise.all([search(), loadStats()]);
-      $("phonetic-status").textContent = "Đã lưu";
-      setTimeout(() => { $("phonetic-status").textContent = ""; }, 1200);
-    } catch (e) {
-      $("phonetic-status").textContent = e.message;
-      $("phonetic-save").disabled = false;
-    }
-  };
-  const phoneticButton = $("phonetic-save");
-  if (phoneticButton) phoneticButton.onclick = savePhonetic;
-}
+      const save = async () => {
+        const form = new FormData();
+        form.append("index", String(item.index));
+        form.append("ground_truth", $("gt-edit").value);
+        // What this page believed was on that row. The server refuses the write
+        // if a merge moved things underneath us.
+        form.append("expect_image", item.image || "");
 
-async function deletePost(item) {
-  if (!item || !isAdmin()) return;
-  if (!confirm("Xoá bài post này khỏi dataset? File ảnh sẽ được giữ lại.")) return;
-  try {
-    await api("/api/data/row", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        index: item.index,
-        expect_image: item.image || "",
-        expect_post_id: item.post_id || "",
-      }),
+        $("gt-save").disabled = true;
+        $("gt-status").textContent = "Đang lưu…";
+        try {
+          const pEdit = $("phonetic-edit");
+          if (pEdit && pEdit.value !== (item.phonetic || "")) {
+            const pForm = new FormData();
+            pForm.append("index", String(item.index));
+            pForm.append("phonetic", pEdit.value);
+            pForm.append("expect_image", item.image || "");
+            const pBody = await api("/api/data/phonetic", { method: "POST", body: pForm });
+            item.phonetic = pBody.phonetic;
+          }
+          const body = await api("/api/data/ground-truth", { method: "POST", body: form });
+          item.ground_truth = body.ground_truth;
+          await Promise.all([search(), loadStats(), loadBackups()]);
+          // search() rebuilds state.items, so re-resolve this row before redrawing.
+          const again = state.items.findIndex((x) => x.index === item.index);
+          openDetail(again >= 0 ? again : i, false, shown);
+        } catch (e) {
+          $("gt-status").textContent = e.message;
+          $("gt-save").disabled = false;
+        }
+      };
+      const saveButton = $("gt-save");
+      if (saveButton) saveButton.onclick = save;
+
+      const savePhonetic = async () => {
+        const form = new FormData();
+        form.append("index", String(item.index));
+        form.append("phonetic", $("phonetic-edit").value);
+        form.append("expect_image", item.image || "");
+        $("phonetic-save").disabled = true;
+        $("phonetic-status").textContent = "Đang lưu…";
+        try {
+          const body = await api("/api/data/phonetic", { method: "POST", body: form });
+          item.phonetic = body.phonetic;
+          await Promise.all([search(), loadStats()]);
+          $("phonetic-status").textContent = "Đã lưu";
+          setTimeout(() => { $("phonetic-status").textContent = ""; }, 1200);
+        } catch (e) {
+          $("phonetic-status").textContent = e.message;
+          $("phonetic-save").disabled = false;
+        }
+      };
+      const phoneticButton = $("phonetic-save");
+      if (phoneticButton) phoneticButton.onclick = savePhonetic;
+    }
+
+    async function deletePost(item) {
+      if (!item || !isAdmin()) return;
+      if (!confirm("Xoá bài post này khỏi dataset? File ảnh sẽ được giữ lại.")) return;
+      try {
+        await api("/api/data/row", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            index: item.index,
+            expect_image: item.image || "",
+            expect_post_id: item.post_id || "",
+          }),
+        });
+        if (state.current?.item.index === item.index) closeDetail();
+        state.page = 1;
+        state.offset = 0;
+        state.items = [];
+        persistView();
+        await Promise.all([search(), loadStats(), loadBackups()]);
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+
+    function closeDetail() {
+      $("lb").classList.remove("show");
+      state.current = null;
+      try { localStorage.setItem("hannom.popup", JSON.stringify({ open: false })); } catch { }
+    }
+    $("lb-close").onclick = closeDetail;
+    $("lb").onclick = (e) => { if (e.target === $("lb")) closeDetail(); };
+    document.addEventListener("keydown", (e) => {
+      if (!state.current) return;
+      if (e.key === "Escape") { closeDetail(); return; }
+      if (e.key === "ArrowRight" && state.current.index + 1 < state.items.length)
+        openDetail(state.current.index + 1);
+      if (e.key === "ArrowLeft" && state.current.index > 0)
+        openDetail(state.current.index - 1);
     });
-    if (state.current?.item.index === item.index) closeDetail();
-    state.page = 1;
-    state.offset = 0;
-    state.items = [];
-    persistView();
-    await Promise.all([search(), loadStats(), loadBackups()]);
-  } catch (error) {
-    alert(error.message);
-  }
-}
 
-function closeDetail() {
-  $("lb").classList.remove("show");
-  state.current = null;
-  try { localStorage.setItem("hannom.popup", JSON.stringify({ open: false })); } catch {}
-}
-$("lb-close").onclick = closeDetail;
-$("lb").onclick = (e) => { if (e.target === $("lb")) closeDetail(); };
-document.addEventListener("keydown", (e) => {
-  if (!state.current) return;
-  if (e.key === "Escape") { closeDetail(); return; }
-  if (e.key === "ArrowRight" && state.current.index + 1 < state.items.length)
-    openDetail(state.current.index + 1);
-  if (e.key === "ArrowLeft" && state.current.index > 0)
-    openDetail(state.current.index - 1);
-});
+    /* ---------------- stats & mismatch ---------------- */
+    async function loadStats() {
+      const paintStats = (s) => {
+        const d = s.dataset, im = s.images;
+        $("c-rows").textContent = fmt(d.rows);
+        $("c-matched").textContent = fmt(im.matched);
+        $("c-verified").textContent = fmt(d.verified);
+        $("c-missing").textContent = fmt(im.rows_without_image);
+        $("c-orphans").textContent = fmt(im.orphan_images);
+        $("corpus-line").textContent = `${fmt(d.rows)} dòng · ${fmt(im.files)} ảnh` +
+          (im.sibling_images ? ` · ${fmt(im.sibling_images)} ảnh kèm theo` : "");
+      };
+      try {
+        const cached = JSON.parse(localStorage.getItem("hannom.stats") || "null");
+        if (cached) paintStats(cached);
+      } catch { }
+      let s;
+      try { s = await api("/api/lookup/stats"); } catch { return; }
+      try { localStorage.setItem("hannom.stats", JSON.stringify(s)); } catch { }
+      paintStats(s);
 
-/* ---------------- stats & mismatch ---------------- */
-async function loadStats() {
-  const paintStats = (s) => {
-    const d = s.dataset, im = s.images;
-    $("c-rows").textContent = fmt(d.rows);
-    $("c-matched").textContent = fmt(im.matched);
-    $("c-verified").textContent = fmt(d.verified);
-    $("c-missing").textContent = fmt(im.rows_without_image);
-    $("c-orphans").textContent = fmt(im.orphan_images);
-    $("corpus-line").textContent = `${fmt(d.rows)} dòng · ${fmt(im.files)} ảnh` +
-      (im.sibling_images ? ` · ${fmt(im.sibling_images)} ảnh kèm theo` : "");
-  };
-  try {
-    const cached = JSON.parse(localStorage.getItem("hannom.stats") || "null");
-    if (cached) paintStats(cached);
-  } catch {}
-  let s;
-  try { s = await api("/api/lookup/stats"); } catch { return; }
-  try { localStorage.setItem("hannom.stats", JSON.stringify(s)); } catch {}
-  paintStats(s);
+      const d = s.dataset, im = s.images;
+      $("btn-missing").classList.toggle("hide", !im.rows_without_image);
+      $("btn-orphans").classList.toggle("hide", !im.orphan_images);
+      $("orphan-card").classList.toggle("hide", !im.orphan_images);
+      $("corpus-line").textContent =
+        `${fmt(d.rows)} dòng · ${fmt(im.files)} ảnh` +
+        // Pictures that sit in a post's folder without a row of their own. Not
+        // orphans — they show inside their post — but they have no ground truth.
+        (im.sibling_images ? ` · ${fmt(im.sibling_images)} ảnh kèm theo` : "");
 
-  const d = s.dataset, im = s.images;
-  $("btn-missing").classList.toggle("hide", !im.rows_without_image);
-  $("btn-orphans").classList.toggle("hide", !im.orphan_images);
-  $("orphan-card").classList.toggle("hide", !im.orphan_images);
-  $("corpus-line").textContent =
-    `${fmt(d.rows)} dòng · ${fmt(im.files)} ảnh` +
-    // Pictures that sit in a post's folder without a row of their own. Not
-    // orphans — they show inside their post — but they have no ground truth.
-    (im.sibling_images ? ` · ${fmt(im.sibling_images)} ảnh kèm theo` : "");
+      if (!d.exists) {
+        banner("Chưa có dataset",
+          `Không tìm thấy ${d.path}. Mount file dataset.jsonl vào đường dẫn đó rồi tải lại trang.`, true);
+      } else if (!im.exists) {
+        banner("Chưa có thư mục ảnh",
+          `Không tìm thấy ${im.directory}. Mọi dòng sẽ báo thiếu ảnh cho tới khi mount thư mục ảnh.`, true);
+      } else if (d.malformed_lines) {
+        banner("Có dòng hỏng trong dataset",
+          `${d.malformed_lines} dòng không đọc được đã bị bỏ qua. Các dòng còn lại vẫn dùng bình thường.`, false);
+      } else if (im.rows_without_image || im.orphan_images) {
+        banner("Dữ liệu và ảnh lệch nhau",
+          `${im.rows_without_image} dòng không tìm thấy ảnh, ${im.orphan_images} ảnh không có dòng nào. ` +
+          `Vẫn tra cứu bình thường — hai con số này để bạn biết còn thiếu gì.`, false);
+      } else {
+        clearBanner();
+      }
+    }
 
-  if (!d.exists) {
-    banner("Chưa có dataset",
-      `Không tìm thấy ${d.path}. Mount file dataset.jsonl vào đường dẫn đó rồi tải lại trang.`, true);
-  } else if (!im.exists) {
-    banner("Chưa có thư mục ảnh",
-      `Không tìm thấy ${im.directory}. Mọi dòng sẽ báo thiếu ảnh cho tới khi mount thư mục ảnh.`, true);
-  } else if (d.malformed_lines) {
-    banner("Có dòng hỏng trong dataset",
-      `${d.malformed_lines} dòng không đọc được đã bị bỏ qua. Các dòng còn lại vẫn dùng bình thường.`, false);
-  } else if (im.rows_without_image || im.orphan_images) {
-    banner("Dữ liệu và ảnh lệch nhau",
-      `${im.rows_without_image} dòng không tìm thấy ảnh, ${im.orphan_images} ảnh không có dòng nào. ` +
-      `Vẫn tra cứu bình thường — hai con số này để bạn biết còn thiếu gì.`, false);
-  } else {
-    clearBanner();
-  }
-}
+    let orphansLoading = false;
 
-let orphansLoading = false;
+    async function loadOrphans(reset) {
+      // The list appends, so two overlapping loads would duplicate every row.
+      // Opening the <details> and pressing the button can both ask at once.
+      if (orphansLoading) return;
+      orphansLoading = true;
+      try {
+        if (reset) { state.orphanOffset = 0; $("orphan-list").innerHTML = ""; }
+        const data = await api(
+          `/api/lookup/orphans?offset=${state.orphanOffset}&limit=60`);
+        $("orphan-list").insertAdjacentHTML("beforeend",
+          data.items.map((n) => `<div>${esc(n)}</div>`).join(""));
+        state.orphanOffset += data.items.length;
+        $("orphan-info").textContent = `${fmt(state.orphanOffset)} / ${fmt(data.total)}`;
+        $("btn-orphan-more").classList.toggle("hide", !data.has_more);
+      } catch {
+        /* the banner already reports a broken connection */
+      } finally {
+        orphansLoading = false;
+      }
+    }
 
-async function loadOrphans(reset) {
-  // The list appends, so two overlapping loads would duplicate every row.
-  // Opening the <details> and pressing the button can both ask at once.
-  if (orphansLoading) return;
-  orphansLoading = true;
-  try {
-    if (reset) { state.orphanOffset = 0; $("orphan-list").innerHTML = ""; }
-    const data = await api(
-      `/api/lookup/orphans?offset=${state.orphanOffset}&limit=60`);
-    $("orphan-list").insertAdjacentHTML("beforeend",
-      data.items.map((n) => `<div>${esc(n)}</div>`).join(""));
-    state.orphanOffset += data.items.length;
-    $("orphan-info").textContent = `${fmt(state.orphanOffset)} / ${fmt(data.total)}`;
-    $("btn-orphan-more").classList.toggle("hide", !data.has_more);
-  } catch {
-    /* the banner already reports a broken connection */
-  } finally {
-    orphansLoading = false;
-  }
-}
-
-/* ---------------- users ---------------- */
-async function loadUsers() {
-  if (!state.me || state.me.role !== "admin") {
-    $("admin-card").classList.add("hide");
-    return;
-  }
-  try {
-    const u = await api("/api/users");
-    $("users").innerHTML = u.users.map((row) => `
+    /* ---------------- users ---------------- */
+    async function loadUsers() {
+      if (!state.me || state.me.role !== "admin") {
+        $("admin-card").classList.add("hide");
+        return;
+      }
+      try {
+        const u = await api("/api/users");
+        $("users").innerHTML = u.users.map((row) => `
       <div class="row user-row" style="font-size:0.82rem; padding:0.15rem 0">
         <b class="user-name" title="${esc(row.username)}">${esc(row.username)}</b>
         <span class="muted">${esc(row.display_name || "")}</span>
         <span class="pill">${esc(row.role)}</span>
         ${row.active ? "" : `<span class="pill">đã khoá</span>`}
         ${row.username === state.me.username
-          ? `<span class="muted">tài khoản hiện tại</span>`
-          : `<button data-edit-user="${esc(row.username)}">Sửa</button>
+            ? `<span class="muted">tài khoản hiện tại</span>`
+            : `<button data-edit-user="${esc(row.username)}">Sửa</button>
              <button class="danger-user" data-delete-user="${esc(row.username)}">Xoá</button>`}
       </div>`).join("");
-    $("users").querySelectorAll("[data-edit-user]").forEach((button) => {
-      button.onclick = async () => {
-        const username = button.dataset.editUser;
-        const newUsername = prompt("Username mới:", username);
-        if (newUsername === null) return;
-        const newPassword = prompt("Mật khẩu mới (bỏ trống nếu không đổi):", "");
-        try {
-          if (newUsername.trim().toLowerCase() !== username.toLowerCase()) {
-            await api(`/api/users/${encodeURIComponent(username)}/username`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ username: newUsername.trim() }),
-            });
-          }
-          if (newPassword) {
-            await api(`/api/users/${encodeURIComponent(newUsername.trim() || username)}/password`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ password: newPassword }),
-            });
-          }
-          await loadUsers();
-        } catch (e) { alert(e.message); }
-      };
-    });
-    $("users").querySelectorAll("[data-delete-user]").forEach((button) => {
-      button.onclick = async () => {
-        const username = button.dataset.deleteUser;
-        if (!confirm(`Xoá tài khoản ${username}?`)) return;
-        try {
-          await api(`/api/users/${encodeURIComponent(username)}`, { method: "DELETE" });
-          await loadUsers();
-        } catch (e) { alert(e.message); }
-      };
-    });
-  } catch {}
-}
-
-/* ---------------- adding data ---------------- */
-const plural = (n, one, many) => `${fmt(n)} ${n === 1 ? one : many}`;
-
-function renderIntake(target, body) {
-  const bits = [`<span class="ok">Đã lưu ${plural(body.saved, "ảnh", "ảnh")}.</span>`];
-  if (body.skipped_conflict) {
-    bits.push(`<span class="warn">${plural(body.skipped_conflict, "ảnh", "ảnh")} ` +
-      `trùng tên nên bỏ qua</span> — tick "ghi đè" nếu muốn thay.` +
-      `<ul>${(body.conflict_sample || []).slice(0, 8)
-        .map((n) => `<li><code>${esc(n)}</code></li>`).join("")}</ul>`);
-  }
-  if (body.skipped_not_image) {
-    bits.push(`${plural(body.skipped_not_image, "file", "file")} không phải ảnh, đã bỏ qua.`);
-  }
-  if (body.skipped_unsafe) {
-    bits.push(`<span class="warn">${body.skipped_unsafe} file có tên không an toàn, đã từ chối.</span>`);
-  }
-  $(target).innerHTML = bits.join("<br>");
-}
-
-$("btn-upload-img").onclick = async () => {
-  const input = $("img-files");
-  if (!input.files.length) { $("img-status").textContent = "Chọn file đã."; return; }
-
-  const form = new FormData();
-  for (const file of input.files) form.append("files", file);
-  form.append("overwrite", $("img-overwrite").checked ? "true" : "false");
-
-  $("btn-upload-img").disabled = true;
-  $("img-status").textContent = "Đang tải lên…";
-  try {
-    const body = await api("/api/data/images", { method: "POST", body: form });
-    await Promise.all([loadStats(), search()]);
-    $("img-status").textContent = "";
-    renderIntake("img-result", body);
-    input.value = "";
-  } catch (e) { $("img-status").textContent = e.message; }
-  $("btn-upload-img").disabled = false;
-};
-
-async function sendDataset(path) {
-  const input = $("ds-file");
-  if (!input.files.length) { $("ds-status").textContent = "Chọn file .jsonl đã."; return null; }
-  const form = new FormData();
-  form.append("file", input.files[0]);
-  return api(path, { method: "POST", body: form });
-}
-
-$("btn-ds-preview").onclick = async () => {
-  $("ds-status").textContent = "Đang đọc…";
-  $("ds-result").innerHTML = "";
-  $("btn-ds-merge").classList.add("hide");
-  try {
-    const body = await sendDataset("/api/data/dataset/preview");
-    if (!body) { $("ds-status").textContent = ""; return; }
-    $("ds-status").textContent = "";
-    $("ds-result").innerHTML =
-      `Nếu gộp: <span class="ok">thêm ${fmt(body.added)}</span>, ` +
-      `cập nhật ${fmt(body.updated)}, giữ nguyên ${fmt(body.unchanged)}. ` +
-      `Tổng ${fmt(body.current_rows)} → <b>${fmt(body.total)}</b> dòng.` +
-      (body.malformed
-        ? `<br><span class="warn">${body.malformed} dòng hỏng sẽ bị bỏ qua.</span>` : "") +
-      (body.changed ? "" : "<br>Không có gì thay đổi.");
-    // Only offer the irreversible half once its consequences are on screen.
-    $("btn-ds-merge").classList.toggle("hide", !body.changed);
-  } catch (e) { $("ds-status").textContent = e.message; }
-};
-
-$("btn-ds-merge").onclick = async () => {
-  $("ds-status").textContent = "Đang gộp…";
-  try {
-    const body = await sendDataset("/api/data/dataset/merge");
-    if (!body) return;
-    await Promise.all([loadStats(), search(), loadBackups()]);
-    $("ds-status").textContent = "";
-    $("ds-result").innerHTML =
-      `<span class="ok">Xong.</span> Thêm ${fmt(body.added)}, ` +
-      `cập nhật ${fmt(body.updated)}. Giờ có <b>${fmt(body.total)}</b> dòng.` +
-      (body.backup ? `<br>Bản cũ đã lưu: <code>${esc(body.backup)}</code>` : "");
-    $("ds-file").value = "";
-    $("btn-ds-merge").classList.add("hide");
-  } catch (e) { $("ds-status").textContent = e.message; }
-};
-
-$("btn-add-row").onclick = async () => {
-  const form = new FormData();
-  form.append("image_name", $("r-image-name").value.trim());
-  form.append("post_id", $("r-post").value.trim());
-  form.append("caption", $("r-caption").value.trim());
-  form.append("ground_truth", $("r-gt").value);
-  if ($("r-file").files.length) form.append("file", $("r-file").files[0]);
-
-  $("btn-add-row").disabled = true;
-  $("row-status").textContent = "Đang lưu…";
-  try {
-    const body = await api("/api/data/row", { method: "POST", body: form });
-    await Promise.all([loadStats(), search(), loadBackups()]);
-    $("row-status").textContent = body.added
-      ? `Đã thêm. Tổng ${fmt(body.total)} dòng.`
-      : `Đã cập nhật dòng sẵn có.`;
-    for (const id of ["r-image-name", "r-post", "r-caption", "r-gt"]) $(id).value = "";
-    $("r-file").value = "";
-  } catch (e) { $("row-status").textContent = e.message; }
-  $("btn-add-row").disabled = false;
-};
-
-async function loadBackups() {
-  if (!state.me || state.me.role !== "admin") return;
-  try {
-    const body = await api("/api/data/backups");
-    $("backups").innerHTML = body.items.length
-      ? body.items.map((b) =>
-          `<div><a href="/api/data/backups/${encodeURIComponent(b.name)}" download>` +
-          `${esc(b.name)}</a> <span class="muted">${b.mb} MB</span></div>`).join("")
-      : `<div class="muted">Chưa có bản nào.</div>`;
-  } catch {}
-}
-
-$("btn-adduser").onclick = async () => {
-  $("user-status").textContent = "";
-  try {
-    await api("/api/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        username: $("u-name").value.trim(),
-        password: $("u-pass").value,
-        display_name: $("u-display").value.trim(),
-        role: $("u-role").value,
-      }),
-    });
-    $("user-status").textContent = `Đã thêm ${$("u-name").value.trim()}.`;
-    $("u-name").value = $("u-pass").value = $("u-display").value = "";
-    loadUsers();
-  } catch (e) { $("user-status").textContent = e.message; }
-};
-
-/* ---------------- controls ---------------- */
-let timer;
-$("q").oninput = (e) => {
-  clearTimeout(timer);
-  timer = setTimeout(() => {
-    state.query = e.target.value.trim();
-    persistView();
-    resetResults();
-  }, 200);
-};
-$("field").onchange = (e) => { state.field = e.target.value; persistView(); resetResults(); };
-$("group-filter").onchange = (e) => { state.group = e.target.value; persistView(); resetResults(); };
-$("verify-filter").onchange = (e) => { state.verifyFilter = e.target.value; persistView(); resetResults(); };
-$("han-similarity-filter").onchange = (e) => {
-  state.hanSimilarityFilter = e.target.value;
-  persistView();
-  resetResults();
-};
-$("sort-filter").onchange = (e) => {
-  state.sortOrder = e.target.value;
-  persistView();
-  resetResults();
-};
-$("btn-clear").onclick = () => {
-  $("q").value = "";
-  $("field").value = "all";
-  $("group-filter").value = "";
-  $("verify-filter").value = "";
-  $("han-similarity-filter").value = "";
-  $("sort-filter").value = "display";
-  state.query = "";
-  state.field = "all";
-  state.group = "";
-  state.verifyFilter = "";
-  state.hanSimilarityFilter = "";
-  state.sortOrder = "display";
-  state.missingOnly = false;
-  state.mode = "scroll";
-  state.limit = 20;
-  state.page = 1;
-  state.offset = 0;
-  $("load-mode").value = state.mode;
-  $("page-size").value = String(state.limit);
-  $("page-number").value = "1";
-  $("page-number-label").classList.add("hide");
-  $("page-number").classList.add("hide");
-  $("btn-go-page").classList.add("hide");
-  $("btn-missing").textContent = "Chỉ xem nhóm này";
-  persistView(); resetResults(); $("q").focus();
-};
-
-$("load-mode").onchange = (e) => {
-  state.mode = e.target.value;
-  persistView();
-  resetResults();
-};
-$("page-size").onchange = (e) => {
-  state.limit = Number(e.target.value) || 20;
-  persistView();
-  resetResults();
-};
-$("page-number").onkeydown = (e) => {
-  if (e.key === "Enter") { state.page = Number(e.target.value) || 1; persistView(); goToPage(state.page); }
-};
-$("btn-go-page").onclick = () => goToPage(Number($("page-number").value) || 1);
-
-$("btn-missing").onclick = () => {
-  state.missingOnly = !state.missingOnly;
-  persistView();
-  $("btn-missing").textContent = state.missingOnly ? "Bỏ lọc" : "Chỉ xem nhóm này";
-  resetResults();
-};
-$("btn-orphans").onclick = () => {
-  const card = $("orphan-card");
-  const wasOpen = card.open;
-  card.open = true;
-  card.scrollIntoView({ behavior: "smooth", block: "start" });
-  // Opening it fires the toggle listener below, which loads. Only load here
-  // when it was already open, so the two paths never both fire.
-  if (wasOpen) loadOrphans(true);
-};
-$("btn-orphan-more").onclick = () => loadOrphans(false);
-$("orphan-card").addEventListener("toggle", () => {
-  if ($("orphan-card").open && !state.orphanOffset) loadOrphans(true);
-});
-
-$("btn-rescan").onclick = async () => {
-  $("btn-rescan").disabled = true;
-  $("rescan-status").textContent = "Đang quét…";
-  try {
-    const r = await api("/api/lookup/rescan", { method: "POST" });
-    await Promise.all([loadStats(), search()]);
-    // Set after the refresh: loadStats() owns the banner and would overwrite
-    // this the moment it lands.
-    $("rescan-status").textContent =
-      `${fmt(r.images.files)} ảnh · khớp ${fmt(r.images.matched)}`;
-  } catch (e) { $("rescan-status").textContent = e.message; }
-  $("btn-rescan").disabled = false;
-};
-
-$("btn-logout").onclick = async () => {
-  await fetch("/api/auth/logout", { method: "POST" });
-  window.location.reload();
-};
-
-/* ---------------- boot ---------------- */
-let uiVersion = null;
-async function watchUiVersion() {
-  try {
-    const body = await api(`/api/ui-version?ts=${Date.now()}`);
-    if (uiVersion === null) uiVersion = body.version;
-    else if (body.version !== uiVersion) window.location.reload();
-  } catch { /* a restarting container is checked on the next interval */ }
-}
-
-(async function boot() {
-  if ("serviceWorker" in navigator) {
-    const hadWorkerController = !!navigator.serviceWorker.controller;
-    navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (hadWorkerController && !window.__reloadingForWorker) {
-        window.__reloadingForWorker = true;
-        window.location.reload();
-      }
-    });
-    navigator.serviceWorker.register("/sw.js", {
-      updateViaCache: "none",
-    }).then((registration) => registration.update()).catch(() => {});
-  }
-  try { state.me = await api("/api/auth/me"); }
-  catch { window.location.reload(); return; }
-
-  $("whoami").textContent = `${state.me.username} · ${state.me.role}`;
-  $("q").value = state.query;
-  $("field").value = state.field;
-  $("group-filter").value = state.group;
-  $("verify-filter").value = state.verifyFilter;
-  $("han-similarity-filter").value = state.hanSimilarityFilter;
-  $("sort-filter").value = state.sortOrder;
-  $("btn-missing").textContent = state.missingOnly ? "Bỏ lọc" : "Chỉ xem nhóm này";
-  $("load-mode").value = state.mode;
-  $("page-size").value = String(state.limit);
-  $("page-number").value = state.page;
-  $("page-number-label").classList.toggle("hide", state.mode !== "pages");
-  $("page-number").classList.toggle("hide", state.mode !== "pages");
-  $("btn-go-page").classList.toggle("hide", state.mode !== "pages");
-  if (state.me.role !== "admin") {
-    $("admin-card").classList.add("hide");
-    $("data-card").classList.add("hide");
-  }
-  await loadFontRegistry();
-  await search();
-  try {
-    const popup = JSON.parse(localStorage.getItem("hannom.popup") || "{}");
-    if (popup.open) {
-      let index = state.items.findIndex((item) => item.index === popup.itemIndex);
-      if (index < 0 && Number.isInteger(popup.itemIndex)) {
-        const restored = await api(`/api/lookup/${popup.itemIndex}`);
-        state.items.push(restored);
-        index = state.items.length - 1;
-      }
-      if (index >= 0) openDetail(index, !!popup.editing, popup.showing || null);
+        $("users").querySelectorAll("[data-edit-user]").forEach((button) => {
+          button.onclick = async () => {
+            const username = button.dataset.editUser;
+            const newUsername = prompt("Username mới:", username);
+            if (newUsername === null) return;
+            const newPassword = prompt("Mật khẩu mới (bỏ trống nếu không đổi):", "");
+            try {
+              if (newUsername.trim().toLowerCase() !== username.toLowerCase()) {
+                await api(`/api/users/${encodeURIComponent(username)}/username`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ username: newUsername.trim() }),
+                });
+              }
+              if (newPassword) {
+                await api(`/api/users/${encodeURIComponent(newUsername.trim() || username)}/password`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ password: newPassword }),
+                });
+              }
+              await loadUsers();
+            } catch (e) { alert(e.message); }
+          };
+        });
+        $("users").querySelectorAll("[data-delete-user]").forEach((button) => {
+          button.onclick = async () => {
+            const username = button.dataset.deleteUser;
+            if (!confirm(`Xoá tài khoản ${username}?`)) return;
+            try {
+              await api(`/api/users/${encodeURIComponent(username)}`, { method: "DELETE" });
+              await loadUsers();
+            } catch (e) { alert(e.message); }
+          };
+        });
+      } catch { }
     }
-  } catch {}
-  void Promise.all([loadStats(), loadUsers(), loadBackups()]);
-  await watchUiVersion();
-  setInterval(watchUiVersion, 5000);
-})();
-</script>
+
+    /* ---------------- adding data ---------------- */
+    const plural = (n, one, many) => `${fmt(n)} ${n === 1 ? one : many}`;
+
+    function renderIntake(target, body) {
+      const bits = [`<span class="ok">Đã lưu ${plural(body.saved, "ảnh", "ảnh")}.</span>`];
+      if (body.skipped_conflict) {
+        bits.push(`<span class="warn">${plural(body.skipped_conflict, "ảnh", "ảnh")} ` +
+          `trùng tên nên bỏ qua</span> — tick "ghi đè" nếu muốn thay.` +
+          `<ul>${(body.conflict_sample || []).slice(0, 8)
+            .map((n) => `<li><code>${esc(n)}</code></li>`).join("")}</ul>`);
+      }
+      if (body.skipped_not_image) {
+        bits.push(`${plural(body.skipped_not_image, "file", "file")} không phải ảnh, đã bỏ qua.`);
+      }
+      if (body.skipped_unsafe) {
+        bits.push(`<span class="warn">${body.skipped_unsafe} file có tên không an toàn, đã từ chối.</span>`);
+      }
+      $(target).innerHTML = bits.join("<br>");
+    }
+
+    $("btn-upload-img").onclick = async () => {
+      const input = $("img-files");
+      if (!input.files.length) { $("img-status").textContent = "Chọn file đã."; return; }
+
+      const form = new FormData();
+      for (const file of input.files) form.append("files", file);
+      form.append("overwrite", $("img-overwrite").checked ? "true" : "false");
+
+      $("btn-upload-img").disabled = true;
+      $("img-status").textContent = "Đang tải lên…";
+      try {
+        const body = await api("/api/data/images", { method: "POST", body: form });
+        await Promise.all([loadStats(), search()]);
+        $("img-status").textContent = "";
+        renderIntake("img-result", body);
+        input.value = "";
+      } catch (e) { $("img-status").textContent = e.message; }
+      $("btn-upload-img").disabled = false;
+    };
+
+    async function sendDataset(path) {
+      const input = $("ds-file");
+      if (!input.files.length) { $("ds-status").textContent = "Chọn file .jsonl đã."; return null; }
+      const form = new FormData();
+      form.append("file", input.files[0]);
+      return api(path, { method: "POST", body: form });
+    }
+
+    $("btn-ds-preview").onclick = async () => {
+      $("ds-status").textContent = "Đang đọc…";
+      $("ds-result").innerHTML = "";
+      $("btn-ds-merge").classList.add("hide");
+      try {
+        const body = await sendDataset("/api/data/dataset/preview");
+        if (!body) { $("ds-status").textContent = ""; return; }
+        $("ds-status").textContent = "";
+        $("ds-result").innerHTML =
+          `Nếu gộp: <span class="ok">thêm ${fmt(body.added)}</span>, ` +
+          `cập nhật ${fmt(body.updated)}, giữ nguyên ${fmt(body.unchanged)}. ` +
+          `Tổng ${fmt(body.current_rows)} → <b>${fmt(body.total)}</b> dòng.` +
+          (body.malformed
+            ? `<br><span class="warn">${body.malformed} dòng hỏng sẽ bị bỏ qua.</span>` : "") +
+          (body.changed ? "" : "<br>Không có gì thay đổi.");
+        // Only offer the irreversible half once its consequences are on screen.
+        $("btn-ds-merge").classList.toggle("hide", !body.changed);
+      } catch (e) { $("ds-status").textContent = e.message; }
+    };
+
+    $("btn-ds-merge").onclick = async () => {
+      $("ds-status").textContent = "Đang gộp…";
+      try {
+        const body = await sendDataset("/api/data/dataset/merge");
+        if (!body) return;
+        await Promise.all([loadStats(), search(), loadBackups()]);
+        $("ds-status").textContent = "";
+        $("ds-result").innerHTML =
+          `<span class="ok">Xong.</span> Thêm ${fmt(body.added)}, ` +
+          `cập nhật ${fmt(body.updated)}. Giờ có <b>${fmt(body.total)}</b> dòng.` +
+          (body.backup ? `<br>Bản cũ đã lưu: <code>${esc(body.backup)}</code>` : "");
+        $("ds-file").value = "";
+        $("btn-ds-merge").classList.add("hide");
+      } catch (e) { $("ds-status").textContent = e.message; }
+    };
+
+    $("btn-add-row").onclick = async () => {
+      const form = new FormData();
+      form.append("image_name", $("r-image-name").value.trim());
+      form.append("post_id", $("r-post").value.trim());
+      form.append("caption", $("r-caption").value.trim());
+      form.append("ground_truth", $("r-gt").value);
+      if ($("r-file").files.length) form.append("file", $("r-file").files[0]);
+
+      $("btn-add-row").disabled = true;
+      $("row-status").textContent = "Đang lưu…";
+      try {
+        const body = await api("/api/data/row", { method: "POST", body: form });
+        await Promise.all([loadStats(), search(), loadBackups()]);
+        $("row-status").textContent = body.added
+          ? `Đã thêm. Tổng ${fmt(body.total)} dòng.`
+          : `Đã cập nhật dòng sẵn có.`;
+        for (const id of ["r-image-name", "r-post", "r-caption", "r-gt"]) $(id).value = "";
+        $("r-file").value = "";
+      } catch (e) { $("row-status").textContent = e.message; }
+      $("btn-add-row").disabled = false;
+    };
+
+    async function loadBackups() {
+      if (!state.me || state.me.role !== "admin") return;
+      try {
+        const body = await api("/api/data/backups");
+        $("backups").innerHTML = body.items.length
+          ? body.items.map((b) =>
+            `<div><a href="/api/data/backups/${encodeURIComponent(b.name)}" download>` +
+            `${esc(b.name)}</a> <span class="muted">${b.mb} MB</span></div>`).join("")
+          : `<div class="muted">Chưa có bản nào.</div>`;
+      } catch { }
+    }
+
+    $("btn-adduser").onclick = async () => {
+      $("user-status").textContent = "";
+      try {
+        await api("/api/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: $("u-name").value.trim(),
+            password: $("u-pass").value,
+            display_name: $("u-display").value.trim(),
+            role: $("u-role").value,
+          }),
+        });
+        $("user-status").textContent = `Đã thêm ${$("u-name").value.trim()}.`;
+        $("u-name").value = $("u-pass").value = $("u-display").value = "";
+        loadUsers();
+      } catch (e) { $("user-status").textContent = e.message; }
+    };
+
+    /* ---------------- controls ---------------- */
+    let timer;
+    $("q").oninput = (e) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        state.query = e.target.value.trim();
+        persistView();
+        resetResults();
+      }, 200);
+    };
+    $("field").onchange = (e) => { state.field = e.target.value; persistView(); resetResults(); };
+    // Multiselect dropdown interactions
+    const groupMs = $("group-multiselect");
+    const groupTrigger = $("group-trigger");
+    const groupDropdown = $("group-dropdown");
+
+    groupTrigger.onclick = (e) => {
+      e.stopPropagation();
+      const isHidden = groupDropdown.classList.contains("hide");
+      groupDropdown.classList.toggle("hide", !isHidden);
+      groupMs.classList.toggle("open", isHidden);
+      groupTrigger.setAttribute("aria-expanded", String(isHidden));
+    };
+
+    document.addEventListener("click", (e) => {
+      if (groupMs && !groupMs.contains(e.target)) {
+        groupDropdown.classList.add("hide");
+        groupMs.classList.remove("open");
+        groupTrigger.setAttribute("aria-expanded", "false");
+      }
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && groupDropdown && !groupDropdown.classList.contains("hide")) {
+        groupDropdown.classList.add("hide");
+        groupMs.classList.remove("open");
+        groupTrigger.setAttribute("aria-expanded", "false");
+        groupTrigger.focus();
+      }
+    });
+
+    $("btn-group-all").onclick = (e) => {
+      e.stopPropagation();
+      const all = [...Object.keys(state.groupTags).sort(), "other"];
+      state.groups = all;
+      updateGroupFilter();
+      persistView();
+      resetResults();
+    };
+
+    $("btn-group-default").onclick = (e) => {
+      e.stopPropagation();
+      state.groups = getDefaultGroups();
+      updateGroupFilter();
+      persistView();
+      resetResults();
+    };
+
+    $("btn-group-clear").onclick = (e) => {
+      e.stopPropagation();
+      state.groups = [];
+      updateGroupFilter();
+      persistView();
+      resetResults();
+    };
+
+    $("verify-filter").onchange = (e) => { state.verifyFilter = e.target.value; persistView(); resetResults(); };
+    $("han-similarity-filter").onchange = (e) => {
+      state.hanSimilarityFilter = e.target.value;
+      persistView();
+      resetResults();
+    };
+    $("sort-filter").onchange = (e) => {
+      state.sortOrder = e.target.value;
+      persistView();
+      resetResults();
+    };
+    $("btn-clear").onclick = () => {
+      $("q").value = "";
+      $("field").value = "all";
+      state.groups = getDefaultGroups();
+      updateGroupFilter();
+      $("verify-filter").value = "";
+      $("han-similarity-filter").value = "";
+      $("sort-filter").value = "display";
+      state.query = "";
+      state.field = "all";
+      state.verifyFilter = "";
+      state.hanSimilarityFilter = "";
+      state.sortOrder = "display";
+      state.missingOnly = false;
+      state.mode = "scroll";
+      state.limit = 20;
+      state.page = 1;
+      state.offset = 0;
+      $("load-mode").value = state.mode;
+      $("page-size").value = String(state.limit);
+      $("page-number").value = "1";
+      $("page-number-label").classList.add("hide");
+      $("page-number").classList.add("hide");
+      $("btn-go-page").classList.add("hide");
+      $("btn-missing").textContent = "Chỉ xem nhóm này";
+      persistView(); resetResults(); $("q").focus();
+    };
+
+    $("load-mode").onchange = (e) => {
+      state.mode = e.target.value;
+      persistView();
+      resetResults();
+    };
+    $("page-size").onchange = (e) => {
+      state.limit = Number(e.target.value) || 20;
+      persistView();
+      resetResults();
+    };
+    $("page-number").onkeydown = (e) => {
+      if (e.key === "Enter") { state.page = Number(e.target.value) || 1; persistView(); goToPage(state.page); }
+    };
+    $("btn-go-page").onclick = () => goToPage(Number($("page-number").value) || 1);
+
+    $("btn-missing").onclick = () => {
+      state.missingOnly = !state.missingOnly;
+      persistView();
+      $("btn-missing").textContent = state.missingOnly ? "Bỏ lọc" : "Chỉ xem nhóm này";
+      resetResults();
+    };
+    $("btn-orphans").onclick = () => {
+      const card = $("orphan-card");
+      const wasOpen = card.open;
+      card.open = true;
+      card.scrollIntoView({ behavior: "smooth", block: "start" });
+      // Opening it fires the toggle listener below, which loads. Only load here
+      // when it was already open, so the two paths never both fire.
+      if (wasOpen) loadOrphans(true);
+    };
+    $("btn-orphan-more").onclick = () => loadOrphans(false);
+    $("orphan-card").addEventListener("toggle", () => {
+      if ($("orphan-card").open && !state.orphanOffset) loadOrphans(true);
+    });
+
+    $("btn-rescan").onclick = async () => {
+      $("btn-rescan").disabled = true;
+      $("rescan-status").textContent = "Đang quét…";
+      try {
+        const r = await api("/api/lookup/rescan", { method: "POST" });
+        await Promise.all([loadStats(), search()]);
+        // Set after the refresh: loadStats() owns the banner and would overwrite
+        // this the moment it lands.
+        $("rescan-status").textContent =
+          `${fmt(r.images.files)} ảnh · khớp ${fmt(r.images.matched)}`;
+      } catch (e) { $("rescan-status").textContent = e.message; }
+      $("btn-rescan").disabled = false;
+    };
+
+    $("btn-logout").onclick = async () => {
+      await fetch("/api/auth/logout", { method: "POST" });
+      window.location.reload();
+    };
+
+    /* ---------------- boot ---------------- */
+    let uiVersion = null;
+    async function watchUiVersion() {
+      try {
+        const body = await api(`/api/ui-version?ts=${Date.now()}`);
+        if (uiVersion === null) uiVersion = body.version;
+        else if (body.version !== uiVersion) window.location.reload();
+      } catch { /* a restarting container is checked on the next interval */ }
+    }
+
+    (async function boot() {
+      if ("serviceWorker" in navigator) {
+        const hadWorkerController = !!navigator.serviceWorker.controller;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (hadWorkerController && !window.__reloadingForWorker) {
+            window.__reloadingForWorker = true;
+            window.location.reload();
+          }
+        });
+        navigator.serviceWorker.register("/sw.js", {
+          updateViaCache: "none",
+        }).then((registration) => registration.update()).catch(() => { });
+      }
+      try { state.me = await api("/api/auth/me"); }
+      catch { window.location.reload(); return; }
+
+      $("whoami").textContent = `${state.me.username} · ${state.me.role}`;
+      $("q").value = state.query;
+      $("field").value = state.field;
+      updateGroupFilter();
+      $("verify-filter").value = state.verifyFilter;
+      $("han-similarity-filter").value = state.hanSimilarityFilter;
+      $("sort-filter").value = state.sortOrder;
+      $("btn-missing").textContent = state.missingOnly ? "Bỏ lọc" : "Chỉ xem nhóm này";
+      $("load-mode").value = state.mode;
+      $("page-size").value = String(state.limit);
+      $("page-number").value = state.page;
+      $("page-number-label").classList.toggle("hide", state.mode !== "pages");
+      $("page-number").classList.toggle("hide", state.mode !== "pages");
+      $("btn-go-page").classList.toggle("hide", state.mode !== "pages");
+      if (state.me.role !== "admin") {
+        $("admin-card").classList.add("hide");
+        $("data-card").classList.add("hide");
+      }
+      await loadFontRegistry();
+      await search();
+      try {
+        const popup = JSON.parse(localStorage.getItem("hannom.popup") || "{}");
+        if (popup.open) {
+          let index = state.items.findIndex((item) => item.index === popup.itemIndex);
+          if (index < 0 && Number.isInteger(popup.itemIndex)) {
+            const restored = await api(`/api/lookup/${popup.itemIndex}`);
+            state.items.push(restored);
+            index = state.items.length - 1;
+          }
+          if (index >= 0) openDetail(index, !!popup.editing, popup.showing || null);
+        }
+      } catch { }
+      void Promise.all([loadStats(), loadUsers(), loadBackups()]);
+      await watchUiVersion();
+      setInterval(watchUiVersion, 5000);
+    })();
+  </script>
 </body>
+
 </html>
