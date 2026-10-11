@@ -13,7 +13,12 @@
     "label": "Lệ",
     "family": "han-le",
     "fallback": "\"Noto Serif TC\", \"Noto Sans TC\", \"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
-    "files": ["Le/CN-Le.ttf"]
+    "files": [
+      "Le/CN-Le.ttf",
+      "Khai/CN-Times.ttf",
+      "Khai/CN-Minh.ttf",
+      "Khai/CN_TONG_A_LIGHT.TTF"
+    ]
   },
   "hanh": {
     "label": "Hành",
@@ -21,7 +26,10 @@
     "fallback": "\"Noto Serif TC\", \"Noto Sans TC\", \"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
     "files": [
       "Hanh/CN_HANHKHAI.TTF",
-      "Hanh/CN_HANH.TTF"
+      "Hanh/CN_HANH.TTF",
+      "Khai/CN-Times.ttf",
+      "Khai/CN-Minh.ttf",
+      "Khai/CN_TONG_A_LIGHT.TTF"
     ]
   },
   "thao": {
@@ -30,7 +38,10 @@
     "fallback": "\"Noto Serif TC\", \"Noto Sans TC\", \"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
     "files": [
       "Thao/博洋草书7000.TTF",
-      "Thao/博洋草书3500.TTF"
+      "Thao/博洋草书3500.TTF",
+      "Khai/CN-Times.ttf",
+      "Khai/CN-Minh.ttf",
+      "Khai/CN_TONG_A_LIGHT.TTF"
     ]
   },
   "trien": {
@@ -43,7 +54,10 @@
       "Trien/汉仪篆书繁.ttf",
       "Trien/汉仪粗篆繁.ttf",
       "Trien/白舟篆古印.ttf",
-      "Trien/汉仪娃娃篆简.ttf"
+      "Trien/汉仪娃娃篆简.ttf",
+      "Khai/CN-Times.ttf",
+      "Khai/CN-Minh.ttf",
+      "Khai/CN_TONG_A_LIGHT.TTF"
     ]
   }
 }
