@@ -333,7 +333,7 @@
       </select>
       <select id="han-similarity-filter" aria-label="Lọc caption theo độ tương đồng chữ Hán">
         <option value="">Mọi độ tương đồng</option>
-        <option value="80">Caption gần ground truth ≥80%</option>
+        <option value="80">Good Caption</option>
       </select>
       <label class="page-label" for="font-select">Font chữ</label>
       <select id="font-select" aria-label="Chọn font chữ Hán-Nôm">
@@ -389,11 +389,8 @@
         <option value="pages">Phân trang</option>
       </select>
       <label class="page-label" for="page-size">Mỗi lần</label>
-      <select id="page-size" aria-label="Số ảnh mỗi lần">
-        <option value="20" selected>20 ảnh</option>
-        <option value="40">40 ảnh</option>
-        <option value="80">80 ảnh</option>
-      </select>
+      <input id="page-size" type="number" min="1" max="1000" step="1" value="20"
+             aria-label="Số ảnh mỗi lần, tối đa 1000" />
       <label class="page-label hide" id="page-number-label" for="page-number">Trang</label>
       <input class="hide" id="page-number" type="number" min="1" value="1"
              aria-label="Số trang" />
@@ -549,6 +546,7 @@ try {
   for (const key of ["query", "field", "group", "verifyFilter", "hanSimilarityFilter", "missingOnly", "mode", "limit", "page", "offset", "fontKey"])
     if (savedView[key] !== undefined) state[key] = savedView[key];
 } catch {}
+state.limit = Math.min(1000, Math.max(1, Math.trunc(Number(state.limit) || 20)));
 
 function persistView() {
   try {
@@ -1762,7 +1760,8 @@ $("load-mode").onchange = (e) => {
   resetResults();
 };
 $("page-size").onchange = (e) => {
-  state.limit = Number(e.target.value) || 20;
+  state.limit = Math.min(1000, Math.max(1, Math.trunc(Number(e.target.value) || 20)));
+  e.target.value = String(state.limit);
   persistView();
   resetResults();
 };

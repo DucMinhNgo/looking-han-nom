@@ -38,7 +38,7 @@ async def lookup(
     q: str = Query("", max_length=500),
     field: str = Query("all"),
     offset: int = Query(0, ge=0),
-    limit: int = Query(0, ge=0, le=200),
+    limit: int = Query(0, ge=0, le=1000),
     missing_only: bool = Query(False),
     group: str = Query(""),
     verified: str = Query(""),

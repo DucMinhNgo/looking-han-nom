@@ -87,6 +87,10 @@ class TestSearch:
         assert len(first["items"]) == 4 and first["has_more"] is True
         last = client.get("/api/lookup", params={"limit": 4, "offset": 8}).json()
         assert len(last["items"]) == 2 and last["has_more"] is False
+        maximum = client.get("/api/lookup", params={"limit": 1000})
+        assert maximum.status_code == 200
+        assert len(maximum.json()["items"]) == 10
+        assert client.get("/api/lookup", params={"limit": 1001}).status_code == 422
 
     def test_a_result_carries_what_the_card_shows(self, client):
         login(client)
