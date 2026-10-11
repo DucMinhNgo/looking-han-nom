@@ -3,6 +3,8 @@
 The app fixture and its helpers live in conftest.py.
 """
 
+import json
+
 import pytest
 
 from tests.conftest import POEM, URL, login  # noqa: F401
@@ -53,6 +55,31 @@ class TestSearch:
         assert client.get(
             "/api/lookup", params={"q": "Chú thích", "field": "ground_truth"}
         ).json()["total"] == 0
+
+    def test_han_similarity_filter_applies_before_pagination(self, client):
+        login(client)
+        path = client.app.state.runtime.dataset.path
+        rows = [
+            {"image": "a.jpg", "caption": "花開花落", "ground_truth": "花開花落"},
+            {"image": "b.jpg", "caption": "花開花落", "ground_truth": "天地玄黃"},
+            {"image": "c.jpg", "caption": "花開花落", "ground_truth": "花開花落"},
+        ]
+        path.write_text(
+            "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows),
+            encoding="utf-8",
+        )
+
+        body = client.get("/api/lookup", params={
+            "min_han_similarity": 80, "offset": 1, "limit": 1,
+        }).json()
+        assert body["total"] == 2
+        assert len(body["items"]) == 1
+        assert body["items"][0]["image"] == "c.jpg"
+
+    def test_han_similarity_filter_excludes_rows_without_han_text(self, client):
+        login(client)
+        body = client.get("/api/lookup", params={"min_han_similarity": 80}).json()
+        assert body["total"] == 0
 
     def test_paging(self, client):
         login(client)

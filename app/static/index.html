@@ -331,6 +331,10 @@
         <option value="verified">Đã verify</option>
         <option value="unverified">Chưa verify</option>
       </select>
+      <select id="han-similarity-filter" aria-label="Lọc caption theo độ tương đồng chữ Hán">
+        <option value="">Mọi độ tương đồng</option>
+        <option value="80">Caption gần ground truth ≥80%</option>
+      </select>
       <label class="page-label" for="font-select">Font chữ</label>
       <select id="font-select" aria-label="Chọn font chữ Hán-Nôm">
         <option value="default">Mặc định</option>
@@ -533,7 +537,7 @@ const fontRegistry = {
 const CJK_FALLBACK = '"Noto Serif TC", "Noto Sans TC", "Noto Serif CJK TC", "Source Han Serif", "MS Mincho", serif';
 
 const state = {
-  me: null, query: "", field: "all", group: "", verifyFilter: "", offset: 0, limit: 20,
+  me: null, query: "", field: "all", group: "", verifyFilter: "", hanSimilarityFilter: "", offset: 0, limit: 20,
   mode: "scroll", page: 1, loading: false, fontKey: "default",
   groupTags: {},
   items: [], total: 0, hasMore: false, missingOnly: false,
@@ -542,7 +546,7 @@ const state = {
 
 try {
   const savedView = JSON.parse(localStorage.getItem("hannom.view") || "{}");
-  for (const key of ["query", "field", "group", "verifyFilter", "missingOnly", "mode", "limit", "page", "offset", "fontKey"])
+  for (const key of ["query", "field", "group", "verifyFilter", "hanSimilarityFilter", "missingOnly", "mode", "limit", "page", "offset", "fontKey"])
     if (savedView[key] !== undefined) state[key] = savedView[key];
 } catch {}
 
@@ -550,6 +554,7 @@ function persistView() {
   try {
     localStorage.setItem("hannom.view", JSON.stringify({
       query: state.query, field: state.field, group: state.group, verifyFilter: state.verifyFilter,
+      hanSimilarityFilter: state.hanSimilarityFilter,
       missingOnly: state.missingOnly,
       mode: state.mode, limit: state.limit, page: state.page, offset: state.offset,
       fontKey: state.fontKey,
@@ -681,7 +686,8 @@ const pageCache = (() => {
 function pageCacheKey(offset) {
   return JSON.stringify({
     q: state.query, field: state.field, group: state.group,
-    verified: state.verifyFilter, missing: state.missingOnly,
+    verified: state.verifyFilter, hanSimilarity: state.hanSimilarityFilter,
+    missing: state.missingOnly,
     offset, limit: state.limit,
   });
 }
@@ -880,6 +886,7 @@ async function search() {
     q: state.query, field: state.field, group: state.group, verified: state.verifyFilter,
     offset: requestOffset, limit: state.limit,
   });
+  if (state.hanSimilarityFilter) params.set("min_han_similarity", state.hanSimilarityFilter);
   if (state.missingOnly) params.set("missing_only", "true");
 
   let data;
@@ -1718,15 +1725,22 @@ $("q").oninput = (e) => {
 $("field").onchange = (e) => { state.field = e.target.value; persistView(); resetResults(); };
 $("group-filter").onchange = (e) => { state.group = e.target.value; persistView(); resetResults(); };
 $("verify-filter").onchange = (e) => { state.verifyFilter = e.target.value; persistView(); resetResults(); };
+$("han-similarity-filter").onchange = (e) => {
+  state.hanSimilarityFilter = e.target.value;
+  persistView();
+  resetResults();
+};
 $("btn-clear").onclick = () => {
   $("q").value = "";
   $("field").value = "all";
   $("group-filter").value = "";
   $("verify-filter").value = "";
+  $("han-similarity-filter").value = "";
   state.query = "";
   state.field = "all";
   state.group = "";
   state.verifyFilter = "";
+  state.hanSimilarityFilter = "";
   state.missingOnly = false;
   state.mode = "scroll";
   state.limit = 20;
@@ -1827,6 +1841,7 @@ async function watchUiVersion() {
   $("field").value = state.field;
   $("group-filter").value = state.group;
   $("verify-filter").value = state.verifyFilter;
+  $("han-similarity-filter").value = state.hanSimilarityFilter;
   $("btn-missing").textContent = state.missingOnly ? "Bỏ lọc" : "Chỉ xem nhóm này";
   $("load-mode").value = state.mode;
   $("page-size").value = String(state.limit);

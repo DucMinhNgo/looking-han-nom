@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import logging
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -37,6 +38,35 @@ _ALIASES = {
     "ground_truth": ("ground_truth", "groundtruth", "ground truth", "gt", "label"),
     "phonetic": ("phonetic", "phien_am", "phienam", "phiên âm", "pinyin"),
 }
+
+
+def han_similarity(first: str, second: str) -> int | None:
+    """Return edit-distance similarity for Han characters, rounded to percent."""
+    def han_chars(text: str) -> list[str]:
+        return [
+            char for char in unicodedata.normalize("NFC", str(text or ""))
+            if unicodedata.name(char, "").startswith((
+                "CJK UNIFIED IDEOGRAPH-", "CJK COMPATIBILITY IDEOGRAPH-",
+            ))
+        ]
+
+    left, right = han_chars(first), han_chars(second)
+    if not left or not right:
+        return None
+
+    previous = list(range(len(right) + 1))
+    for row, left_char in enumerate(left, 1):
+        current = [row]
+        for column, right_char in enumerate(right, 1):
+            current.append(min(
+                current[column - 1] + 1,
+                previous[column] + 1,
+                previous[column - 1] + (left_char != right_char),
+            ))
+        previous = current
+
+    percent = 100 * (1 - previous[-1] / max(len(left), len(right)))
+    return int(percent + 0.5)
 
 
 def _pick(row: dict[str, Any], field: str) -> str:

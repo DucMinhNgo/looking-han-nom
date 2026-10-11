@@ -12,7 +12,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.api.auth import current_user
-from app.core.dataset import FIELDS
+from app.core.dataset import FIELDS, han_similarity
 
 log = logging.getLogger(__name__)
 
@@ -42,6 +42,7 @@ async def lookup(
     missing_only: bool = Query(False),
     group: str = Query(""),
     verified: str = Query(""),
+    min_han_similarity: int = Query(0, ge=0, le=100),
     user: dict = Depends(current_user),
 ):
     """Search by Facebook link, post id, caption, ground truth or filename."""
@@ -55,6 +56,12 @@ async def lookup(
         q, field=field, offset=0, limit=len(runtime.dataset.items) or 1
     )
     rows = everything.items
+    if min_han_similarity:
+        rows = [
+            item for item in rows
+            if (han_similarity(item.caption, item.ground_truth) or 0)
+            >= min_han_similarity
+        ]
     if missing_only:
         rows = [item for item in rows if not item.has_image]
     if verified == "verified":
