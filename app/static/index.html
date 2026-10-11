@@ -74,6 +74,24 @@
   }
   input:focus, select:focus { outline: 2px solid var(--series-1); outline-offset: 1px; }
   #q { flex: 1; min-width: 220px; font-size: 1rem; }
+  .lookup-controls { display: grid; gap: 0.85rem; }
+  .lookup-search-row {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, 220px) auto;
+    gap: 0.55rem; align-items: center;
+  }
+  .lookup-search-row #q { width: 100%; min-width: 0; }
+  .lookup-filter-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 185px), 1fr));
+    gap: 0.65rem; padding-top: 0.85rem; border-top: 1px solid var(--border);
+  }
+  .lookup-filter-control { display: grid; gap: 0.3rem; min-width: 0; }
+  .lookup-filter-control > span, .lookup-filter-control > label {
+    font-size: 0.72rem; font-weight: 700; color: var(--ink-2);
+  }
+  .lookup-filter-control select { width: 100%; min-width: 0; text-overflow: ellipsis; }
+  .lookup-font-row { display: flex; align-items: center; gap: 0.45rem; min-width: 0; }
+  .lookup-font-row select { flex: 1; min-width: 0; }
+  .lookup-font-row #font-status { font-size: 0.7rem; overflow-wrap: anywhere; }
 
   .muted { color: var(--muted); }
   .row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
@@ -284,10 +302,17 @@
   @media (max-width: 620px) {
     body { padding: 0.65rem; }
     .card { padding: 0.8rem; }
+    .lookup-search-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .lookup-search-row #q { grid-column: 1 / -1; }
+    .lookup-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .lookup-font-row { display: grid; grid-template-columns: minmax(0, 1fr); }
     .results-toolbar { align-items: stretch; }
     .results-toolbar .spacer { display: none; }
     .results-toolbar .page-label { width: 100%; }
     .grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.65rem; }
+  }
+  @media (max-width: 380px) {
+    .lookup-filter-grid { grid-template-columns: minmax(0, 1fr); }
   }
 </style>
 </head>
@@ -308,47 +333,66 @@
 
   <!-- ============ search ============ -->
   <div class="card">
-    <div class="row">
-      <input type="search" id="q" placeholder="Dán link Facebook, post id, caption hoặc chữ trong ground truth…"
-             autocomplete="off" autofocus />
-      <select id="field" aria-label="Tìm trong trường">
-        <option value="all">Tất cả</option>
-        <option value="post">Link / Post ID</option>
-        <option value="caption">Caption</option>
-        <option value="ground_truth">Ground truth</option>
-        <option value="phonetic">Phiên âm</option>
-        <option value="image">Tên file ảnh</option>
-      </select>
-      <select id="group-filter" aria-label="Lọc theo nhóm">
-        <option value="">Tất cả group</option>
-        <option value="group1">group1</option>
-        <option value="group2">group2</option>
-        <option value="hieu">hieu</option>
-        <option value="other">other</option>
-      </select>
-      <select id="verify-filter" aria-label="Lọc theo trạng thái verify">
-        <option value="">Tất cả trạng thái</option>
-        <option value="verified">Đã verify</option>
-        <option value="unverified">Chưa verify</option>
-      </select>
-      <select id="han-similarity-filter" aria-label="Lọc caption theo độ tương đồng chữ Hán">
-        <option value="">Mọi độ tương đồng</option>
-        <option value="80">Caption gần ground truth ≥80%</option>
-      </select>
-      <label class="page-label" for="sort-filter">Sắp xếp ngày DB</label>
-      <select id="sort-filter" aria-label="Sắp xếp theo created_at hoặc updated_at trong PostgreSQL">
-        <option value="display">Mặc định</option>
-        <option value="created_desc">created_at · mới nhất</option>
-        <option value="created_asc">created_at · cũ nhất</option>
-        <option value="updated_desc">updated_at · mới nhất</option>
-        <option value="updated_asc">updated_at · cũ nhất</option>
-      </select>
-      <label class="page-label" for="font-select">Font chữ</label>
-      <select id="font-select" aria-label="Chọn font chữ Hán-Nôm">
-        <option value="default">Mặc định</option>
-      </select>
-      <span class="muted" id="font-status" aria-live="polite"></span>
-      <button id="btn-clear">Xoá</button>
+    <div class="lookup-controls">
+      <div class="lookup-search-row">
+        <input type="search" id="q" placeholder="Dán link Facebook, post id, caption hoặc chữ trong ground truth…"
+               autocomplete="off" autofocus />
+        <select id="field" aria-label="Tìm trong trường">
+          <option value="all">Tất cả</option>
+          <option value="post">Link / Post ID</option>
+          <option value="caption">Caption</option>
+          <option value="ground_truth">Ground truth</option>
+          <option value="phonetic">Phiên âm</option>
+          <option value="image">Tên file ảnh</option>
+        </select>
+        <button id="btn-clear">Xoá</button>
+      </div>
+      <div class="lookup-filter-grid" aria-label="Bộ lọc kết quả">
+        <label class="lookup-filter-control" for="group-filter">
+          <span>Nhóm</span>
+          <select id="group-filter" aria-label="Lọc theo nhóm">
+            <option value="">Tất cả group</option>
+            <option value="group1">group1</option>
+            <option value="group2">group2</option>
+            <option value="hieu">hieu</option>
+            <option value="other">other</option>
+          </select>
+        </label>
+        <label class="lookup-filter-control" for="verify-filter">
+          <span>Trạng thái verify</span>
+          <select id="verify-filter" aria-label="Lọc theo trạng thái verify">
+            <option value="">Tất cả trạng thái</option>
+            <option value="verified">Đã verify</option>
+            <option value="unverified">Chưa verify</option>
+          </select>
+        </label>
+        <label class="lookup-filter-control" for="han-similarity-filter">
+          <span>Độ giống caption</span>
+          <select id="han-similarity-filter" aria-label="Lọc caption theo độ tương đồng chữ Hán">
+            <option value="">Mọi độ tương đồng</option>
+            <option value="80">Gần ground truth ≥80%</option>
+          </select>
+        </label>
+        <label class="lookup-filter-control" for="sort-filter">
+          <span>Sắp xếp ngày DB</span>
+          <select id="sort-filter" aria-label="Sắp xếp theo ngày tạo hoặc cập nhật từ PostgreSQL">
+            <option value="display">Mặc định</option>
+            <option value="created_desc">Ngày tạo · mới nhất</option>
+            <option value="created_asc">Ngày tạo · cũ nhất</option>
+            <option value="updated_desc">Ngày cập nhật · mới nhất</option>
+            <option value="updated_asc">Ngày cập nhật · cũ nhất</option>
+          </select>
+        </label>
+        <div class="lookup-filter-control">
+          <label for="font-select">Font chữ Hán-Nôm</label>
+          <div class="lookup-font-row">
+            <select id="font-select" aria-label="Chọn font chữ Hán-Nôm">
+              <option value="default">Mặc định</option>
+            </select>
+            <span class="muted" id="font-status" aria-live="polite"></span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="counts" style="margin-top:1rem">
