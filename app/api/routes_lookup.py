@@ -8,11 +8,13 @@ always drift, and the useful thing is to see by how much.
 from __future__ import annotations
 
 import logging
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.api.auth import current_user
 from app.core.dataset import FIELDS, han_similarity
+from app.core.models import Item
 
 log = logging.getLogger(__name__)
 
@@ -32,6 +34,17 @@ def _group_for_image(image: str, group_tags: dict[str, str]) -> str | None:
     )
 
 
+def _sort_by_timestamp(rows: list[Item], sort: str) -> list[Item]:
+    if sort == "display":
+        return rows
+
+    field, direction = sort.rsplit("_", 1)
+    dated = [item for item in rows if getattr(item, field, None) is not None]
+    undated = [item for item in rows if getattr(item, field, None) is None]
+    dated.sort(key=lambda item: getattr(item, field), reverse=direction == "desc")
+    return dated + undated
+
+
 @router.get("/lookup")
 async def lookup(
     request: Request,
@@ -43,6 +56,9 @@ async def lookup(
     group: str = Query(""),
     verified: str = Query(""),
     min_han_similarity: int = Query(0, ge=0, le=100),
+    sort: Literal[
+        "display", "created_desc", "created_asc", "updated_desc", "updated_asc",
+    ] = Query("display"),
     user: dict = Depends(current_user),
 ):
     """Search by Facebook link, post id, caption, ground truth or filename."""
@@ -73,6 +89,7 @@ async def lookup(
             item for item in rows
             if (_group_for_image(item.image, runtime.settings.group_tags) or "other") == group
         ]
+    rows = _sort_by_timestamp(rows, sort)
     window = rows[offset : offset + page_limit]
     payload = {
         **everything.to_json(),

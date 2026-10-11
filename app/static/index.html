@@ -343,6 +343,16 @@
         <button id="btn-clear">Xoá bộ lọc</button>
       </div>
       <div class="lookup-filters" aria-label="Bộ lọc kết quả">
+        <label class="lookup-filter" for="sort-filter">
+          <span>Sắp xếp theo ngày</span>
+          <select id="sort-filter" aria-label="Sắp xếp theo ngày tạo hoặc cập nhật">
+            <option value="display">Thứ tự mặc định</option>
+            <option value="created_desc">Ngày tạo · mới nhất</option>
+            <option value="created_asc">Ngày tạo · cũ nhất</option>
+            <option value="updated_desc">Ngày cập nhật · mới nhất</option>
+            <option value="updated_asc">Ngày cập nhật · cũ nhất</option>
+          </select>
+        </label>
         <label class="lookup-filter" for="group-filter">
           <span>Nhóm</span>
           <select id="group-filter" aria-label="Lọc theo nhóm">
@@ -571,7 +581,7 @@ const fontRegistry = {
 const CJK_FALLBACK = '"Noto Serif TC", "Noto Sans TC", "Noto Serif CJK TC", "Source Han Serif", "MS Mincho", serif';
 
 const state = {
-  me: null, query: "", field: "all", group: "", verifyFilter: "", hanSimilarityFilter: "", offset: 0, limit: 20,
+  me: null, query: "", field: "all", group: "", verifyFilter: "", hanSimilarityFilter: "", sortOrder: "display", offset: 0, limit: 20,
   mode: "scroll", page: 1, loading: false, fontKey: "default",
   groupTags: {},
   items: [], total: 0, hasMore: false, missingOnly: false,
@@ -580,7 +590,7 @@ const state = {
 
 try {
   const savedView = JSON.parse(localStorage.getItem("hannom.view") || "{}");
-  for (const key of ["query", "field", "group", "verifyFilter", "hanSimilarityFilter", "missingOnly", "mode", "limit", "page", "offset", "fontKey"])
+  for (const key of ["query", "field", "group", "verifyFilter", "hanSimilarityFilter", "sortOrder", "missingOnly", "mode", "limit", "page", "offset", "fontKey"])
     if (savedView[key] !== undefined) state[key] = savedView[key];
 } catch {}
 state.limit = Math.min(1000, Math.max(1, Math.trunc(Number(state.limit) || 20)));
@@ -590,6 +600,7 @@ function persistView() {
     localStorage.setItem("hannom.view", JSON.stringify({
       query: state.query, field: state.field, group: state.group, verifyFilter: state.verifyFilter,
       hanSimilarityFilter: state.hanSimilarityFilter,
+      sortOrder: state.sortOrder,
       missingOnly: state.missingOnly,
       mode: state.mode, limit: state.limit, page: state.page, offset: state.offset,
       fontKey: state.fontKey,
@@ -722,7 +733,7 @@ function pageCacheKey(offset) {
   return JSON.stringify({
     q: state.query, field: state.field, group: state.group,
     verified: state.verifyFilter, hanSimilarity: state.hanSimilarityFilter,
-    missing: state.missingOnly,
+    sort: state.sortOrder, missing: state.missingOnly,
     offset, limit: state.limit,
   });
 }
@@ -919,7 +930,7 @@ async function search() {
   }
   const params = new URLSearchParams({
     q: state.query, field: state.field, group: state.group, verified: state.verifyFilter,
-    offset: requestOffset, limit: state.limit,
+    sort: state.sortOrder, offset: requestOffset, limit: state.limit,
   });
   if (state.hanSimilarityFilter) params.set("min_han_similarity", state.hanSimilarityFilter);
   if (state.missingOnly) params.set("missing_only", "true");
@@ -1765,17 +1776,24 @@ $("han-similarity-filter").onchange = (e) => {
   persistView();
   resetResults();
 };
+$("sort-filter").onchange = (e) => {
+  state.sortOrder = e.target.value;
+  persistView();
+  resetResults();
+};
 $("btn-clear").onclick = () => {
   $("q").value = "";
   $("field").value = "all";
   $("group-filter").value = "";
   $("verify-filter").value = "";
   $("han-similarity-filter").value = "";
+  $("sort-filter").value = "display";
   state.query = "";
   state.field = "all";
   state.group = "";
   state.verifyFilter = "";
   state.hanSimilarityFilter = "";
+  state.sortOrder = "display";
   state.missingOnly = false;
   state.mode = "scroll";
   state.limit = 20;
@@ -1878,6 +1896,7 @@ async function watchUiVersion() {
   $("group-filter").value = state.group;
   $("verify-filter").value = state.verifyFilter;
   $("han-similarity-filter").value = state.hanSimilarityFilter;
+  $("sort-filter").value = state.sortOrder;
   $("btn-missing").textContent = state.missingOnly ? "Bỏ lọc" : "Chỉ xem nhóm này";
   $("load-mode").value = state.mode;
   $("page-size").value = String(state.limit);

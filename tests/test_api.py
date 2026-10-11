@@ -4,6 +4,7 @@ The app fixture and its helpers live in conftest.py.
 """
 
 import json
+from datetime import datetime, timezone
 
 import pytest
 
@@ -80,6 +81,26 @@ class TestSearch:
         login(client)
         body = client.get("/api/lookup", params={"min_han_similarity": 80}).json()
         assert body["total"] == 0
+
+    def test_timestamp_sort_is_applied_before_pagination(self, client):
+        login(client)
+        items = client.app.state.runtime.dataset.items
+        items[0].created_at = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        items[1].created_at = datetime(2025, 1, 3, tzinfo=timezone.utc)
+        items[2].created_at = datetime(2025, 1, 2, tzinfo=timezone.utc)
+        items[0].updated_at = datetime(2025, 2, 3, tzinfo=timezone.utc)
+        items[1].updated_at = datetime(2025, 2, 1, tzinfo=timezone.utc)
+        items[2].updated_at = datetime(2025, 2, 2, tzinfo=timezone.utc)
+
+        expected_first = {
+            "created_desc": "sample_01.jpg",
+            "created_asc": "sample_00.jpg",
+            "updated_desc": "sample_00.jpg",
+            "updated_asc": "sample_01.jpg",
+        }
+        for sort, image in expected_first.items():
+            body = client.get("/api/lookup", params={"sort": sort, "limit": 1}).json()
+            assert body["items"][0]["image"] == image
 
     def test_paging(self, client):
         login(client)

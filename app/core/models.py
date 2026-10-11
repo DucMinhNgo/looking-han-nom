@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
 # Facebook permalinks carry the post's identity as digits inside the URL, so a
@@ -49,6 +50,8 @@ class Item:
     # The other pictures in this one's folder, filled in by the image library.
     siblings: list[str] = field(default_factory=list)
     extra: dict[str, Any] = field(default_factory=dict)
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     @property
     def post_url(self) -> str:
