@@ -615,6 +615,26 @@ function persistView() {
   } catch {}
 }
 
+function registerFontFaces(info) {
+  if (!info) return [];
+  const family = info.family || "Noto Serif CJK TC";
+  const files = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
+  const families = files.map((_, index) => `${family}-${index}`);
+
+  files.forEach((file, index) => {
+    const fontFamily = families[index];
+    const id = `han-font-${fontFamily.replace(/[^a-z0-9_-]/gi, "-")}`;
+    if (document.getElementById(id)) return;
+
+    const url = `/static/fonts/${file.split("/").map(encodeURIComponent).join("/")}`;
+    const style = document.createElement("style");
+    style.id = id;
+    style.textContent = `@font-face { font-family: "${fontFamily}"; src: url("${url}") format("truetype"); font-display: swap; }`;
+    document.head.appendChild(style);
+  });
+  return families;
+}
+
 async function loadFontRegistry() {
   const select = $("font-select");
   if (!select) return;
@@ -632,6 +652,9 @@ async function loadFontRegistry() {
     }});
   }
 
+  // Đăng ký font-face cho font mặc định (font gốc) để sẵn sàng làm fallback
+  registerFontFaces(fontRegistry.default);
+
   const order = Object.entries(fontRegistry);
   select.innerHTML = order.map(([key, value]) =>
     `<option value="${esc(key)}">${esc(value.label || key)}</option>`).join("");
@@ -648,31 +671,34 @@ async function loadFontRegistry() {
 }
 
 async function applySelectedFont(key) {
-  const info = fontRegistry[key] || fontRegistry.default || {};
-  const fallback = info.fallback || CJK_FALLBACK;
-  const family = info.family || "Noto Serif CJK TC";
-  const files = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
-  const families = files.map((_, index) => `${family}-${index}`);
+  const defaultInfo = fontRegistry.default || {};
+  const defaultFamilies = registerFontFaces(defaultInfo);
+  const defaultStack = defaultFamilies.map((name) => `"${name}"`).join(", ");
 
-  files.forEach((file, index) => {
-    const fontFamily = families[index];
-    const id = `han-font-${fontFamily.replace(/[^a-z0-9_-]/gi, "-")}`;
-    if (document.getElementById(id)) return;
+  const info = fontRegistry[key] || defaultInfo;
+  const isDefault = key === "default" || info === defaultInfo;
+  const selectedFamilies = isDefault ? defaultFamilies : registerFontFaces(info);
+  const selectedStack = selectedFamilies.map((name) => `"${name}"`).join(", ");
 
-    const url = `/static/fonts/${file.split("/").map(encodeURIComponent).join("/")}`;
-    const style = document.createElement("style");
-    style.id = id;
-    style.textContent = `@font-face { font-family: "${fontFamily}"; src: url("${url}") format("truetype"); font-display: swap; }`;
-    document.head.appendChild(style);
-  });
+  const fallback = info.fallback || defaultInfo.fallback || CJK_FALLBACK;
 
-  const selectedStack = families.map((name) => `"${name}"`).join(", ");
+  const composeFontFamily = (currentStack) => {
+    const list = [];
+    if (currentStack) list.push(currentStack);
+    // Nếu dùng font mới, luôn kèm font gốc ngay sau font mới để các ký tự
+    // không có trong font mới (hoặc font tải lỗi) tự động hiển thị theo font gốc
+    if (!isDefault && defaultStack) list.push(defaultStack);
+    if (fallback) list.push(fallback);
+    return list.filter(Boolean).join(", ");
+  };
+
   document.documentElement.style.setProperty(
     "--han-font-family",
-    selectedStack ? `${selectedStack}, ${fallback}` : fallback,
+    composeFontFamily(selectedStack) || fallback,
   );
 
   const status = $("font-status");
+  const files = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
   if (!files.length) {
     if (status) status.textContent = "Font hệ thống";
     return;
@@ -682,18 +708,38 @@ async function applySelectedFont(key) {
     return;
   }
 
+  // Tải ngầm font gốc để ký tự fallback hiển thị ngay lập tức
+  if (!isDefault && defaultFamilies.length) {
+    defaultFamilies.forEach((fontFamily) => {
+      document.fonts.load(`16px "${fontFamily}"`).catch(() => {});
+    });
+  }
+
   if (status) status.textContent = `Đang tải ${files.length} font…`;
   const results = await Promise.allSettled(
-    families.map((fontFamily) => document.fonts.load(`16px "${fontFamily}"`)),
+    selectedFamilies.map((fontFamily) => document.fonts.load(`16px "${fontFamily}"`)),
   );
   if (state.fontKey !== key) return;
 
-  const loaded = results.filter((result) =>
-    result.status === "fulfilled" && result.value.length > 0).length;
+  const successfulFamilies = selectedFamilies.filter((_, index) =>
+    results[index].status === "fulfilled" && results[index].value?.length > 0
+  );
+  const loaded = successfulFamilies.length;
+
+  const successfulStack = successfulFamilies.map((name) => `"${name}"`).join(", ");
+  document.documentElement.style.setProperty(
+    "--han-font-family",
+    composeFontFamily(successfulStack) || fallback,
+  );
+
   if (status) {
-    status.textContent = loaded === files.length
-      ? `Đã tải ${loaded} font`
-      : `Tải được ${loaded}/${files.length} font`;
+    if (loaded === files.length) {
+      status.textContent = `Đã tải ${loaded} font`;
+    } else if (loaded > 0) {
+      status.textContent = `Tải được ${loaded}/${files.length} font (chữ thiếu hiển thị font gốc)`;
+    } else {
+      status.textContent = "Không tải được font mới, hiển thị font gốc";
+    }
     status.title = results.map((result, index) =>
       result.status === "rejected" || !result.value?.length ? files[index] : "")
       .filter(Boolean).join("\n");
