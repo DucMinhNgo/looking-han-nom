@@ -635,6 +635,101 @@ function registerFontFaces(info) {
   return families;
 }
 
+/* ---- Canvas-based glyph detection ----
+ * Nhiều font CJK trang trí (Thảo, Triện...) map ký tự vào glyph rỗng (blank).
+ * Trình duyệt thấy font có glyph → không fallback → chữ "mất".
+ * Giải pháp: vẽ ký tự lên canvas bằng font mới, nếu trống thì coi như font
+ * không hỗ trợ ký tự đó → hiển thị bằng font gốc.
+ */
+const _glyphCache = new Map();  // key: "fontStack|char" → boolean
+let _glyphCanvas = null;
+let _glyphCtx = null;
+
+function _getGlyphCtx() {
+  if (!_glyphCtx) {
+    _glyphCanvas = document.createElement("canvas");
+    _glyphCanvas.width = 64;
+    _glyphCanvas.height = 64;
+    _glyphCtx = _glyphCanvas.getContext("2d", { willReadFrequently: true });
+  }
+  return _glyphCtx;
+}
+
+function _hasVisibleGlyph(fontStack, char) {
+  const key = `${fontStack}|${char}`;
+  const cached = _glyphCache.get(key);
+  if (cached !== undefined) return cached;
+
+  const ctx = _getGlyphCtx();
+  ctx.clearRect(0, 0, 64, 64);
+  ctx.font = `48px ${fontStack}`;
+  ctx.fillStyle = "#000";
+  ctx.textBaseline = "middle";
+  ctx.fillText(char, 4, 36);
+
+  const data = ctx.getImageData(0, 0, 64, 64).data;
+  let hasPixels = false;
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] > 10) { hasPixels = true; break; }
+  }
+  _glyphCache.set(key, hasPixels);
+  return hasPixels;
+}
+
+// Font stack hiện tại chỉ gồm font mới (KHÔNG kèm default), dùng để kiểm tra
+let _currentSelectedStack = "";
+// Font stack default, dùng để fallback
+let _currentDefaultStack = "";
+// Có đang dùng font khác default không?
+let _usingCustomFont = false;
+
+/**
+ * Wrap từng ký tự Hán/Nôm: nếu font mới không render được thì bọc trong
+ * <span> dùng font gốc. Gọi SAU khi esc() hoặc highlight() đã xử lý.
+ * Hàm này nhận HTML string (đã escape) và trả về HTML string.
+ */
+function wrapFallbackChars(html) {
+  if (!_usingCustomFont || !_currentSelectedStack || !_currentDefaultStack) return html;
+  // Tách HTML tags khỏi text để không vô tình wrap bên trong tag
+  return html.replace(/([^<]+)/g, (textSegment) => {
+    // Decode HTML entities tạm để kiểm tra ký tự thực
+    const tmp = document.createElement("span");
+    tmp.innerHTML = textSegment;
+    const plain = tmp.textContent || "";
+    if (!plain) return textSegment;
+
+    let result = "";
+    // Duyệt từng ký tự gốc, nhưng giữ nguyên HTML entity
+    let htmlPos = 0;
+    for (const char of plain) {
+      // Tìm vị trí ký tự trong textSegment (HTML encoded)
+      const encoded = textSegment.substring(htmlPos);
+      let charHtml;
+      if (encoded.startsWith("&")) {
+        const semiIdx = encoded.indexOf(";");
+        charHtml = semiIdx >= 0 ? encoded.substring(0, semiIdx + 1) : encoded.substring(0, 1);
+      } else {
+        charHtml = encoded.substring(0, char.length);
+      }
+      htmlPos += charHtml.length;
+
+      // Chỉ kiểm tra ký tự CJK (Han/Nôm)
+      const cp = char.codePointAt(0);
+      const isCJK = (cp >= 0x2E80 && cp <= 0x9FFF)
+        || (cp >= 0xF900 && cp <= 0xFAFF)
+        || (cp >= 0x3400 && cp <= 0x4DBF)
+        || (cp >= 0x20000 && cp <= 0x3134F);
+
+      if (isCJK && !_hasVisibleGlyph(_currentSelectedStack, char)) {
+        result += `<span class="font-fb">${charHtml}</span>`;
+      } else {
+        result += charHtml;
+      }
+    }
+    return result;
+  });
+}
+
 async function loadFontRegistry() {
   const select = $("font-select");
   if (!select) return;
@@ -685,8 +780,6 @@ async function applySelectedFont(key) {
   const composeFontFamily = (currentStack) => {
     const list = [];
     if (currentStack) list.push(currentStack);
-    // Nếu dùng font mới, luôn kèm font gốc ngay sau font mới để các ký tự
-    // không có trong font mới (hoặc font tải lỗi) tự động hiển thị theo font gốc
     if (!isDefault && defaultStack) list.push(defaultStack);
     if (fallback) list.push(fallback);
     return list.filter(Boolean).join(", ");
@@ -697,22 +790,37 @@ async function applySelectedFont(key) {
     composeFontFamily(selectedStack) || fallback,
   );
 
+  // Cập nhật CSS class .font-fb cho các ký tự fallback
+  let fbStyle = document.getElementById("font-fb-style");
+  if (!fbStyle) {
+    fbStyle = document.createElement("style");
+    fbStyle.id = "font-fb-style";
+    document.head.appendChild(fbStyle);
+  }
+  const defaultFontFamily = defaultStack
+    ? `${defaultStack}, ${fallback}` : fallback;
+  fbStyle.textContent = `.font-fb { font-family: ${defaultFontFamily} !important; }`;
+
   const status = $("font-status");
   const files = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
   if (!files.length) {
+    _usingCustomFont = false;
+    _currentSelectedStack = "";
+    _currentDefaultStack = "";
     if (status) status.textContent = "Font hệ thống";
     return;
   }
   if (!document.fonts?.load) {
+    _usingCustomFont = false;
     if (status) status.textContent = "Trình duyệt không hỗ trợ tải font chủ động";
     return;
   }
 
-  // Tải ngầm font gốc để ký tự fallback hiển thị ngay lập tức
+  // Tải ngầm font gốc song song
   if (!isDefault && defaultFamilies.length) {
-    defaultFamilies.forEach((fontFamily) => {
-      document.fonts.load(`16px "${fontFamily}"`).catch(() => {});
-    });
+    await Promise.allSettled(
+      defaultFamilies.map((f) => document.fonts.load(`16px "${f}"`)),
+    );
   }
 
   if (status) status.textContent = `Đang tải ${files.length} font…`;
@@ -732,6 +840,13 @@ async function applySelectedFont(key) {
     composeFontFamily(successfulStack) || fallback,
   );
 
+  // Cập nhật state cho glyph detection
+  _usingCustomFont = !isDefault && loaded > 0;
+  _currentSelectedStack = successfulStack;
+  _currentDefaultStack = defaultStack;
+  // Xoá cache glyph khi đổi font
+  _glyphCache.clear();
+
   if (status) {
     if (loaded === files.length) {
       status.textContent = `Đã tải ${loaded} font`;
@@ -744,6 +859,9 @@ async function applySelectedFont(key) {
       result.status === "rejected" || !result.value?.length ? files[index] : "")
       .filter(Boolean).join("\n");
   }
+
+  // Re-render kết quả với fallback detection
+  renderVisibleCards();
 }
 
 const pageCache = (() => {
@@ -1086,7 +1204,7 @@ function goToPage(page) {
 function card(item, i) {
   const q = state.query;
   const gt = item.ground_truth
-    ? `<div class="gt">${highlight(item.ground_truth, q)}</div>` : "";
+    ? `<div class="gt">${wrapFallbackChars(highlight(item.ground_truth, q))}</div>` : "";
   const phon = item.phonetic
     ? `<div class="phonetic" title="${esc(item.phonetic)}">${highlight(item.phonetic, q)}</div>` : "";
   const cap = item.caption
@@ -1224,7 +1342,7 @@ function openDetail(i, editing = isAdmin(), showing = null) {
                <span class="muted" id="gt-status"></span>
              </div>`
           : `<div class="block gt">${
-               highlight(item.ground_truth || "(trống)", state.query)}</div>`}
+               wrapFallbackChars(highlight(item.ground_truth || "(trống)", state.query))}</div>`}
       </div>
       <div style="margin-bottom:0.8rem">
         <label class="field">Phiên âm / Phonetic</label>
@@ -1354,7 +1472,7 @@ function openDetail(i, editing = isAdmin(), showing = null) {
         $("qwen-results").innerHTML = result.lines.length
           ? result.lines.map((line) => `
               <div class="qwen-line">
-                <div class="gt">${esc(line.text || "")}</div>
+                <div class="gt">${wrapFallbackChars(esc(line.text || ""))}</div>
                 <span class="muted">Vị trí: ${esc(JSON.stringify(line.bounding_box || []))}</span>
                 ${(line.sources || []).map((source) =>
                   `<a class="qwen-source" href="${esc(source.url)}" target="_blank"
