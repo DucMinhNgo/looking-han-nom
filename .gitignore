@@ -22,3 +22,4 @@ coverage.xml
 sample/dataset2.jsonl
 /looking
 /font
+app/static/fonts
