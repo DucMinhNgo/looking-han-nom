@@ -1493,17 +1493,16 @@
       const files = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
       const families = files.map((_, index) => `${family}-${index}`);
 
-      files.forEach((file, index) => {
-        const fontFamily = families[index];
-        const id = `han-font-${fontFamily.replace(/[^a-z0-9_-]/gi, "-")}`;
-        if (document.getElementById(id)) return;
-
-        const url = `/static/fonts/${file.split("/").map(encodeURIComponent).join("/")}`;
+      const id = `han-font-style-${family.replace(/[^a-z0-9_-]/gi, "-")}`;
+      if (!document.getElementById(id)) {
         const style = document.createElement("style");
         style.id = id;
-        style.textContent = `@font-face { font-family: "${fontFamily}"; src: url("${url}") format("truetype"); font-display: swap; }`;
+        style.textContent = files.map((file, index) => {
+          const url = `/static/fonts/${file.split("/").map(encodeURIComponent).join("/")}`;
+          return `@font-face { font-family: "${families[index]}"; src: url("${url}") format("truetype"); font-display: swap; }`;
+        }).join("\n");
         document.head.appendChild(style);
-      });
+      }
       return families;
     }
 
@@ -1554,6 +1553,8 @@
     let _currentDefaultStack = "";
     // Có đang dùng font khác default không?
     let _usingCustomFont = false;
+    let fontApplyToken = 0;
+    let fontRenderToken = 0;
 
     /**
      * Wrap từng ký tự Hán/Nôm: nếu font mới không render được thì bọc trong
@@ -1631,15 +1632,16 @@
         ? state.fontKey : "default";
       state.fontKey = chosen;
       select.value = chosen;
-      select.onchange = async (event) => {
+      select.onchange = (event) => {
         state.fontKey = event.target.value;
         persistView();
-        await applySelectedFont(state.fontKey);
+        applySelectedFont(state.fontKey);
       };
-      await applySelectedFont(chosen);
+      applySelectedFont(chosen);
     }
 
-    async function applySelectedFont(key) {
+    function applySelectedFont(key) {
+      const token = ++fontApplyToken;
       const defaultInfo = fontRegistry.default || {};
       const defaultFamilies = registerFontFaces(defaultInfo);
       const defaultStack = defaultFamilies.map((name) => `"${name}"`).join(", ");
@@ -1647,7 +1649,6 @@
       const info = fontRegistry[key] || defaultInfo;
       const isDefault = key === "default" || info === defaultInfo;
       const selectedFamilies = isDefault ? defaultFamilies : registerFontFaces(info);
-      const selectedStack = selectedFamilies.map((name) => `"${name}"`).join(", ");
 
       const fallback = info.fallback || defaultInfo.fallback || CJK_FALLBACK;
 
@@ -1659,12 +1660,6 @@
         return list.filter(Boolean).join(", ");
       };
 
-      document.documentElement.style.setProperty(
-        "--han-font-family",
-        composeFontFamily(selectedStack) || fallback,
-      );
-
-      // Cập nhật CSS class .font-fb cho các ký tự fallback
       let fbStyle = document.getElementById("font-fb-style");
       if (!fbStyle) {
         fbStyle = document.createElement("style");
@@ -1681,61 +1676,120 @@
         _usingCustomFont = false;
         _currentSelectedStack = "";
         _currentDefaultStack = "";
+        document.documentElement.style.setProperty("--han-font-family", composeFontFamily("") || fallback);
         if (status) status.textContent = "Font hệ thống";
+        refreshVisibleCardsProgressively();
         return;
       }
       if (!document.fonts?.load) {
         _usingCustomFont = false;
+        _currentSelectedStack = "";
+        _currentDefaultStack = "";
+        document.documentElement.style.setProperty("--han-font-family", fallback);
         if (status) status.textContent = "Trình duyệt không hỗ trợ tải font chủ động";
+        refreshVisibleCardsProgressively();
         return;
       }
 
-      // Tải ngầm font gốc song song
-      if (!isDefault && defaultFamilies.length) {
-        await Promise.allSettled(
-          defaultFamilies.map((f) => document.fonts.load(`16px "${f}"`)),
-        );
-      }
-
-      if (status) status.textContent = `Đang tải ${files.length} font…`;
-      const results = await Promise.allSettled(
-        selectedFamilies.map((fontFamily) => document.fonts.load(`16px "${fontFamily}"`)),
-      );
-      if (state.fontKey !== key) return;
-
-      const successfulFamilies = selectedFamilies.filter((_, index) =>
-        results[index].status === "fulfilled" && results[index].value?.length > 0
-      );
-      const loaded = successfulFamilies.length;
-
-      const successfulStack = successfulFamilies.map((name) => `"${name}"`).join(", ");
       document.documentElement.style.setProperty(
         "--han-font-family",
-        composeFontFamily(successfulStack) || fallback,
+        composeFontFamily("") || fallback,
       );
-
-      // Cập nhật state cho glyph detection
-      _usingCustomFont = !isDefault && loaded > 0;
-      _currentSelectedStack = successfulStack;
+      _usingCustomFont = false;
+      _currentSelectedStack = "";
       _currentDefaultStack = defaultStack;
-      // Xoá cache glyph khi đổi font
       _glyphCache.clear();
-
       if (status) {
-        if (loaded === files.length) {
-          status.textContent = `Đã tải ${loaded} font`;
-        } else if (loaded > 0) {
-          status.textContent = `Tải được ${loaded}/${files.length} font (chữ thiếu hiển thị font gốc)`;
-        } else {
-          status.textContent = "Không tải được font mới, hiển thị font gốc";
-        }
-        status.title = results.map((result, index) =>
-          result.status === "rejected" || !result.value?.length ? files[index] : "")
-          .filter(Boolean).join("\n");
+        status.textContent = `Đang tải font… 0/${files.length}`;
+        status.title = "";
       }
+      refreshVisibleCardsProgressively();
 
-      // Re-render kết quả với fallback detection
-      renderVisibleCards();
+      void loadFontBatches();
+
+      async function loadFontBatches() {
+        const batchSize = 4;
+        const successfulFamilies = [];
+        const failedFiles = [];
+        let processed = 0;
+
+        for (let start = 0; start < selectedFamilies.length; start += batchSize) {
+          if (token !== fontApplyToken) return;
+          const batch = selectedFamilies.slice(start, start + batchSize);
+          const results = await Promise.allSettled(
+            batch.map((fontFamily) => document.fonts.load(`16px "${fontFamily}"`)),
+          );
+          if (token !== fontApplyToken) return;
+
+          results.forEach((result, index) => {
+            if (result.status === "fulfilled" && result.value?.length) {
+              successfulFamilies.push(batch[index]);
+            } else {
+              failedFiles.push(files[start + index]);
+            }
+          });
+          processed += batch.length;
+
+          const successfulStack = successfulFamilies.map((name) => `"${name}"`).join(", ");
+          _usingCustomFont = !isDefault && successfulFamilies.length > 0;
+          _currentSelectedStack = successfulStack;
+          _glyphCache.clear();
+          document.documentElement.style.setProperty(
+            "--han-font-family",
+            composeFontFamily(successfulStack) || fallback,
+          );
+          refreshVisibleCardsProgressively();
+
+          if (status) {
+            if (processed === files.length) {
+              status.textContent = successfulFamilies.length === files.length
+                ? `Đã tải ${successfulFamilies.length} font`
+                : successfulFamilies.length
+                  ? `Tải được ${successfulFamilies.length}/${files.length} font (chữ thiếu hiển thị font gốc)`
+                  : "Không tải được font mới, hiển thị font gốc";
+              status.title = failedFiles.join("\n");
+            } else {
+              status.textContent = `Đang tải font… ${processed}/${files.length}`;
+            }
+          }
+
+          if (processed < files.length) {
+            await new Promise((resolve) => setTimeout(resolve, 16));
+          }
+        }
+      }
+    }
+
+    function refreshVisibleCardsProgressively() {
+      const grid = $("results");
+      if (!grid) return;
+      const token = ++fontRenderToken;
+      const cards = [...grid.querySelectorAll(":scope > .item")];
+      let cursor = 0;
+
+      const paint = () => {
+        if (token !== fontRenderToken) return;
+        const end = Math.min(cursor + 8, cards.length, state.items.length);
+        for (; cursor < end; cursor += 1) {
+          const groundTruth = cards[cursor].querySelector(".gt");
+          const item = state.items[cursor];
+          if (groundTruth && item?.ground_truth) {
+            groundTruth.innerHTML = wrapFallbackChars(highlight(item.ground_truth, state.query));
+          }
+        }
+
+        if (cursor < cards.length && cursor < state.items.length) {
+          requestAnimationFrame(paint);
+        }
+      };
+
+      if (cards.length) requestAnimationFrame(paint);
+      const detailGroundTruth = $("lb-inner")?.querySelector(".gt");
+      if (detailGroundTruth && state.current?.item.ground_truth) {
+        detailGroundTruth.innerHTML = wrapFallbackChars(
+          highlight(state.current.item.ground_truth, state.query),
+        );
+      }
     }
 
     const pageCache = (() => {
