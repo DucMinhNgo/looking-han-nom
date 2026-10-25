@@ -295,11 +295,14 @@ class TestQwenFontSelection:
                 "font_keys": ["thao", "trien"],
                 "per_character": True,
                 "preferred_font_key": "thao",
+                "force_refresh": True,
             },
         )
 
         assert response.status_code == 200, response.text
         assert response.json()["font_map"] == {"花": "thao", "開": "trien"}
+        prompt = calls["messages"][0]["content"]
+        assert "thao" in prompt
 
 
 
