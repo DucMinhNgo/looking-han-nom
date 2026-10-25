@@ -3408,6 +3408,10 @@
         groupMs.classList.remove("open");
         groupTrigger.setAttribute("aria-expanded", "false");
       }
+
+      for (const picker of [$("font-main-picker"), $("font-file-picker")]) {
+        if (picker?.open && !picker.contains(e.target)) picker.open = false;
+      }
     });
 
     document.addEventListener("keydown", (e) => {
