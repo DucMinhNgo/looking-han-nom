@@ -2887,8 +2887,7 @@
         const chars = textChars;
         const assignments = new Map();
         const groupByFamily = new Map();
-        const preferredGroups = [chosenFontKey];
-        const scanGroups = [...new Set([...preferredGroups, ...candidateKeys])];
+        const scanGroups = [...new Set([chosenFontKey, ...candidateKeys])];
         const failedFiles = new Set();
         let qwenFontMap = {};
         let repairError = "";
@@ -2954,26 +2953,20 @@
           }
         };
 
-        await resolveCharacters(chosenFontKey, new Set(chars));
-        let missingChars = chars.filter((char) => !assignments.has(char));
-        if (missingChars.length) {
-          const repairGroups = [...new Set(missingChars.map((char) => qwenFontMap[char])
-            .filter((key) => candidateKeys.includes(key) && key !== chosenFontKey))];
-          for (const groupKey of repairGroups) {
-            const preferredChars = new Set(missingChars.filter(
-              (char) => qwenFontMap[char] === groupKey,
-            ));
-            await resolveCharacters(groupKey, preferredChars);
-          }
-          for (const groupKey of scanGroups) {
-            missingChars = chars.filter((char) => !assignments.has(char));
-            if (!missingChars.length) break;
-            await resolveCharacters(groupKey, new Set(missingChars));
-          }
+        const qwenGroups = [...new Set(chars.map((char) => qwenFontMap[char])
+          .filter((key) => candidateKeys.includes(key)))];
+        for (const groupKey of qwenGroups) {
+          const mappedChars = new Set(chars.filter((char) => qwenFontMap[char] === groupKey));
+          await resolveCharacters(groupKey, mappedChars);
+        }
+        for (const groupKey of scanGroups) {
+          const missingChars = chars.filter((char) => !assignments.has(char));
+          if (!missingChars.length) break;
+          await resolveCharacters(groupKey, new Set(missingChars));
         }
 
-          await showLoading("Đang hoàn tất hiển thị câu…");
-          renderRecommendedFont(cardElement, item, assignments);
+        await showLoading("Đang hoàn tất hiển thị câu…");
+        renderRecommendedFont(cardElement, item, assignments);
         const chosenStyle = fontRegistry[chosenFontKey]?.label || chosenFontKey;
         const usedGroups = [...new Set([...assignments.values()].map((family) => groupByFamily.get(family))
           .filter(Boolean))];
