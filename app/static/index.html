@@ -373,6 +373,94 @@
       text-overflow: ellipsis;
     }
 
+    .font-file-picker {
+      position: relative;
+      min-width: 0;
+    }
+
+    .font-file-picker > summary {
+      list-style: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      min-height: 2.35rem;
+      padding: 0.5rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--plane);
+      color: var(--ink);
+      cursor: pointer;
+      font-size: 0.84rem;
+      font-weight: 400;
+    }
+
+    .font-file-picker > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .font-file-picker > summary::after {
+      content: "▾";
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+
+    .font-file-picker[open] > summary {
+      outline: 2px solid var(--series-1);
+      outline-offset: 1px;
+    }
+
+    .font-file-hint {
+      display: block;
+      margin-top: 0.2rem;
+      color: var(--muted);
+      font-size: 0.65rem;
+      font-weight: 400;
+      line-height: 1.35;
+    }
+
+    .font-file-options {
+      position: absolute;
+      z-index: 20;
+      top: calc(100% + 0.3rem);
+      left: 0;
+      right: 0;
+      max-height: min(18rem, 55vh);
+      overflow: auto;
+      padding: 0.35rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .font-file-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      padding: 0.4rem 0.45rem;
+      border-radius: 5px;
+      color: var(--ink);
+      font-size: 0.78rem;
+      font-weight: 400;
+      line-height: 1.35;
+      cursor: pointer;
+      overflow-wrap: anywhere;
+    }
+
+    .font-file-option:hover {
+      background: color-mix(in srgb, var(--series-1) 10%, transparent);
+    }
+
+    .font-file-option input {
+      flex: 0 0 auto;
+      width: 15px;
+      height: 15px;
+      margin: 0.05rem 0 0;
+      padding: 0;
+      accent-color: var(--series-1);
+    }
+
     .lookup-font-row #font-status {
       font-size: 0.7rem;
       overflow-wrap: anywhere;
@@ -1264,9 +1352,11 @@
                 </select>
               </label>
               <label class="lookup-font-field" for="font-file-select">Font con
-                <select id="font-file-select" aria-label="Chọn font con">
-                  <option value="">Tất cả font con</option>
-                </select>
+                <details class="font-file-picker" id="font-file-picker">
+                  <summary id="font-file-summary">Tất cả font con</summary>
+                  <div class="font-file-options" id="font-file-options"></div>
+                </details>
+                <small class="font-file-hint">Chọn từ 2 font con trở lên để tự dò từng chữ trong các font đã chọn.</small>
               </label>
               <span class="muted" id="font-status" aria-live="polite"></span>
             </div>
@@ -1481,7 +1571,8 @@
 
     const state = {
       me: null, query: "", field: "all", groups: [...DEFAULT_GROUP_NAMES], verifyFilter: "", hanSimilarityFilter: "", sortOrder: "display", offset: 0, limit: 20,
-      mode: "scroll", page: 1, loading: false, fontKey: "default", fontFile: "",
+      mode: "scroll", page: 1, loading: false, fontKey: "default",
+      fontMode: "all", fontFiles: [],
       groupTags: {},
       items: [], total: 0, hasMore: false, missingOnly: false,
       current: null, orphanOffset: 0, renderToken: 0,
@@ -1489,7 +1580,7 @@
 
     try {
       const savedView = JSON.parse(localStorage.getItem("hannom.view") || "{}");
-      for (const key of ["query", "field", "verifyFilter", "hanSimilarityFilter", "sortOrder", "missingOnly", "mode", "limit", "page", "offset", "fontKey", "fontFile"])
+      for (const key of ["query", "field", "verifyFilter", "hanSimilarityFilter", "sortOrder", "missingOnly", "mode", "limit", "page", "offset", "fontKey", "fontMode", "fontFiles"])
         if (savedView[key] !== undefined) state[key] = savedView[key];
       if (Array.isArray(savedView.groups)) {
         state.groups = savedView.groups;
@@ -1506,7 +1597,7 @@
           sortOrder: state.sortOrder,
           missingOnly: state.missingOnly,
           mode: state.mode, limit: state.limit, page: state.page, offset: state.offset,
-          fontKey: state.fontKey, fontFile: state.fontFile,
+          fontKey: state.fontKey, fontMode: state.fontMode, fontFiles: state.fontFiles,
         }));
       } catch { }
     }
@@ -1556,19 +1647,29 @@
       if (cached !== undefined) return cached;
 
       const ctx = _getGlyphCtx();
+      const selectedPixels = renderGlyphPixels(ctx, fontStack, char);
+      const hasPixels = selectedPixels.some((pixel, index) => index % 4 === 3 && pixel > 10);
+      const result = hasPixels && (!_currentDefaultStack
+        || !pixelsEqual(selectedPixels, renderGlyphPixels(ctx, _currentDefaultStack, char)));
+      _glyphCache.set(key, result);
+      return result;
+    }
+
+    function renderGlyphPixels(ctx, fontStack, char) {
       ctx.clearRect(0, 0, 64, 64);
       ctx.font = `48px ${fontStack}`;
       ctx.fillStyle = "#000";
       ctx.textBaseline = "middle";
       ctx.fillText(char, 4, 36);
+      return ctx.getImageData(0, 0, 64, 64).data;
+    }
 
-      const data = ctx.getImageData(0, 0, 64, 64).data;
-      let hasPixels = false;
-      for (let i = 3; i < data.length; i += 4) {
-        if (data[i] > 10) { hasPixels = true; break; }
+    function pixelsEqual(left, right) {
+      if (left.length !== right.length) return false;
+      for (let index = 0; index < left.length; index += 1) {
+        if (left[index] !== right[index]) return false;
       }
-      _glyphCache.set(key, hasPixels);
-      return hasPixels;
+      return true;
     }
 
     // Font stack hiện tại chỉ gồm font mới (KHÔNG kèm default), dùng để kiểm tra
@@ -1659,13 +1760,24 @@
       updateFontFileOptions(chosen);
       select.onchange = (event) => {
         state.fontKey = event.target.value;
-        state.fontFile = "";
         updateFontFileOptions(state.fontKey);
         persistView();
         applySelectedFont(state.fontKey);
       };
-      $("font-file-select").onchange = (event) => {
-        state.fontFile = event.target.value;
+      $("font-file-options").onchange = (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement)) return;
+        if (target.value === "auto" || target.value === "all") {
+          state.fontMode = target.value;
+          state.fontFiles = [];
+        } else {
+          state.fontMode = "manual";
+          state.fontFiles = [...$("font-file-options").querySelectorAll(
+            'input[type="checkbox"]:checked',
+          )].map((input) => input.value);
+          if (!state.fontFiles.length) state.fontMode = "all";
+        }
+        updateFontFileOptions(state.fontKey);
         persistView();
         applySelectedFont(state.fontKey);
       };
@@ -1673,21 +1785,57 @@
     }
 
     function updateFontFileOptions(key) {
-      const select = $("font-file-select");
-      if (!select) return;
+      const options = $("font-file-options");
+      const summary = $("font-file-summary");
+      if (!options || !summary) return;
       const info = fontRegistry[key] || fontRegistry.default || {};
       const files = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
-      const hasSavedFile = files.includes(state.fontFile);
-      if (!hasSavedFile) state.fontFile = "";
+      if (!["auto", "all", "manual"].includes(state.fontMode)) state.fontMode = "all";
+      if (!Array.isArray(state.fontFiles)) state.fontFiles = [];
+      state.fontFiles = state.fontFiles.filter((file) => files.includes(file));
+      if (state.fontMode === "manual" && !state.fontFiles.length) state.fontMode = "all";
 
-      select.innerHTML = `<option value="">Tất cả font con (${files.length})</option>` +
-        files.map((file) => {
-          const label = file.split("/").pop().replace(/\.(ttf|otf|woff2?)$/i, "");
-          return `<option value="${esc(file)}">${esc(label)}</option>`;
-        }).join("");
-      select.value = state.fontFile;
-      select.disabled = files.length === 0;
-      select.title = state.fontFile || "Không chọn font con sẽ tải tất cả font trong mục này";
+      const option = (value, label, checked, type = "radio") => `
+        <label class="font-file-option">
+          <input type="${type}" name="font-file-mode" value="${esc(value)}" ${checked ? "checked" : ""} />
+          <span>${esc(label)}</span>
+        </label>`;
+      options.innerHTML = option("auto", "Tự động theo chữ đang hiển thị", state.fontMode === "auto")
+        + option("all", `Tất cả font con (${files.length})`, state.fontMode === "all")
+        + files.map((file) => option(
+          file,
+          file.split("/").pop().replace(/\.(ttf|otf|woff2?)$/i, ""),
+          state.fontMode === "manual" && state.fontFiles.includes(file),
+          "checkbox",
+        )).join("");
+
+      if (state.fontMode === "auto") {
+        summary.textContent = "Tự động theo chữ";
+      } else if (state.fontMode === "manual") {
+        summary.textContent = state.fontFiles.length > 1
+          ? `Tự động · ${state.fontFiles.length} font con`
+          : `${state.fontFiles.length} font con đã chọn`;
+      } else {
+        summary.textContent = `Tất cả font con (${files.length})`;
+      }
+      options.querySelectorAll("input").forEach((input) => {
+        input.disabled = files.length === 0;
+      });
+    }
+
+    function collectVisibleHanChars() {
+      const text = state.items.map((item) => item.ground_truth || "").join("");
+      const chars = new Set();
+      for (const char of text) {
+        const cp = char.codePointAt(0);
+        if ((cp >= 0x2E80 && cp <= 0x9FFF)
+          || (cp >= 0xF900 && cp <= 0xFAFF)
+          || (cp >= 0x3400 && cp <= 0x4DBF)
+          || (cp >= 0x20000 && cp <= 0x3134F)) {
+          chars.add(char);
+        }
+      }
+      return chars;
     }
 
     function applySelectedFont(key) {
@@ -1700,11 +1848,16 @@
       const isDefault = key === "default" || info === defaultInfo;
       const allFamilies = isDefault ? defaultFamilies : registerFontFaces(info);
       const allFiles = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
-      const selectedIndexes = state.fontFile
-        ? [allFiles.indexOf(state.fontFile)].filter((index) => index >= 0)
+      const selectedIndexes = state.fontMode === "manual"
+        ? allFiles.map((file, index) => state.fontFiles.includes(file) ? index : -1)
+          .filter((index) => index >= 0)
         : allFiles.map((_, index) => index);
       const files = selectedIndexes.map((index) => allFiles[index]);
       const selectedFamilies = selectedIndexes.map((index) => allFamilies[index]);
+      const autoMode = !isDefault && (
+        state.fontMode === "auto"
+        || (state.fontMode === "manual" && selectedIndexes.length > 1)
+      );
 
       const fallback = info.fallback || defaultInfo.fallback || CJK_FALLBACK;
       const composeFontFamily = (currentStack) => {
@@ -1762,11 +1915,18 @@
       void loadFontBatches();
 
       async function loadFontBatches() {
-        const batchSize = 4;
         const successfulFamilies = [];
         const failedFiles = [];
+        const uncoveredChars = autoMode ? collectVisibleHanChars() : new Set();
         let processed = 0;
 
+        if (autoMode && !uncoveredChars.size) {
+          _usingCustomFont = false;
+          if (status) status.textContent = "Auto: chưa có chữ Hán-Nôm trong dữ liệu";
+          return;
+        }
+
+        const batchSize = autoMode ? 1 : 4;
         for (let start = 0; start < selectedFamilies.length; start += batchSize) {
           if (token !== fontApplyToken) return;
           const batch = selectedFamilies.slice(start, start + batchSize);
@@ -1783,7 +1943,19 @@
 
           results.forEach((result, index) => {
             if (result.status === "fulfilled") {
-              successfulFamilies.push(batch[index]);
+              const fontFamily = batch[index];
+              if (!autoMode) {
+                successfulFamilies.push(fontFamily);
+              } else {
+                let coversCharacter = false;
+                for (const char of uncoveredChars) {
+                  if (_hasVisibleGlyph(`"${fontFamily}"`, char)) {
+                    uncoveredChars.delete(char);
+                    coversCharacter = true;
+                  }
+                }
+                if (coversCharacter) successfulFamilies.push(fontFamily);
+              }
             } else {
               failedFiles.push(files[start + index]);
             }
@@ -1801,7 +1973,12 @@
           refreshVisibleCardsProgressively();
 
           if (status) {
-            if (processed === files.length) {
+            if (autoMode) {
+              const selectedCount = successfulFamilies.length;
+              status.textContent = processed === files.length || !uncoveredChars.size
+                ? `Auto: ${selectedCount} font con · ${uncoveredChars.size} chữ dùng font mặc định`
+                : `Auto: đã kiểm tra ${processed}/${files.length} font · ${uncoveredChars.size} chữ chưa khớp`;
+            } else if (processed === files.length) {
               status.textContent = successfulFamilies.length === files.length
                 ? `Đã tải ${successfulFamilies.length} font`
                 : successfulFamilies.length
@@ -1813,6 +1990,7 @@
             }
           }
 
+          if (autoMode && !uncoveredChars.size) break;
           if (processed < files.length) {
             await new Promise((resolve) => setTimeout(resolve, 16));
           }
