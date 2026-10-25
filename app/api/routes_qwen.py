@@ -253,14 +253,17 @@ async def select_font(request: Request, user: dict = Depends(current_user)):
         if per_character:
             allowed_chars = set(han_chars)
             font_map = {}
-            for assignment in result_data.get("fonts", []):
+            assignments = result_data.get("fonts", [])
+            if not isinstance(assignments, list):
+                assignments = []
+            for assignment in assignments:
+                if not isinstance(assignment, dict):
+                    continue
                 char = assignment.get("char")
                 font_key = assignment.get("font_key")
                 if char in allowed_chars and font_key in allowed:
                     font_map[char] = font_key
             result_data = {**result_data, "font_map": font_map}
-            if not font_map:
-                raise ValueError("Qwen did not return any valid per-character font assignments")
             font_key = None
         else:
             font_key = result_data.get("font_key")

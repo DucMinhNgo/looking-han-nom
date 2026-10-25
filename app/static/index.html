@@ -659,6 +659,30 @@
       font-size: 0.7rem;
     }
 
+    .qwen-font-report {
+      grid-column: 1 / -1;
+      min-width: 0;
+      font-size: 0.7rem;
+    }
+
+    .qwen-font-report > summary {
+      width: fit-content;
+      cursor: pointer;
+      color: var(--series-1);
+    }
+
+    .qwen-font-report-body {
+      max-height: 10rem;
+      overflow: auto;
+      margin-top: 0.25rem;
+      padding: 0.45rem;
+      border-radius: 6px;
+      background: var(--plane);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      line-height: 1.45;
+    }
+
     .foot>span:not(.spacer),
     .foot>a,
     .foot>button {
@@ -2748,6 +2772,10 @@
         <div class="qwen-font-tools">
           <button type="button" data-qwen-font="${i}">Qwen chọn font</button>
           <span class="muted qwen-font-status" aria-live="polite"></span>
+          <details class="qwen-font-report">
+            <summary>Kiểu chữ và font đã tải</summary>
+            <div class="qwen-font-report-body"></div>
+          </details>
         </div>
       </div>
     </div>`;
@@ -2835,6 +2863,10 @@
                   assignments.set(char, entry.family);
                 }
               }
+              renderRecommendedFont(cardElement, item, assignments);
+              if (status) {
+                status.textContent = `Đang dò font ${entry.file.split("/").pop()} · ${assignments.size}/${chars.length} chữ`;
+              }
             }
           } finally {
             _currentDefaultStack = previousDefaultStack;
@@ -2856,33 +2888,49 @@
         const tokenUsage = recommendation.usage
           ? ` · ${recommendation.usage.input_tokens ?? "?"}+${recommendation.usage.output_tokens ?? "?"} tokens`
           : "";
-        const note = recommendation.reason ? ` — ${recommendation.reason}` : "";
         if (status) {
           const styleCounts = new Map();
+          const entriesByFamily = new Map(
+            state.fontKeys.flatMap(getFontEntriesForKey).map((entry) => [entry.family, entry]),
+          );
           for (const [char, family] of assignments) {
-            const key = getFontEntriesForKey(family.split("-").slice(0, -1).join("-"))
-              .find((entry) => entry.family === family);
-            const groupKey = key ? key.family.split("-").slice(0, -1).join("-") : "";
-            const label = groupKey || family;
-            styleCounts.set(label, (styleCounts.get(label) || 0) + 1);
+            const entry = entriesByFamily.get(family);
+            const groupKey = entry?.key || family;
+            styleCounts.set(groupKey, (styleCounts.get(groupKey) || 0) + 1);
           }
-          const styles = [...new Set([...assignments.values()])].map((family) => {
-            const entry = getSelectedFontEntries().find((font) => font.family === family)
-              || state.fontKeys.flatMap(getFontEntriesForKey).find((font) => font.family === family);
-            const label = entry?.key ? fontRegistry[entry.key]?.label || entry.key : family;
-            return `${label} (${[...assignments.values()].filter((value) => value === family).length})`;
-          });
+          const styles = [...styleCounts].map(([key, count]) =>
+            `${fontRegistry[key]?.label || key} (${count})`,
+          );
           const fontFiles = [...loadedFamilies].map((family) =>
-            state.fontKeys.flatMap(getFontEntriesForKey).find((entry) => entry.family === family)?.file.split("/").pop() || family,
+            entriesByFamily.get(family)?.file.split("/").pop() || family,
           );
           const missingChars = chars.filter((char) => !assignments.has(char));
-          status.textContent = `${styles.join(", ") || "Chưa có glyph"} · ${assignments.size}/${chars.length} chữ`;
-          status.title = [
-            `File font đã tải: ${fontFiles.join(", ") || "không có"}`,
-            `Chữ chưa tìm được font: ${missingChars.join("") || "không có"}`,
-            `Font lỗi: ${[...failedFiles].join(", ") || "không có"}`,
-            recommendation.reason || "",
-          ].filter(Boolean).join("\n");
+          status.textContent = `${styles.join(", ") || "Chưa có glyph"} · ${assignments.size}/${chars.length} chữ${tokenUsage}`;
+          const report = cardElement.querySelector(".qwen-font-report-body");
+          if (report) {
+            const lines = [
+              `Qwen đề xuất kiểu cho từng chữ: ${chars.map((char) =>
+                `${char} → ${fontRegistry[qwenFontMap[char]]?.label || qwenFontMap[char] || "chưa phân loại"}`,
+              ).join(" · ") || "không có chữ Hán-Nôm"}`,
+              `Font thực tế từng chữ: ${chars.map((char) => {
+                const family = assignments.get(char);
+                const file = family && entriesByFamily.get(family)?.file.split("/").pop();
+                return `${char} → ${file || "không tìm thấy glyph"}`;
+              }).join(" · ") || "không có chữ Hán-Nôm"}`,
+              `Font con đã tải: ${fontFiles.join(", ") || "không có"}`,
+              `Font con thực sự được dùng: ${[...new Set([...assignments.values()])].map((family) =>
+                entriesByFamily.get(family)?.file.split("/").pop() || family,
+              ).join(", ") || "không có"}`,
+              `Chữ chưa tìm được glyph trong font đã chọn: ${missingChars.join("") || "không có"}`,
+              `Font lỗi khi tải: ${[...failedFiles].join(", ") || "không có"}`,
+              recommendation.reason ? `Ghi chú Qwen: ${recommendation.reason}` : "",
+              recommendation.usage
+                ? `Token Qwen: ${recommendation.usage.input_tokens ?? "?"} input + ${recommendation.usage.output_tokens ?? "?"} output`
+                : "",
+            ].filter(Boolean);
+            report.textContent = lines.join("\n");
+            report.parentElement.open = true;
+          }
         }
       } catch (error) {
         if (status) status.textContent = error.message;
