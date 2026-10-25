@@ -176,12 +176,26 @@ async def select_font(request: Request, user: dict = Depends(current_user)):
     caption = (item.caption or "").strip()[:500]
     if not text:
         raise HTTPException(422, "Record has no ground-truth text")
+    per_character = body.get("per_character") is True
+    han_chars: list[str] = []
+    if per_character:
+        han_chars = list(dict.fromkeys(
+            char for char in text
+            if 0x2E80 <= ord(char) <= 0x9FFF
+            or 0xF900 <= ord(char) <= 0xFAFF
+            or 0x3400 <= ord(char) <= 0x4DBF
+            or 0x20000 <= ord(char) <= 0x3134F
+        ))
+        if not han_chars:
+            raise HTTPException(422, "Record has no Han characters to assign fonts")
+
     payload = json.dumps(
         {
             "model": settings.qwen_model,
             "text": text,
             "caption": caption,
             "candidates": candidates,
+            "per_character": per_character,
         },
         ensure_ascii=False,
         sort_keys=True,
@@ -199,14 +213,28 @@ async def select_font(request: Request, user: dict = Depends(current_user)):
     try:
         from openai import OpenAI
 
-        prompt = (
-            "Choose the best calligraphic font style for displaying the supplied "
-            "Han-Nom text. Use only one candidate key. Consider readability and "
-            "the style implied by the candidate label and font filenames. Do not "
-            "rewrite the text. Return JSON only with keys font_key, reason. "
-            f"Text: {text}\nCaption/context: {caption}\n"
-            f"Allowed font candidates: {json.dumps(candidates, ensure_ascii=False)}"
-        )
+        if per_character:
+            prompt = (
+                "For every Han character in the supplied text, choose one font "
+                "group that can display it in the desired calligraphic style. "
+                "Use only the supplied font keys. Keep the same style coherent "
+                "across the sentence where possible, but assign characters "
+                "individually so missing glyphs can fall back to another group. "
+                "Do not rewrite, omit, or add characters. Return JSON only as "
+                '{"fonts":[{"char":"漢","font_key":"thao"}],"reason":"..."}. '
+                f"Text: {text}\nCaption/context: {caption}\n"
+                f"Assign exactly these Han characters: {json.dumps(han_chars, ensure_ascii=False)}\n"
+                f"Allowed font candidates: {json.dumps(candidates, ensure_ascii=False)}"
+            )
+        else:
+            prompt = (
+                "Choose the best calligraphic font style for displaying the supplied "
+                "Han-Nom text. Use only one candidate key. Consider readability and "
+                "the style implied by the candidate label and font filenames. Do not "
+                "rewrite the text. Return JSON only with keys font_key, reason. "
+                f"Text: {text}\nCaption/context: {caption}\n"
+                f"Allowed font candidates: {json.dumps(candidates, ensure_ascii=False)}"
+            )
         client = OpenAI(api_key=settings.qwen_api_key, base_url=settings.qwen_base_url)
         response = client.chat.completions.create(
             model=settings.qwen_model,
@@ -221,22 +249,39 @@ async def select_font(request: Request, user: dict = Depends(current_user)):
             .removesuffix("```")
             .strip()
         )
-        font_key = result_data.get("font_key")
         allowed = {candidate["key"] for candidate in candidates}
-        if font_key not in allowed:
-            raise ValueError("Qwen returned a font outside the allowed candidates")
+        if per_character:
+            allowed_chars = set(han_chars)
+            font_map = {}
+            for assignment in result_data.get("fonts", []):
+                char = assignment.get("char")
+                font_key = assignment.get("font_key")
+                if char in allowed_chars and font_key in allowed:
+                    font_map[char] = font_key
+            result_data = {**result_data, "font_map": font_map}
+            if not font_map:
+                raise ValueError("Qwen did not return any valid per-character font assignments")
+            font_key = None
+        else:
+            font_key = result_data.get("font_key")
+            if font_key not in allowed:
+                raise ValueError("Qwen returned a font outside the allowed candidates")
+        usage = getattr(response, "usage", None)
         result = {
             "enabled": True,
             "font_key": font_key,
+            "characters": han_chars if per_character else [],
             "font_label": next(
-                candidate["label"] for candidate in candidates if candidate["key"] == font_key
+                (candidate["label"] for candidate in candidates if candidate["key"] == font_key),
+                "Nhiều font theo ký tự" if per_character else "",
             ),
+            "font_map": result_data.get("font_map", {}),
             "reason": str(result_data.get("reason", ""))[:240],
             "model": settings.qwen_model,
             "usage": {
-                "input_tokens": getattr(response.usage, "prompt_tokens", None),
-                "output_tokens": getattr(response.usage, "completion_tokens", None),
-            } if response.usage else None,
+                "input_tokens": getattr(usage, "prompt_tokens", None),
+                "output_tokens": getattr(usage, "completion_tokens", None),
+            } if usage else None,
         }
         _font_choice_cache[cache_key] = (time.monotonic() + 86400, result)
         if len(_font_choice_cache) > 256:

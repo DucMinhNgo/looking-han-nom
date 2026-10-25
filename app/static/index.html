@@ -638,6 +638,27 @@
       color: var(--muted);
     }
 
+    .qwen-font-tools {
+      display: grid;
+      grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+      align-items: start;
+      gap: 0.35rem 0.55rem;
+      min-width: 0;
+      margin-top: 0.25rem;
+    }
+
+    .qwen-font-tools button {
+      max-width: 100%;
+      white-space: normal;
+    }
+
+    .qwen-font-status {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      line-height: 1.4;
+      font-size: 0.7rem;
+    }
+
     .foot>span:not(.spacer),
     .foot>a,
     .foot>button {
@@ -1259,6 +1280,10 @@
 
     @media (max-width: 380px) {
       .lookup-filter-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .qwen-font-tools {
         grid-template-columns: minmax(0, 1fr);
       }
     }
@@ -2711,8 +2736,6 @@
           <span>#${item.index + 1}</span>
           ${groupTag}
           <span class="spacer"></span>
-          <button type="button" data-qwen-font="${i}">Qwen chọn font</button>
-          <span class="muted qwen-font-status" aria-live="polite"></span>
           ${item.post_url
           ? `<a class="postlink" href="${esc(item.post_url)}" target="_blank"
                   rel="noopener" title="${esc(item.post_url)}">Bài post ↗</a>`
@@ -2721,6 +2744,10 @@
           ? `<button class="primary" data-edit="${i}">Chỉnh ground truth</button>
                <button class="danger-user" data-delete="${i}">Xoá post</button>`
           : ""}
+        </div>
+        <div class="qwen-font-tools">
+          <button type="button" data-qwen-font="${i}">Qwen chọn font</button>
+          <span class="muted qwen-font-status" aria-live="polite"></span>
         </div>
       </div>
     </div>`;
@@ -2742,65 +2769,120 @@
       button.disabled = true;
       if (status) status.textContent = "Đang hỏi Qwen chọn kiểu…";
       try {
+        const allFontGroupsSelected = state.fontKeys.length === Object.keys(fontRegistry).length;
         const recommendation = await api("/api/qwen/select-font", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ index: item.index, font_keys: state.fontKeys }),
+          body: JSON.stringify({
+            index: item.index,
+            font_keys: state.fontKeys,
+            per_character: allFontGroupsSelected,
+          }),
         });
         if (!recommendation.enabled) {
           if (status) status.textContent = recommendation.message;
           return;
         }
 
-        const info = fontRegistry[recommendation.font_key];
-        if (!info) throw new Error("Qwen chọn kiểu font không có trong registry.");
-        const entries = getSelectedFontEntries().filter(
-          (entry) => entry.key === recommendation.font_key,
-        );
-        const fallback = info.fallback || CJK_FALLBACK;
-        const chars = [...new Set([...item.ground_truth].filter((char) => {
+        if (!allFontGroupsSelected && !fontRegistry[recommendation.font_key]) {
+          throw new Error("Qwen chọn kiểu font không có trong registry.");
+        }
+        const textChars = [...new Set([...item.ground_truth].filter((char) => {
           const cp = char.codePointAt(0);
           return (cp >= 0x2E80 && cp <= 0x9FFF)
             || (cp >= 0xF900 && cp <= 0xFAFF)
             || (cp >= 0x3400 && cp <= 0x4DBF)
             || (cp >= 0x20000 && cp <= 0x3134F);
         }))];
+        const chars = allFontGroupsSelected && recommendation.characters?.length
+          ? recommendation.characters : textChars;
         const assignments = new Map();
-        const unassigned = new Set(chars);
-        const previousDefaultStack = _currentDefaultStack;
-        await document.fonts.load(`48px ${fallback}`, chars.join(""));
-        _currentDefaultStack = fallback;
-        try {
-          for (const entry of entries) {
-            if (!unassigned.size) break;
-            const fontFace = registeredFontFaces.get(entry.family);
-            if (!fontFace) continue;
-            try {
-              await fontFace.load();
-            } catch {
-              discardFailedFontFace(entry.family, fontFace);
-              continue;
-            }
-            _glyphCache.clear();
-            for (const char of [...unassigned]) {
-              if (_hasVisibleGlyph(`"${entry.family}", ${fallback}`, char)) {
-                assignments.set(char, entry.family);
-                unassigned.delete(char);
+        const qwenFontMap = recommendation.font_map || Object.fromEntries(
+          chars.map((char) => [char, recommendation.font_key]),
+        );
+        const preferredGroups = [...new Set(chars.map((char) => qwenFontMap[char])
+          .filter((key) => state.fontKeys.includes(key)))];
+        const scanGroups = [...new Set([...preferredGroups, ...state.fontKeys])];
+        const loadedFamilies = new Set();
+        const failedFiles = new Set();
+        const resolveCharacters = async (groupKey, candidates) => {
+          const info = fontRegistry[groupKey];
+          if (!info || !candidates.size) return;
+          const fallback = info.fallback || CJK_FALLBACK;
+          await document.fonts.load(`48px ${fallback}`, [...candidates].join(""));
+          const previousDefaultStack = _currentDefaultStack;
+          _currentDefaultStack = fallback;
+          try {
+            for (const entry of getFontEntriesForKey(groupKey)) {
+              const unresolved = [...candidates].filter((char) => !assignments.has(char));
+              if (!unresolved.length) break;
+              const fontFace = registeredFontFaces.get(entry.family);
+              if (!fontFace) {
+                failedFiles.add(entry.file);
+                continue;
+              }
+              try {
+                await fontFace.load();
+              } catch {
+                discardFailedFontFace(entry.family, fontFace);
+                failedFiles.add(entry.file);
+                continue;
+              }
+              loadedFamilies.add(entry.family);
+              _glyphCache.clear();
+              for (const char of unresolved) {
+                if (_hasVisibleGlyph(`"${entry.family}", ${fallback}`, char)) {
+                  assignments.set(char, entry.family);
+                }
               }
             }
+          } finally {
+            _currentDefaultStack = previousDefaultStack;
+            _glyphCache.clear();
           }
-        } finally {
-          _currentDefaultStack = previousDefaultStack;
-          _glyphCache.clear();
+        };
+
+        for (const groupKey of preferredGroups) {
+          const preferredChars = new Set(chars.filter((char) => qwenFontMap[char] === groupKey));
+          await resolveCharacters(groupKey, preferredChars);
+        }
+        for (const groupKey of scanGroups) {
+          const stillUnresolved = new Set(chars.filter((char) => !assignments.has(char)));
+          if (!stillUnresolved.size) break;
+          await resolveCharacters(groupKey, stillUnresolved);
         }
 
-        renderRecommendedFont(cardElement, item, assignments, fallback);
+        renderRecommendedFont(cardElement, item, assignments);
         const tokenUsage = recommendation.usage
           ? ` · ${recommendation.usage.input_tokens ?? "?"}+${recommendation.usage.output_tokens ?? "?"} tokens`
           : "";
         const note = recommendation.reason ? ` — ${recommendation.reason}` : "";
         if (status) {
-          status.textContent = `Font ${recommendation.font_label}: ${assignments.size}/${chars.length} chữ có glyph${tokenUsage}${note}`;
+          const styleCounts = new Map();
+          for (const [char, family] of assignments) {
+            const key = getFontEntriesForKey(family.split("-").slice(0, -1).join("-"))
+              .find((entry) => entry.family === family);
+            const groupKey = key ? key.family.split("-").slice(0, -1).join("-") : "";
+            const label = groupKey || family;
+            styleCounts.set(label, (styleCounts.get(label) || 0) + 1);
+          }
+          const styles = [...new Set([...assignments.values()])].map((family) => {
+            const entry = getSelectedFontEntries().find((font) => font.family === family)
+              || state.fontKeys.flatMap(getFontEntriesForKey).find((font) => font.family === family);
+            const label = entry?.key ? fontRegistry[entry.key]?.label || entry.key : family;
+            return `${label} (${[...assignments.values()].filter((value) => value === family).length})`;
+          });
+          const fontFiles = [...loadedFamilies].map((family) =>
+            state.fontKeys.flatMap(getFontEntriesForKey).find((entry) => entry.family === family)?.file.split("/").pop() || family,
+          );
+          const missingChars = chars.filter((char) => !assignments.has(char));
+          status.textContent = `${styles.join(", ") || "Chưa có glyph"} · ${assignments.size}/${chars.length} chữ`;
+          status.title = [
+            `File font đã tải: ${fontFiles.join(", ") || "không có"}`,
+            `Chữ chưa tìm được font: ${missingChars.join("") || "không có"}`,
+            `Font lỗi: ${[...failedFiles].join(", ") || "không có"}`,
+            recommendation.reason || "",
+          ].filter(Boolean).join("\n");
         }
       } catch (error) {
         if (status) status.textContent = error.message;
@@ -2809,7 +2891,15 @@
       }
     }
 
-    function renderRecommendedFont(cardElement, item, assignments, fallback) {
+    function getFontEntriesForKey(key) {
+      const info = fontRegistry[key];
+      if (!info) return [];
+      const files = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
+      const families = registerFontFaces(info);
+      return files.map((file, index) => ({ file, family: families[index] }));
+    }
+
+    function renderRecommendedFont(cardElement, item, assignments) {
       const groundTruth = cardElement?.querySelector(".gt");
       if (!groundTruth) return;
       groundTruth.innerHTML = highlight(item.ground_truth, state.query);
@@ -2826,7 +2916,7 @@
             continue;
           }
           const span = document.createElement("span");
-          span.style.fontFamily = `"${family}", ${fallback}`;
+          span.style.fontFamily = `"${family}", var(--han-font-family)`;
           span.textContent = char;
           fragment.appendChild(span);
         }

@@ -181,6 +181,87 @@ class TestImages:
         assert client.get(f"/img/{name}").status_code in (404, 400)
 
 
+class TestQwenFontSelection:
+    def test_font_selection_requires_configured_qwen(self, client):
+        login(client)
+
+        response = client.post(
+            "/api/qwen/select-font",
+            json={"index": 0, "font_keys": ["thao"]},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["enabled"] is False
+
+    def test_qwen_selects_only_from_requested_font_groups(self, client, monkeypatch):
+        from types import SimpleNamespace
+        import openai
+        from app.api import routes_qwen
+
+        login(client)
+        client.app.state.settings.qwen_api_key = "test-key"
+        routes_qwen._font_choice_cache.clear()
+        calls = {}
+
+        class FakeOpenAI:
+            def __init__(self, **kwargs):
+                self.chat = SimpleNamespace(
+                    completions=SimpleNamespace(create=self.create_completion),
+                )
+
+            def create_completion(self, **kwargs):
+                calls.update(kwargs)
+                return SimpleNamespace(
+                    choices=[SimpleNamespace(message=SimpleNamespace(
+                        content='{"font_key":"thao","reason":"Thảo style"}',
+                    ))],
+                    usage=SimpleNamespace(prompt_tokens=120, completion_tokens=18),
+                )
+
+        monkeypatch.setattr(openai, "OpenAI", FakeOpenAI)
+        response = client.post(
+            "/api/qwen/select-font",
+            json={"index": 0, "font_keys": ["thao"]},
+        )
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["font_key"] == "thao"
+        assert body["usage"] == {"input_tokens": 120, "output_tokens": 18}
+        assert calls["model"] == client.app.state.settings.qwen_model
+
+    def test_all_font_groups_return_per_character_assignments(self, client, monkeypatch):
+        from types import SimpleNamespace
+        import openai
+
+        login(client)
+        client.app.state.settings.qwen_api_key = "test-key"
+
+        class FakeOpenAI:
+            def __init__(self, **kwargs):
+                self.chat = SimpleNamespace(
+                    completions=SimpleNamespace(create=self.create_completion),
+                )
+
+            def create_completion(self, **kwargs):
+                return SimpleNamespace(
+                    choices=[SimpleNamespace(message=SimpleNamespace(
+                        content='{"fonts":[{"char":"花","font_key":"thao"},{"char":"開","font_key":"trien"}],"reason":"best coverage"}',
+                    ))],
+                    usage=None,
+                )
+
+        monkeypatch.setattr(openai, "OpenAI", FakeOpenAI)
+        response = client.post(
+            "/api/qwen/select-font",
+            json={"index": 0, "font_keys": ["thao", "trien"], "per_character": True},
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["font_map"] == {"花": "thao", "開": "trien"}
+
+
+
 class TestStats:
     def test_dataset_counts(self, client):
         login(client)
