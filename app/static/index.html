@@ -659,28 +659,17 @@
       font-size: 0.7rem;
     }
 
-    .qwen-font-report {
-      grid-column: 1 / -1;
+    .qwen-font-type-tag {
       min-width: 0;
-      font-size: 0.7rem;
-    }
-
-    .qwen-font-report > summary {
-      width: fit-content;
-      cursor: pointer;
-      color: var(--series-1);
-    }
-
-    .qwen-font-report-body {
-      max-height: 10rem;
-      overflow: auto;
-      margin-top: 0.25rem;
-      padding: 0.45rem;
-      border-radius: 6px;
+      max-width: 100%;
+      padding: 0.2rem 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
       background: var(--plane);
-      white-space: pre-wrap;
+      color: var(--ink-2);
+      font-size: 0.68rem;
+      line-height: 1.35;
       overflow-wrap: anywhere;
-      line-height: 1.45;
     }
 
     .foot>span:not(.spacer),
@@ -2770,12 +2759,9 @@
           : ""}
         </div>
         <div class="qwen-font-tools">
-          <button type="button" data-qwen-font="${i}">Qwen chọn font</button>
+          <button type="button" data-qwen-font="${i}">Apply font</button>
           <span class="muted qwen-font-status" aria-live="polite"></span>
-          <details class="qwen-font-report">
-            <summary>Kiểu chữ và font đã tải</summary>
-            <div class="qwen-font-report-body"></div>
-          </details>
+          <span class="qwen-font-type-tag" hidden></span>
         </div>
       </div>
     </div>`;
@@ -2785,17 +2771,27 @@
       const item = state.items[index];
       const cardElement = button.closest(".item");
       const status = cardElement?.querySelector(".qwen-font-status");
+      const typeTag = cardElement?.querySelector(".qwen-font-type-tag");
+      if (status) {
+        status.textContent = "";
+        status.hidden = true;
+      }
       if (!item?.ground_truth?.trim()) {
-        if (status) status.textContent = "Record chưa có ground truth.";
+        if (status) {
+          status.textContent = "Không thể áp dụng font: record chưa có ground truth.";
+          status.hidden = false;
+        }
         return;
       }
       if (!state.fontKeys.length) {
-        if (status) status.textContent = "Chọn ít nhất một font chính.";
+        if (status) {
+          status.textContent = "Không thể áp dụng font: hãy chọn font chính trước.";
+          status.hidden = false;
+        }
         return;
       }
 
       button.disabled = true;
-      if (status) status.textContent = "Đang hỏi Qwen chọn kiểu…";
       try {
         const allFontGroupsSelected = state.fontKeys.length === Object.keys(fontRegistry).length;
         const recommendation = await api("/api/qwen/select-font", {
@@ -2808,7 +2804,10 @@
           }),
         });
         if (!recommendation.enabled) {
-          if (status) status.textContent = recommendation.message;
+          if (status) {
+            status.textContent = recommendation.message;
+            status.hidden = false;
+          }
           return;
         }
 
@@ -2831,7 +2830,6 @@
         const preferredGroups = [...new Set(chars.map((char) => qwenFontMap[char])
           .filter((key) => state.fontKeys.includes(key)))];
         const scanGroups = [...new Set([...preferredGroups, ...state.fontKeys])];
-        const loadedFamilies = new Set();
         const failedFiles = new Set();
         const resolveCharacters = async (groupKey, candidates) => {
           const info = fontRegistry[groupKey];
@@ -2856,7 +2854,6 @@
                 failedFiles.add(entry.file);
                 continue;
               }
-              loadedFamilies.add(entry.family);
               _glyphCache.clear();
               for (const char of unresolved) {
                 if (_hasVisibleGlyph(`"${entry.family}", ${fallback}`, char)) {
@@ -2864,9 +2861,6 @@
                 }
               }
               renderRecommendedFont(cardElement, item, assignments);
-              if (status) {
-                status.textContent = `Đang dò font ${entry.file.split("/").pop()} · ${assignments.size}/${chars.length} chữ`;
-              }
             }
           } finally {
             _currentDefaultStack = previousDefaultStack;
@@ -2885,55 +2879,26 @@
         }
 
         renderRecommendedFont(cardElement, item, assignments);
-        const tokenUsage = recommendation.usage
-          ? ` · ${recommendation.usage.input_tokens ?? "?"}+${recommendation.usage.output_tokens ?? "?"} tokens`
-          : "";
-        if (status) {
-          const styleCounts = new Map();
-          const entriesByFamily = new Map(
-            state.fontKeys.flatMap(getFontEntriesForKey).map((entry) => [entry.family, entry]),
-          );
-          for (const [char, family] of assignments) {
-            const entry = entriesByFamily.get(family);
-            const groupKey = entry?.key || family;
-            styleCounts.set(groupKey, (styleCounts.get(groupKey) || 0) + 1);
-          }
-          const styles = [...styleCounts].map(([key, count]) =>
-            `${fontRegistry[key]?.label || key} (${count})`,
-          );
-          const fontFiles = [...loadedFamilies].map((family) =>
-            entriesByFamily.get(family)?.file.split("/").pop() || family,
-          );
-          const missingChars = chars.filter((char) => !assignments.has(char));
-          status.textContent = `${styles.join(", ") || "Chưa có glyph"} · ${assignments.size}/${chars.length} chữ${tokenUsage}`;
-          const report = cardElement.querySelector(".qwen-font-report-body");
-          if (report) {
-            const lines = [
-              `Qwen đề xuất kiểu cho từng chữ: ${chars.map((char) =>
-                `${char} → ${fontRegistry[qwenFontMap[char]]?.label || qwenFontMap[char] || "chưa phân loại"}`,
-              ).join(" · ") || "không có chữ Hán-Nôm"}`,
-              `Font thực tế từng chữ: ${chars.map((char) => {
-                const family = assignments.get(char);
-                const file = family && entriesByFamily.get(family)?.file.split("/").pop();
-                return `${char} → ${file || "không tìm thấy glyph"}`;
-              }).join(" · ") || "không có chữ Hán-Nôm"}`,
-              `Font con đã tải: ${fontFiles.join(", ") || "không có"}`,
-              `Font con thực sự được dùng: ${[...new Set([...assignments.values()])].map((family) =>
-                entriesByFamily.get(family)?.file.split("/").pop() || family,
-              ).join(", ") || "không có"}`,
-              `Chữ chưa tìm được glyph trong font đã chọn: ${missingChars.join("") || "không có"}`,
-              `Font lỗi khi tải: ${[...failedFiles].join(", ") || "không có"}`,
-              recommendation.reason ? `Ghi chú Qwen: ${recommendation.reason}` : "",
-              recommendation.usage
-                ? `Token Qwen: ${recommendation.usage.input_tokens ?? "?"} input + ${recommendation.usage.output_tokens ?? "?"} output`
-                : "",
-            ].filter(Boolean);
-            report.textContent = lines.join("\n");
-            report.parentElement.open = true;
-          }
+        const usedGroups = [...new Set([...assignments.values()].map((family) =>
+          state.fontKeys.flatMap(getFontEntriesForKey)
+            .find((entry) => entry.family === family)?.key,
+        ).filter(Boolean))];
+        const labels = usedGroups.map((key) => fontRegistry[key]?.label || key);
+        if (typeTag) {
+          typeTag.textContent = `Đang hiển thị: ${labels.join(", ") || recommendation.font_label || "font dự phòng"}`;
+          typeTag.hidden = false;
+          typeTag.title = `${assignments.size}/${chars.length} chữ được gán font`;
+        }
+        if (failedFiles.size && status) {
+          status.textContent = `Không tải được ${failedFiles.size} font con; chữ tương ứng giữ font dự phòng.`;
+          status.hidden = false;
+          status.title = [...failedFiles].join("\n");
         }
       } catch (error) {
-        if (status) status.textContent = error.message;
+        if (status) {
+          status.textContent = error.message;
+          status.hidden = false;
+        }
       } finally {
         button.disabled = false;
       }
