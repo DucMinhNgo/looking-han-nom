@@ -172,6 +172,25 @@ async def select_font(request: Request, user: dict = Depends(current_user)):
     if not candidates:
         raise HTTPException(422, "No valid font choices were provided")
 
+    preferred_font_file = body.get("preferred_font_file")
+    selected_font_files = {
+        font
+        for key in {candidate["key"] for candidate in candidates}
+        for font in registry[key].get("files", [])
+        if isinstance(font, str)
+    }
+    if preferred_font_file is not None and (
+        not isinstance(preferred_font_file, str)
+        or preferred_font_file not in selected_font_files
+    ):
+        raise HTTPException(422, "preferred_font_file must be listed in the selected font groups")
+    if preferred_font_file:
+        for candidate in candidates:
+            if preferred_font_file in registry[candidate["key"]].get("files", []):
+                filename = Path(preferred_font_file).stem
+                if filename not in candidate["fonts"]:
+                    candidate["fonts"].insert(0, filename)
+
     text = (item.ground_truth or "").strip()[:1000]
     caption = (item.caption or "").strip()[:500]
     if not text:
@@ -227,6 +246,7 @@ async def select_font(request: Request, user: dict = Depends(current_user)):
             "characters": han_chars if per_character else [],
             "image": image_cache_identity,
             "preferred_font_key": preferred_font_key,
+            "preferred_font_file": preferred_font_file,
         },
         ensure_ascii=False,
         sort_keys=True,
@@ -259,8 +279,9 @@ async def select_font(request: Request, user: dict = Depends(current_user)):
                 "requested Han character, choose the most suitable "
                 "font group that is likely to contain a visible Unicode glyph. "
                 "Use only supplied font keys and consider each group's font filenames. "
-                f"Strongly prefer {preferred_font_key!r} for the original style; choose "
-                "another group only if the preferred font lacks a visible glyph. "
+                f"Strongly prefer {preferred_font_key!r} for the original style. "
+                f"Prefer font file {preferred_font_file!r} when provided. "
+                "Use another group only when the preferred group lacks a visible glyph. "
                 "If no preferred group was specified, choose the closest match to the image. "
                 "Choose another "
                 "group for a character if needed to avoid a missing glyph. "
@@ -276,6 +297,7 @@ async def select_font(request: Request, user: dict = Depends(current_user)):
                 "the closest of the available calligraphic font groups to the writing "
                 "in the image, and choose exactly one group. Consider stroke shape, "
                 "brush character, layout, and readability. Do not rewrite the text. "
+                f"Prefer font file {preferred_font_file!r} if one is specified. "
                 "Return JSON only with keys font_key, reason. "
                 f"Text: {text}\nCaption/context: {caption}\n"
                 f"Allowed font candidates: {json.dumps(candidates, ensure_ascii=False)}"

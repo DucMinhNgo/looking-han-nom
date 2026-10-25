@@ -2862,7 +2862,10 @@
       try {
         await showLoading("Đang chuẩn bị ảnh và gửi yêu cầu Qwen…");
         let chosenFontKey = fontChoice;
-        if (fontChoice === "auto") {
+        const fontFileGroup = fontFileChoice === "auto" ? "" : candidateKeys.find(
+          (key) => (fontRegistry[key]?.files || []).includes(fontFileChoice),
+        );
+        if (fontChoice === "auto" && !fontFileGroup) {
           await showLoading("Qwen đang nhận diện kiểu chữ từ ảnh…");
           const recommendation = await api("/api/qwen/select-font", {
             method: "POST",
@@ -2881,6 +2884,8 @@
             return;
           }
           chosenFontKey = recommendation.font_key;
+        } else if (fontChoice === "auto" && fontFileGroup) {
+          chosenFontKey = fontFileGroup;
         }
 
         if (!candidateKeys.includes(chosenFontKey)) {
@@ -2969,14 +2974,16 @@
           }
         };
 
-        const qwenGroups = [...new Set(chars.map((char) => qwenFontMap[char])
-          .filter((key) => candidateKeys.includes(key)))];
+        await resolveCharacters(chosenFontKey, new Set(chars));
+        let missingChars = chars.filter((char) => !assignments.has(char));
+        const qwenGroups = [...new Set(missingChars.map((char) => qwenFontMap[char])
+          .filter((key) => candidateKeys.includes(key) && key !== chosenFontKey))];
         for (const groupKey of qwenGroups) {
-          const mappedChars = new Set(chars.filter((char) => qwenFontMap[char] === groupKey));
+          const mappedChars = new Set(missingChars.filter((char) => qwenFontMap[char] === groupKey));
           await resolveCharacters(groupKey, mappedChars);
         }
         for (const groupKey of scanGroups) {
-          const missingChars = chars.filter((char) => !assignments.has(char));
+          missingChars = chars.filter((char) => !assignments.has(char));
           if (!missingChars.length) break;
           await resolveCharacters(groupKey, new Set(missingChars));
         }
@@ -3018,16 +3025,22 @@
       if (!groupSelect || !fileSelect) return;
       const selectedGroup = groupSelect.value;
       const previousFile = fileSelect.value;
-      const files = selectedGroup === "auto"
-        ? []
-        : fontRegistry[selectedGroup]?.files || [];
-      fileSelect.innerHTML = `<option value="auto">${selectedGroup === "auto"
-        ? "Tự động chọn font con"
-        : "Tự động chọn font con"}</option>${files.map((file) =>
-        `<option value="${esc(file)}">${esc(file.split("/").pop().replace(/\.(ttf|otf|woff2?)$/i, ""))}</option>`
-      ).join("")}`;
-      fileSelect.value = files.includes(previousFile) ? previousFile : "auto";
-      fileSelect.disabled = selectedGroup === "auto" || files.length === 0;
+      const groups = selectedGroup === "auto"
+        ? Object.entries(fontRegistry)
+        : [[selectedGroup, fontRegistry[selectedGroup]]];
+      const options = groups.map(([key, info]) => {
+        const files = Array.isArray(info?.files) ? info.files : [];
+        if (!files.length) return "";
+        return `<optgroup label="${esc(info.label || key)}">${files.map((file) =>
+          `<option value="${esc(file)}">${esc(file.split("/").pop().replace(/\.(ttf|otf|woff2?)$/i, ""))}</option>`
+        ).join("")}</optgroup>`;
+      }).join("");
+      fileSelect.innerHTML = `<option value="auto">Tự động chọn font con</option>${options}`;
+      fileSelect.value = previousFile !== "auto"
+        && [...fileSelect.options].some((option) => option.value === previousFile)
+        ? previousFile
+        : "auto";
+      fileSelect.disabled = !options;
     }
 
     function renderRecommendedFont(cardElement, item, assignments) {
