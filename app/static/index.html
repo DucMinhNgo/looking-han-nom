@@ -2783,9 +2783,12 @@
         }
         return;
       }
-      if (!state.fontKeys.length) {
+      const candidateKeys = Object.keys(fontRegistry).filter((key) =>
+        Array.isArray(fontRegistry[key]?.files) && fontRegistry[key].files.length,
+      );
+      if (!candidateKeys.length) {
         if (status) {
-          status.textContent = "Không thể áp dụng font: hãy chọn font chính trước.";
+          status.textContent = "Không thể áp dụng font: chưa tải được danh sách 5 kiểu chữ.";
           status.hidden = false;
         }
         return;
@@ -2793,14 +2796,13 @@
 
       button.disabled = true;
       try {
-        const allFontGroupsSelected = state.fontKeys.length === Object.keys(fontRegistry).length;
         const recommendation = await api("/api/qwen/select-font", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             index: item.index,
-            font_keys: state.fontKeys,
-            per_character: allFontGroupsSelected,
+            font_keys: candidateKeys,
+            per_character: false,
           }),
         });
         if (!recommendation.enabled) {
@@ -2811,7 +2813,7 @@
           return;
         }
 
-        if (!allFontGroupsSelected && !fontRegistry[recommendation.font_key]) {
+        if (!fontRegistry[recommendation.font_key]) {
           throw new Error("Qwen chọn kiểu font không có trong registry.");
         }
         const textChars = [...new Set([...item.ground_truth].filter((char) => {
@@ -2821,15 +2823,10 @@
             || (cp >= 0x3400 && cp <= 0x4DBF)
             || (cp >= 0x20000 && cp <= 0x3134F);
         }))];
-        const chars = allFontGroupsSelected && recommendation.characters?.length
-          ? recommendation.characters : textChars;
+        const chars = textChars;
         const assignments = new Map();
-        const qwenFontMap = recommendation.font_map || Object.fromEntries(
-          chars.map((char) => [char, recommendation.font_key]),
-        );
-        const preferredGroups = [...new Set(chars.map((char) => qwenFontMap[char])
-          .filter((key) => state.fontKeys.includes(key)))];
-        const scanGroups = [...new Set([...preferredGroups, ...state.fontKeys])];
+        const preferredGroups = [recommendation.font_key];
+        const scanGroups = [...new Set([...preferredGroups, ...candidateKeys])];
         const failedFiles = new Set();
         const resolveCharacters = async (groupKey, candidates) => {
           const info = fontRegistry[groupKey];
@@ -2869,8 +2866,7 @@
         };
 
         for (const groupKey of preferredGroups) {
-          const preferredChars = new Set(chars.filter((char) => qwenFontMap[char] === groupKey));
-          await resolveCharacters(groupKey, preferredChars);
+          await resolveCharacters(groupKey, new Set(chars));
         }
         for (const groupKey of scanGroups) {
           const stillUnresolved = new Set(chars.filter((char) => !assignments.has(char)));
@@ -2879,13 +2875,9 @@
         }
 
         renderRecommendedFont(cardElement, item, assignments);
-        const usedGroups = [...new Set([...assignments.values()].map((family) =>
-          state.fontKeys.flatMap(getFontEntriesForKey)
-            .find((entry) => entry.family === family)?.key,
-        ).filter(Boolean))];
-        const labels = usedGroups.map((key) => fontRegistry[key]?.label || key);
+        const chosenStyle = fontRegistry[recommendation.font_key]?.label || recommendation.font_key;
         if (typeTag) {
-          typeTag.textContent = `Đang hiển thị: ${labels.join(", ") || recommendation.font_label || "font dự phòng"}`;
+          typeTag.textContent = `Kiểu chữ: ${chosenStyle}`;
           typeTag.hidden = false;
           typeTag.title = `${assignments.size}/${chars.length} chữ được gán font`;
         }
