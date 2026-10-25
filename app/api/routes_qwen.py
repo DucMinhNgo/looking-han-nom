@@ -268,7 +268,10 @@ async def select_font(request: Request, user: dict = Depends(current_user)):
                 f"Text: {text}\nCaption/context: {caption}\n"
                 f"Allowed font candidates: {json.dumps(candidates, ensure_ascii=False)}"
             )
-        message_content = [{"type": "text", "text": prompt}, *image_content]
+        message_content = (
+            [{"type": "text", "text": prompt}, *image_content]
+            if image_content else prompt
+        )
         client = OpenAI(api_key=settings.qwen_api_key, base_url=settings.qwen_base_url)
         response = client.chat.completions.create(
             model=settings.qwen_model,

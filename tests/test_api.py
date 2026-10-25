@@ -230,6 +230,42 @@ class TestQwenFontSelection:
         assert body["usage"] == {"input_tokens": 120, "output_tokens": 18}
         assert calls["model"] == client.app.state.settings.qwen_model
 
+    def test_font_selection_can_compare_record_image(self, client, monkeypatch):
+        from types import SimpleNamespace
+        import openai
+        from app.api import routes_qwen
+
+        login(client)
+        client.app.state.settings.qwen_api_key = "test-key"
+        routes_qwen._font_choice_cache.clear()
+        calls = {}
+
+        class FakeOpenAI:
+            def __init__(self, **kwargs):
+                self.chat = SimpleNamespace(
+                    completions=SimpleNamespace(create=self.create_completion),
+                )
+
+            def create_completion(self, **kwargs):
+                calls.update(kwargs)
+                return SimpleNamespace(
+                    choices=[SimpleNamespace(message=SimpleNamespace(
+                        content='{"font_key":"thao","reason":"matches image"}',
+                    ))],
+                    usage=None,
+                )
+
+        monkeypatch.setattr(openai, "OpenAI", FakeOpenAI)
+        response = client.post(
+            "/api/qwen/select-font",
+            json={"index": 0, "font_keys": ["thao"], "include_image": True},
+        )
+
+        assert response.status_code == 200, response.text
+        content = calls["messages"][0]["content"]
+        assert any(part["type"] == "image_url" for part in content)
+        assert "attached image" in content[0]["text"]
+
     def test_all_font_groups_return_per_character_assignments(self, client, monkeypatch):
         from types import SimpleNamespace
         import openai

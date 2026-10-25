@@ -2926,6 +2926,16 @@
     function renderRecommendedFont(cardElement, item, assignments) {
       const groundTruth = cardElement?.querySelector(".gt");
       if (!groundTruth) return;
+      const glyphHeights = new Map();
+      for (const [char, family] of assignments) {
+        const height = measureGlyphHeight(`"${family}"`, char);
+        if (height > 0) glyphHeights.set(char, height);
+      }
+      const sortedHeights = [...glyphHeights.values()].sort((left, right) => left - right);
+      const targetHeight = sortedHeights.length
+        ? sortedHeights[Math.floor(sortedHeights.length / 2)]
+        : 0;
+      const baseFontSize = Number.parseFloat(getComputedStyle(groundTruth).fontSize) || 16;
       groundTruth.innerHTML = highlight(item.ground_truth, state.query);
       const walker = document.createTreeWalker(groundTruth, NodeFilter.SHOW_TEXT);
       const textNodes = [];
@@ -2940,12 +2950,33 @@
             continue;
           }
           const span = document.createElement("span");
+          span.className = "han-font-glyph";
           span.style.fontFamily = `"${family}", var(--han-font-family)`;
+          const glyphHeight = glyphHeights.get(char);
+          if (glyphHeight && targetHeight) {
+            span.style.fontSize = `${baseFontSize * targetHeight / glyphHeight}px`;
+          }
           span.textContent = char;
           fragment.appendChild(span);
         }
         textNode.replaceWith(fragment);
       }
+    }
+
+    function measureGlyphHeight(fontStack, char) {
+      const ctx = _getGlyphCtx();
+      const pixels = renderGlyphPixels(ctx, fontStack, char);
+      let top = _glyphCanvas.height;
+      let bottom = -1;
+      for (let y = 0; y < _glyphCanvas.height; y += 1) {
+        for (let x = 0; x < _glyphCanvas.width; x += 1) {
+          if (pixels[(y * _glyphCanvas.width + x) * 4 + 3] > 10) {
+            top = Math.min(top, y);
+            bottom = Math.max(bottom, y);
+          }
+        }
+      }
+      return bottom >= top ? bottom - top + 1 : 0;
     }
 
     function renderHanSimilarity(caption, groundTruth) {
