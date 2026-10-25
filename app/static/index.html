@@ -652,13 +652,6 @@
       white-space: normal;
     }
 
-    .qwen-font-status {
-      min-width: 0;
-      overflow-wrap: anywhere;
-      line-height: 1.4;
-      font-size: 0.7rem;
-    }
-
     .qwen-font-type-tag {
       min-width: 0;
       max-width: 100%;
@@ -2760,8 +2753,7 @@
         </div>
         <div class="qwen-font-tools">
           <button type="button" data-qwen-font="${i}">Apply font</button>
-          <span class="muted qwen-font-status" aria-live="polite"></span>
-          <span class="qwen-font-type-tag" hidden></span>
+          <span class="qwen-font-type-tag" role="status" aria-live="polite" hidden></span>
         </div>
       </div>
     </div>`;
@@ -2770,27 +2762,23 @@
     async function recommendFontForRecord(index, button) {
       const item = state.items[index];
       const cardElement = button.closest(".item");
-      const status = cardElement?.querySelector(".qwen-font-status");
       const typeTag = cardElement?.querySelector(".qwen-font-type-tag");
-      if (status) {
-        status.textContent = "";
-        status.hidden = true;
-      }
+      const showResult = (message, title = "") => {
+        if (!typeTag) return;
+        typeTag.textContent = message;
+        typeTag.title = title;
+        typeTag.hidden = false;
+      };
+      if (typeTag) typeTag.hidden = true;
       if (!item?.ground_truth?.trim()) {
-        if (status) {
-          status.textContent = "Không thể áp dụng font: record chưa có ground truth.";
-          status.hidden = false;
-        }
+        showResult("Không thể áp dụng font: record chưa có ground truth.");
         return;
       }
       const candidateKeys = Object.keys(fontRegistry).filter((key) =>
         Array.isArray(fontRegistry[key]?.files) && fontRegistry[key].files.length,
       );
       if (!candidateKeys.length) {
-        if (status) {
-          status.textContent = "Không thể áp dụng font: chưa tải được danh sách 5 kiểu chữ.";
-          status.hidden = false;
-        }
+        showResult("Không thể áp dụng font: chưa tải được danh sách 5 kiểu chữ.");
         return;
       }
 
@@ -2806,10 +2794,7 @@
           }),
         });
         if (!recommendation.enabled) {
-          if (status) {
-            status.textContent = recommendation.message;
-            status.hidden = false;
-          }
+          showResult(recommendation.message || "Qwen chưa được cấu hình.");
           return;
         }
 
@@ -2825,6 +2810,7 @@
         }))];
         const chars = textChars;
         const assignments = new Map();
+        const groupByFamily = new Map();
         const preferredGroups = [recommendation.font_key];
         const scanGroups = [...new Set([...preferredGroups, ...candidateKeys])];
         const failedFiles = new Set();
@@ -2837,6 +2823,7 @@
           _currentDefaultStack = fallback;
           try {
             for (const entry of getFontEntriesForKey(groupKey)) {
+              groupByFamily.set(entry.family, groupKey);
               const unresolved = [...candidates].filter((char) => !assignments.has(char));
               if (!unresolved.length) break;
               const fontFace = registeredFontFaces.get(entry.family);
@@ -2868,29 +2855,48 @@
         for (const groupKey of preferredGroups) {
           await resolveCharacters(groupKey, new Set(chars));
         }
-        for (const groupKey of scanGroups) {
-          const stillUnresolved = new Set(chars.filter((char) => !assignments.has(char)));
-          if (!stillUnresolved.size) break;
-          await resolveCharacters(groupKey, stillUnresolved);
+
+        let missingChars = chars.filter((char) => !assignments.has(char));
+        if (missingChars.length) {
+          const repair = await api("/api/qwen/select-font", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              index: item.index,
+              font_keys: candidateKeys,
+              per_character: true,
+              characters: missingChars,
+            }),
+          });
+          if (repair.enabled && repair.font_map) {
+            const repairGroups = [...new Set(missingChars.map((char) => repair.font_map[char])
+              .filter((key) => candidateKeys.includes(key)))];
+            for (const groupKey of repairGroups) {
+              const preferredChars = new Set(missingChars.filter(
+                (char) => repair.font_map[char] === groupKey,
+              ));
+              await resolveCharacters(groupKey, preferredChars);
+            }
+          }
+          for (const groupKey of scanGroups) {
+            missingChars = chars.filter((char) => !assignments.has(char));
+            if (!missingChars.length) break;
+            await resolveCharacters(groupKey, new Set(missingChars));
+          }
         }
 
         renderRecommendedFont(cardElement, item, assignments);
         const chosenStyle = fontRegistry[recommendation.font_key]?.label || recommendation.font_key;
-        if (typeTag) {
-          typeTag.textContent = `Kiểu chữ: ${chosenStyle}`;
-          typeTag.hidden = false;
-          typeTag.title = `${assignments.size}/${chars.length} chữ được gán font`;
-        }
-        if (failedFiles.size && status) {
-          status.textContent = `Không tải được ${failedFiles.size} font con; chữ tương ứng giữ font dự phòng.`;
-          status.hidden = false;
-          status.title = [...failedFiles].join("\n");
-        }
+        const usedGroups = [...new Set([...assignments.values()].map((family) => groupByFamily.get(family))
+          .filter(Boolean))];
+        const labels = usedGroups.map((key) => fontRegistry[key]?.label || key);
+        const complete = assignments.size === chars.length;
+        const result = complete
+          ? `Đã kiểm tra: đủ ${assignments.size}/${chars.length} chữ · ${labels.join(", ") || chosenStyle}`
+          : `Chưa đủ glyph: ${assignments.size}/${chars.length} chữ · kiểu Qwen: ${chosenStyle}`;
+        showResult(result, failedFiles.size ? `Font không tải được:\n${[...failedFiles].join("\n")}` : "");
       } catch (error) {
-        if (status) {
-          status.textContent = error.message;
-          status.hidden = false;
-        }
+        showResult(`Không thể áp dụng font: ${error.message}`);
       } finally {
         button.disabled = false;
       }

@@ -179,13 +179,23 @@ async def select_font(request: Request, user: dict = Depends(current_user)):
     per_character = body.get("per_character") is True
     han_chars: list[str] = []
     if per_character:
-        han_chars = list(dict.fromkeys(
+        text_han_chars = list(dict.fromkeys(
             char for char in text
             if 0x2E80 <= ord(char) <= 0x9FFF
             or 0xF900 <= ord(char) <= 0xFAFF
             or 0x3400 <= ord(char) <= 0x4DBF
             or 0x20000 <= ord(char) <= 0x3134F
         ))
+        requested_chars = body.get("characters")
+        if requested_chars is not None:
+            if not isinstance(requested_chars, list) or not all(
+                isinstance(char, str) and len(char) == 1 for char in requested_chars
+            ):
+                raise HTTPException(422, "characters must be a list of single characters")
+            requested_set = set(requested_chars)
+            han_chars = [char for char in text_han_chars if char in requested_set]
+        else:
+            han_chars = text_han_chars
         if not han_chars:
             raise HTTPException(422, "Record has no Han characters to assign fonts")
 
@@ -196,6 +206,7 @@ async def select_font(request: Request, user: dict = Depends(current_user)):
             "caption": caption,
             "candidates": candidates,
             "per_character": per_character,
+            "characters": han_chars if per_character else [],
         },
         ensure_ascii=False,
         sort_keys=True,
@@ -215,11 +226,11 @@ async def select_font(request: Request, user: dict = Depends(current_user)):
 
         if per_character:
             prompt = (
-                "For every Han character in the supplied text, choose one font "
-                "group that can display it in the desired calligraphic style. "
-                "Use only the supplied font keys. Keep the same style coherent "
-                "across the sentence where possible, but assign characters "
-                "individually so missing glyphs can fall back to another group. "
+                "For every requested Han character, choose the most suitable "
+                "font group that is likely to contain a visible Unicode glyph. "
+                "Use only supplied font keys and consider each group's font filenames. "
+                "Prefer the requested calligraphic style where possible; choose another "
+                "group for a character if needed to avoid a missing glyph. "
                 "Do not rewrite, omit, or add characters. Return JSON only as "
                 '{"fonts":[{"char":"漢","font_key":"thao"}],"reason":"..."}. '
                 f"Text: {text}\nCaption/context: {caption}\n"
