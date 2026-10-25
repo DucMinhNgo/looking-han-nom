@@ -1347,9 +1347,10 @@
             <span>Font chữ Hán-Nôm</span>
             <div class="lookup-font-row">
               <label class="lookup-font-field" for="font-select">Font chính
-                <select id="font-select" aria-label="Chọn font chữ Hán-Nôm">
+                <select id="font-select" aria-label="Chọn font chữ Hán-Nôm" multiple size="4">
                   <option value="default">Mặc định</option>
                 </select>
+                <small class="font-file-hint">Giữ Ctrl/Cmd để chọn nhiều kiểu; danh sách font con sẽ gộp từ các kiểu đã chọn.</small>
               </label>
               <div class="lookup-font-field">
                 <span>Font con</span>
@@ -1572,7 +1573,7 @@
 
     const state = {
       me: null, query: "", field: "all", groups: [...DEFAULT_GROUP_NAMES], verifyFilter: "", hanSimilarityFilter: "", sortOrder: "display", offset: 0, limit: 20,
-      mode: "scroll", page: 1, loading: false, fontKey: "default",
+      mode: "scroll", page: 1, loading: false, fontKey: "default", fontKeys: ["default"],
       fontMode: "manual", fontFiles: [],
       groupTags: {},
       items: [], total: 0, hasMore: false, missingOnly: false,
@@ -1583,8 +1584,14 @@
     try {
       const savedView = JSON.parse(localStorage.getItem("hannom.view") || "{}");
       hasSavedFontPreferences = savedView.fontMode !== undefined || Array.isArray(savedView.fontFiles);
-      for (const key of ["query", "field", "verifyFilter", "hanSimilarityFilter", "sortOrder", "missingOnly", "mode", "limit", "page", "offset", "fontKey", "fontMode", "fontFiles"])
+      for (const key of ["query", "field", "verifyFilter", "hanSimilarityFilter", "sortOrder", "missingOnly", "mode", "limit", "page", "offset", "fontKey", "fontKeys", "fontMode", "fontFiles"])
         if (savedView[key] !== undefined) state[key] = savedView[key];
+      if (!Array.isArray(savedView.fontKeys) && savedView.fontKey) {
+        state.fontKeys = [savedView.fontKey];
+      }
+      if (!Array.isArray(state.fontKeys) || !state.fontKeys.length) {
+        state.fontKeys = [state.fontKey || "default"];
+      }
       if (Array.isArray(savedView.groups)) {
         state.groups = savedView.groups;
       } else if (typeof savedView.group === "string" && savedView.group) {
@@ -1600,7 +1607,8 @@
           sortOrder: state.sortOrder,
           missingOnly: state.missingOnly,
           mode: state.mode, limit: state.limit, page: state.page, offset: state.offset,
-          fontKey: state.fontKey, fontMode: state.fontMode, fontFiles: state.fontFiles,
+          fontKey: state.fontKey, fontKeys: state.fontKeys,
+          fontMode: state.fontMode, fontFiles: state.fontFiles,
         }));
       } catch { }
     }
@@ -1759,10 +1767,16 @@
       const order = Object.entries(fontRegistry);
       select.innerHTML = order.map(([key, value]) =>
         `<option value="${esc(key)}">${esc(value.label || key)}</option>`).join("");
-      const chosen = Object.prototype.hasOwnProperty.call(fontRegistry, state.fontKey)
-        ? state.fontKey : "default";
+      state.fontKeys = state.fontKeys.filter((key) => Object.prototype.hasOwnProperty.call(fontRegistry, key));
+      if (!state.fontKeys.length) {
+        state.fontKeys = [Object.prototype.hasOwnProperty.call(fontRegistry, state.fontKey)
+          ? state.fontKey : "default"];
+      }
+      const chosen = state.fontKeys[0];
       state.fontKey = chosen;
-      select.value = chosen;
+      [...select.options].forEach((option) => {
+        option.selected = state.fontKeys.includes(option.value);
+      });
       if (!hasSavedFontPreferences) {
         const info = fontRegistry[chosen] || fontRegistry.default || {};
         const initialFiles = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
@@ -1772,11 +1786,22 @@
       }
       updateFontFileOptions(chosen);
       select.onchange = (event) => {
-        state.fontKey = event.target.value;
-        const info = fontRegistry[state.fontKey] || fontRegistry.default || {};
-        const files = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
-        state.fontMode = "manual";
-        state.fontFiles = files.slice(0, 1);
+        state.fontKeys = [...event.target.selectedOptions].map((option) => option.value);
+        if (!state.fontKeys.length) {
+          state.fontKeys = [state.fontKey];
+          const retained = [...event.target.options].find((option) => option.value === state.fontKey);
+          if (retained) retained.selected = true;
+        }
+        state.fontKey = state.fontKeys[0];
+        if (state.fontKeys.length > 1) {
+          state.fontMode = "auto";
+          state.fontFiles = [];
+        } else {
+          const info = fontRegistry[state.fontKey] || {};
+          const files = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
+          state.fontMode = "manual";
+          state.fontFiles = files.slice(0, 1);
+        }
         updateFontFileOptions(state.fontKey);
         persistView();
         applySelectedFont(state.fontKey);
@@ -1816,8 +1841,10 @@
       const options = $("font-file-options");
       const summary = $("font-file-summary");
       if (!options || !summary) return;
-      const info = fontRegistry[key] || fontRegistry.default || {};
-      const files = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
+      const files = [...new Set(getSelectedFontKeys().flatMap((fontKey) => {
+        const info = fontRegistry[fontKey] || {};
+        return Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
+      }))];
       if (!["auto", "all", "manual"].includes(state.fontMode)) state.fontMode = "all";
       if (!Array.isArray(state.fontFiles)) state.fontFiles = [];
       state.fontFiles = state.fontFiles.filter((file) => files.includes(file));
@@ -1852,6 +1879,27 @@
       });
     }
 
+    function getSelectedFontKeys() {
+      const selectedKeys = Array.isArray(state.fontKeys) ? state.fontKeys : [];
+      return selectedKeys.filter((key) => Object.prototype.hasOwnProperty.call(fontRegistry, key));
+    }
+
+    function getSelectedFontEntries() {
+      const entries = [];
+      const seenFiles = new Set();
+      for (const key of getSelectedFontKeys()) {
+        const info = fontRegistry[key] || {};
+        const files = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
+        const families = registerFontFaces(info);
+        files.forEach((file, index) => {
+          if (seenFiles.has(file)) return;
+          seenFiles.add(file);
+          entries.push({ key, file, family: families[index], info });
+        });
+      }
+      return entries;
+    }
+
     function collectVisibleHanChars() {
       const text = state.items.map((item) => item.ground_truth || "").join("");
       const chars = new Set();
@@ -1874,12 +1922,11 @@
 
     function applyAdditionalFont(key, file) {
       const token = ++fontApplyToken;
-      const info = fontRegistry[key] || fontRegistry.default || {};
+      const entry = getSelectedFontEntries().find((font) => font.file === file);
+      const info = entry?.info || fontRegistry[key] || fontRegistry.default || {};
       const defaultInfo = fontRegistry.default || {};
-      const isDefault = key === "default" || info === defaultInfo;
-      const allFiles = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
-      const index = allFiles.indexOf(file);
-      const family = (info.family || "Noto Serif CJK TC") + `-${index}`;
+      const family = entry?.family || "";
+      const isDefault = getSelectedFontKeys().every((fontKey) => fontKey === "default");
       const fallback = info.fallback || defaultInfo.fallback || CJK_FALLBACK;
       const chars = collectVisibleHanChars();
 
@@ -1887,13 +1934,12 @@
         if ($("font-status")) $("font-status").textContent = "Chưa có chữ Hán-Nôm để dò font con";
         return;
       }
-      if (index < 0 || !document.fonts?.add || typeof FontFace !== "function") {
+      if (!entry || !document.fonts?.add || typeof FontFace !== "function") {
         applySelectedFont(key);
         return;
       }
 
-      const families = registerFontFaces(info);
-      const fontFace = registeredFontFaces.get(families[index]);
+      const fontFace = registeredFontFaces.get(family);
       if (!fontFace) {
         applySelectedFont(key);
         return;
@@ -1952,18 +1998,22 @@
       const defaultFamilies = registerFontFaces(defaultInfo);
       const defaultStack = defaultFamilies.map((name) => `"${name}"`).join(", ");
 
-      const info = fontRegistry[key] || defaultInfo;
-      const isDefault = key === "default" || info === defaultInfo;
-      const allFamilies = isDefault ? defaultFamilies : registerFontFaces(info);
-      const allFiles = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
+      const selectedKeys = getSelectedFontKeys();
+      const selectedInfos = selectedKeys.map((fontKey) => fontRegistry[fontKey] || defaultInfo);
+      const info = selectedInfos[0] || fontRegistry[key] || defaultInfo;
+      const isDefault = selectedKeys.every((fontKey) => fontKey === "default");
+      const entries = getSelectedFontEntries();
+      const allFiles = entries.map((entry) => entry.file);
       const selectedIndexes = state.fontMode === "manual"
         ? state.fontFiles.map((file) => allFiles.indexOf(file)).filter((index) => index >= 0)
         : allFiles.map((_, index) => index);
-      const files = selectedIndexes.map((index) => allFiles[index]);
-      const selectedFamilies = selectedIndexes.map((index) => allFamilies[index]);
+      const files = selectedIndexes.map((index) => entries[index].file);
+      const selectedFamilies = selectedIndexes.map((index) => entries[index].family);
       const autoMode = shouldAutoMatchFontFiles(key);
 
-      const fallback = info.fallback || defaultInfo.fallback || CJK_FALLBACK;
+      const fallback = [...new Set(selectedInfos.map((fontInfo) =>
+        fontInfo.fallback || defaultInfo.fallback || CJK_FALLBACK,
+      ))].join(", ");
       const composeFontFamily = (currentStack) => {
         const list = [];
         if (currentStack) list.push(currentStack);
