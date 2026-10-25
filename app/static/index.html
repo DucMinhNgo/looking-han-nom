@@ -2861,11 +2861,37 @@
       button.disabled = true;
       try {
         await showLoading("Đang chuẩn bị ảnh và gửi yêu cầu Qwen…");
+        const textChars = [...new Set([...item.ground_truth].filter((char) => {
+          const cp = char.codePointAt(0);
+          return (cp >= 0x2E80 && cp <= 0x9FFF)
+            || (cp >= 0xF900 && cp <= 0xFAFF)
+            || (cp >= 0x3400 && cp <= 0x4DBF)
+            || (cp >= 0x20000 && cp <= 0x3134F);
+        }))];
+        if (fontFileChoice !== "auto") {
+          const selectedGroup = candidateKeys.find((key) =>
+            (fontRegistry[key]?.files || []).includes(fontFileChoice),
+          );
+          const selectedEntry = selectedGroup
+            ? getFontEntriesForKey(selectedGroup).find((entry) => entry.file === fontFileChoice)
+            : null;
+          const fontFace = selectedEntry && registeredFontFaces.get(selectedEntry.family);
+          if (!selectedEntry || !fontFace) {
+            throw new Error("Không tìm thấy font con đã chọn trong han-fonts.json.");
+          }
+          await showLoading(`Đang tải font con ${fontFileChoice.split("/").pop()}…`);
+          await fontFace.load();
+          const assignments = new Map(textChars.map((char) => [char, selectedEntry.family]));
+          renderRecommendedFont(cardElement, item, assignments);
+          const styleLabel = fontRegistry[selectedGroup]?.label || selectedGroup;
+          showResult(
+            `Đã áp dụng font con · ${styleLabel}: ${fontFileChoice.split("/").pop()}`,
+          );
+          return;
+        }
+
         let chosenFontKey = fontChoice;
-        const fontFileGroup = fontFileChoice === "auto" ? "" : candidateKeys.find(
-          (key) => (fontRegistry[key]?.files || []).includes(fontFileChoice),
-        );
-        if (fontChoice === "auto" && !fontFileGroup) {
+        if (fontChoice === "auto") {
           await showLoading("Qwen đang nhận diện kiểu chữ từ ảnh…");
           const recommendation = await api("/api/qwen/select-font", {
             method: "POST",
@@ -2876,7 +2902,6 @@
               per_character: false,
               include_image: true,
               force_refresh: true,
-              preferred_font_file: fontFileChoice === "auto" ? null : fontFileChoice,
             }),
           });
           if (!recommendation.enabled) {
@@ -2884,20 +2909,11 @@
             return;
           }
           chosenFontKey = recommendation.font_key;
-        } else if (fontChoice === "auto" && fontFileGroup) {
-          chosenFontKey = fontFileGroup;
         }
 
         if (!candidateKeys.includes(chosenFontKey)) {
           throw new Error("Qwen chọn kiểu font không có trong registry.");
         }
-        const textChars = [...new Set([...item.ground_truth].filter((char) => {
-          const cp = char.codePointAt(0);
-          return (cp >= 0x2E80 && cp <= 0x9FFF)
-            || (cp >= 0xF900 && cp <= 0xFAFF)
-            || (cp >= 0x3400 && cp <= 0x4DBF)
-            || (cp >= 0x20000 && cp <= 0x3134F);
-        }))];
         const chars = textChars;
         const assignments = new Map();
         const groupByFamily = new Map();
@@ -2917,7 +2933,6 @@
               characters: chars,
               include_image: true,
               preferred_font_key: chosenFontKey,
-              preferred_font_file: fontFileChoice === "auto" ? null : fontFileChoice,
               force_refresh: true,
             }),
           });
