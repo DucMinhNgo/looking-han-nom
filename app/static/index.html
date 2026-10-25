@@ -1641,6 +1641,7 @@
      * không hỗ trợ ký tự đó → hiển thị bằng font gốc.
      */
     const _glyphCache = new Map();  // key: "fontStack|char" → boolean
+    const _glyphAssignments = new Map();
     let _glyphCanvas = null;
     let _glyphCtx = null;
 
@@ -1730,6 +1731,12 @@
             || (cp >= 0xF900 && cp <= 0xFAFF)
             || (cp >= 0x3400 && cp <= 0x4DBF)
             || (cp >= 0x20000 && cp <= 0x3134F);
+
+          const assignedFamily = isCJK && _glyphAssignments.get(char);
+          if (assignedFamily) {
+            result += `<span style="font-family:${esc(`${JSON.stringify(assignedFamily)}, ${_currentDefaultStack}`)}">${charHtml}</span>`;
+            continue;
+          }
 
           if (isCJK && !_hasVisibleGlyph(
             `${_currentSelectedStack}, ${_currentDefaultStack}`,
@@ -1957,7 +1964,7 @@
     }
 
     function shouldAutoMatchFontFiles(key = state.fontKey) {
-      if (state.fontMode === "auto") return true;
+      if (state.fontMode === "auto" || state.fontMode === "all") return true;
       return state.fontMode === "manual" && state.fontFiles.length > 1;
     }
 
@@ -1993,7 +2000,8 @@
           await document.fonts.load(`48px ${fallback}`, [...chars].join(""));
           if (token !== fontApplyToken) return;
           const uncoveredChars = new Set([...chars].filter((char) =>
-            !_currentSelectedStack || !_hasVisibleGlyph(_currentSelectedStack, char),
+            !_glyphAssignments.has(char)
+              && (!_currentSelectedStack || !_hasVisibleGlyph(_currentSelectedStack, char)),
           ));
           if (!uncoveredChars.size) {
             if (status) status.textContent = "Font trước đã hiển thị đủ chữ đang có";
@@ -2006,6 +2014,7 @@
             _hasVisibleGlyph(`"${family}", ${fallback}`, char),
           );
           if (addedChars.length) {
+            addedChars.forEach((char) => _glyphAssignments.set(char, family));
             const selectedFamilies = _currentSelectedStack
               ? `${_currentSelectedStack}, "${family}"`
               : `"${family}"`;
@@ -2100,6 +2109,7 @@
       _usingCustomFont = false;
       _currentSelectedStack = "";
       _currentDefaultStack = fallback;
+      _glyphAssignments.clear();
       _glyphCache.clear();
       if (status) {
         status.textContent = `Đang tải font… 0/${files.length}`;
@@ -2158,6 +2168,7 @@
                 for (const char of uncoveredChars) {
                   if (_hasVisibleGlyph(`"${fontFamily}", ${fallback}`, char)) {
                     uncoveredChars.delete(char);
+                    _glyphAssignments.set(char, fontFamily);
                     coversCharacter = true;
                   }
                 }
