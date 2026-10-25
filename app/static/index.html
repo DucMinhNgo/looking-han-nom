@@ -1346,12 +1346,14 @@
           <div class="lookup-filter-control lookup-font-control">
             <span>Font chữ Hán-Nôm</span>
             <div class="lookup-font-row">
-              <label class="lookup-font-field" for="font-select">Font chính
-                <select id="font-select" aria-label="Chọn font chữ Hán-Nôm" multiple size="4">
-                  <option value="default">Mặc định</option>
-                </select>
-                <small class="font-file-hint">Giữ Ctrl/Cmd để chọn nhiều kiểu; danh sách font con sẽ gộp từ các kiểu đã chọn.</small>
-              </label>
+              <div class="lookup-font-field">
+                <span>Font chính</span>
+                <details class="font-file-picker" id="font-main-picker">
+                  <summary id="font-main-summary">Mặc định</summary>
+                  <div class="font-file-options" id="font-main-options"></div>
+                </details>
+                <small class="font-file-hint">Chọn nhiều kiểu hoặc chọn tất cả; danh sách font con sẽ gộp theo các kiểu đã chọn.</small>
+              </div>
               <div class="lookup-font-field">
                 <span>Font con</span>
                 <details class="font-file-picker" id="font-file-picker">
@@ -1743,8 +1745,8 @@
     }
 
     async function loadFontRegistry() {
-      const select = $("font-select");
-      if (!select) return;
+      const options = $("font-main-options");
+      if (!options) return;
       try {
         const response = await fetch("/static/fonts/han-fonts.json");
         if (!response.ok) throw new Error("font registry unavailable");
@@ -1765,8 +1767,18 @@
       registerFontFaces(fontRegistry.default);
 
       const order = Object.entries(fontRegistry);
-      select.innerHTML = order.map(([key, value]) =>
-        `<option value="${esc(key)}">${esc(value.label || key)}</option>`).join("");
+      const option = (value, label, checked) => `
+        <label class="font-file-option">
+          <input type="checkbox" name="font-main-option" value="${esc(value)}" ${checked ? "checked" : ""} />
+          <span>${esc(label)}</span>
+        </label>`;
+      options.innerHTML = option(
+        "__all__",
+        `Chọn tất cả (${order.length})`,
+        state.fontKeys.length === order.length,
+      ) + order.map(([key, value]) =>
+        option(key, value.label || key, state.fontKeys.includes(key)),
+      ).join("");
       state.fontKeys = state.fontKeys.filter((key) => Object.prototype.hasOwnProperty.call(fontRegistry, key));
       if (!state.fontKeys.length) {
         state.fontKeys = [Object.prototype.hasOwnProperty.call(fontRegistry, state.fontKey)
@@ -1774,9 +1786,6 @@
       }
       const chosen = state.fontKeys[0];
       state.fontKey = chosen;
-      [...select.options].forEach((option) => {
-        option.selected = state.fontKeys.includes(option.value);
-      });
       if (!hasSavedFontPreferences) {
         const info = fontRegistry[chosen] || fontRegistry.default || {};
         const initialFiles = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
@@ -1784,13 +1793,25 @@
         state.fontFiles = initialFiles.slice(0, 1);
         hasSavedFontPreferences = true;
       }
+      if (state.fontKeys.length > 1) {
+        state.fontMode = "auto";
+        state.fontFiles = [];
+      }
+      updateFontMainOptions();
       updateFontFileOptions(chosen);
-      select.onchange = (event) => {
-        state.fontKeys = [...event.target.selectedOptions].map((option) => option.value);
+      options.onchange = (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement)) return;
+        if (target.value === "__all__") {
+          state.fontKeys = target.checked ? order.map(([key]) => key) : [];
+        } else {
+          const selectedKeys = new Set([...options.querySelectorAll(
+            'input[name="font-main-option"]:checked',
+          )].map((input) => input.value).filter((key) => key !== "__all__"));
+          state.fontKeys = order.map(([key]) => key).filter((key) => selectedKeys.has(key));
+        }
         if (!state.fontKeys.length) {
           state.fontKeys = [state.fontKey];
-          const retained = [...event.target.options].find((option) => option.value === state.fontKey);
-          if (retained) retained.selected = true;
         }
         state.fontKey = state.fontKeys[0];
         if (state.fontKeys.length > 1) {
@@ -1802,6 +1823,7 @@
           state.fontMode = "manual";
           state.fontFiles = files.slice(0, 1);
         }
+        updateFontMainOptions();
         updateFontFileOptions(state.fontKey);
         persistView();
         applySelectedFont(state.fontKey);
@@ -1835,6 +1857,25 @@
         }
       };
       applySelectedFont(chosen);
+    }
+
+    function updateFontMainOptions() {
+      const options = $("font-main-options");
+      const summary = $("font-main-summary");
+      if (!options || !summary) return;
+      const entries = Object.entries(fontRegistry);
+      const selectedKeys = getSelectedFontKeys();
+      const selected = new Set(selectedKeys);
+      options.querySelectorAll('input[name="font-main-option"]').forEach((input) => {
+        input.checked = input.value === "__all__"
+          ? selectedKeys.length === entries.length
+          : selected.has(input.value);
+      });
+      summary.textContent = selectedKeys.length === entries.length
+        ? `Tất cả kiểu font (${entries.length})`
+        : selectedKeys.length > 1
+          ? `Đã chọn ${selectedKeys.length} kiểu font`
+          : fontRegistry[selectedKeys[0]]?.label || selectedKeys[0] || "Chọn font chính";
     }
 
     function updateFontFileOptions(key) {
