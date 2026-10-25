@@ -1357,7 +1357,7 @@
                   <summary id="font-file-summary">Tất cả font con</summary>
                   <div class="font-file-options" id="font-file-options"></div>
                 </details>
-                <small class="font-file-hint">Một font: dùng trực tiếp. Từ 2 font: tự dò từng chữ trong các font đã chọn. Auto: dò tất cả font con.</small>
+                <small class="font-file-hint">Mặc định chọn 1 font con. Chọn thêm font để bổ sung chữ còn thiếu; có thể bỏ chọn bất kỳ lúc nào. Auto dò toàn bộ font con.</small>
               </div>
               <span class="muted" id="font-status" aria-live="polite"></span>
             </div>
@@ -1784,18 +1784,30 @@
       $("font-file-options").onchange = (event) => {
         const target = event.target;
         if (!(target instanceof HTMLInputElement)) return;
+        const previousMode = state.fontMode;
+        const previousFiles = [...state.fontFiles];
         if (target.value === "auto" || target.value === "all") {
           state.fontMode = target.value;
           state.fontFiles = [];
         } else {
           state.fontMode = "manual";
-          state.fontFiles = [...$("font-file-options").querySelectorAll(
+          const checkedFiles = new Set([...$("font-file-options").querySelectorAll(
             'input[type="checkbox"]:checked',
-          )].map((input) => input.value);
+          )].map((input) => input.value));
+          state.fontFiles = state.fontFiles.filter((file) => checkedFiles.has(file));
+          if (target.checked && !state.fontFiles.includes(target.value)) {
+            state.fontFiles.push(target.value);
+          }
         }
         updateFontFileOptions(state.fontKey);
         persistView();
-        applySelectedFont(state.fontKey);
+        if (target.type === "checkbox" && target.checked
+          && previousMode === "manual"
+          && previousFiles.every((file) => state.fontFiles.includes(file))) {
+          applyAdditionalFont(state.fontKey, target.value);
+        } else {
+          applySelectedFont(state.fontKey);
+        }
       };
       applySelectedFont(chosen);
     }
@@ -1860,6 +1872,80 @@
       return state.fontMode === "manual" && state.fontFiles.length > 1;
     }
 
+    function applyAdditionalFont(key, file) {
+      const token = ++fontApplyToken;
+      const info = fontRegistry[key] || fontRegistry.default || {};
+      const defaultInfo = fontRegistry.default || {};
+      const isDefault = key === "default" || info === defaultInfo;
+      const allFiles = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
+      const index = allFiles.indexOf(file);
+      const family = (info.family || "Noto Serif CJK TC") + `-${index}`;
+      const fallback = info.fallback || defaultInfo.fallback || CJK_FALLBACK;
+      const chars = collectVisibleHanChars();
+
+      if (!chars.size) {
+        if ($("font-status")) $("font-status").textContent = "Chưa có chữ Hán-Nôm để dò font con";
+        return;
+      }
+      if (index < 0 || !document.fonts?.add || typeof FontFace !== "function") {
+        applySelectedFont(key);
+        return;
+      }
+
+      const families = registerFontFaces(info);
+      const fontFace = registeredFontFaces.get(families[index]);
+      if (!fontFace) {
+        applySelectedFont(key);
+        return;
+      }
+      const status = $("font-status");
+      if (status) status.textContent = `Đang kiểm tra chữ chưa được font trước hiển thị…`;
+
+      void (async () => {
+        try {
+          await document.fonts.load(`48px ${fallback}`, [...chars].join(""));
+          if (token !== fontApplyToken) return;
+          const uncoveredChars = new Set([...chars].filter((char) =>
+            !_currentSelectedStack || !_hasVisibleGlyph(_currentSelectedStack, char),
+          ));
+          if (!uncoveredChars.size) {
+            if (status) status.textContent = "Font trước đã hiển thị đủ chữ đang có";
+            return;
+          }
+          await fontFace.load();
+          if (token !== fontApplyToken) return;
+
+          const addedChars = [...uncoveredChars].filter((char) =>
+            _hasVisibleGlyph(`"${family}", ${fallback}`, char),
+          );
+          if (addedChars.length) {
+            const selectedFamilies = _currentSelectedStack
+              ? `${_currentSelectedStack}, "${family}"`
+              : `"${family}"`;
+            const defaultFamilies = registerFontFaces(defaultInfo)
+              .map((name) => `"${name}"`).join(", ");
+            const stack = [selectedFamilies];
+            if (!isDefault && defaultFamilies) stack.push(defaultFamilies);
+            if (fallback) stack.push(fallback);
+            _currentSelectedStack = selectedFamilies;
+            _usingCustomFont = true;
+            _glyphCache.clear();
+            document.documentElement.style.setProperty("--han-font-family", stack.join(", "));
+            refreshVisibleCardsProgressively();
+          }
+          if (status) {
+            status.textContent = addedChars.length
+              ? `Đã bổ sung ${file.split("/").pop()} cho ${addedChars.length} chữ`
+              : `Font này không hỗ trợ ${uncoveredChars.size} chữ còn thiếu`;
+          }
+        } catch (error) {
+          if (token === fontApplyToken && status) {
+            status.textContent = `Không thể tải font ${file.split("/").pop()}: ${error.message}`;
+          }
+        }
+      })();
+    }
+
     function applySelectedFont(key) {
       const token = ++fontApplyToken;
       const defaultInfo = fontRegistry.default || {};
@@ -1871,8 +1957,7 @@
       const allFamilies = isDefault ? defaultFamilies : registerFontFaces(info);
       const allFiles = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
       const selectedIndexes = state.fontMode === "manual"
-        ? allFiles.map((file, index) => state.fontFiles.includes(file) ? index : -1)
-          .filter((index) => index >= 0)
+        ? state.fontFiles.map((file) => allFiles.indexOf(file)).filter((index) => index >= 0)
         : allFiles.map((_, index) => index);
       const files = selectedIndexes.map((index) => allFiles[index]);
       const selectedFamilies = selectedIndexes.map((index) => allFamilies[index]);
