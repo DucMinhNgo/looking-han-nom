@@ -680,6 +680,28 @@
       overflow-wrap: anywhere;
     }
 
+    .qwen-font-type-tag.is-loading {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      color: var(--series-1);
+    }
+
+    .qwen-font-type-tag.is-loading::before {
+      width: 0.85rem;
+      height: 0.85rem;
+      flex: 0 0 auto;
+      border: 2px solid color-mix(in srgb, var(--series-1) 25%, transparent);
+      border-top-color: var(--series-1);
+      border-radius: 50%;
+      content: "";
+      animation: qwen-font-spin 0.75s linear infinite;
+    }
+
+    @keyframes qwen-font-spin {
+      to { transform: rotate(360deg); }
+    }
+
     .qwen-font-type-tag[hidden] {
       display: none;
     }
@@ -2798,11 +2820,24 @@
       const typeTag = cardElement?.querySelector(".qwen-font-type-tag");
       const showResult = (message, title = "") => {
         if (!typeTag) return;
+        typeTag.classList.remove("is-loading");
         typeTag.textContent = message;
         typeTag.title = title;
         typeTag.hidden = false;
       };
-      if (typeTag) typeTag.hidden = true;
+      const showLoading = async (message) => {
+        if (typeTag) {
+          typeTag.classList.add("is-loading");
+          typeTag.textContent = message;
+          typeTag.title = "";
+          typeTag.hidden = false;
+        }
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      };
+      if (typeTag) {
+        typeTag.hidden = true;
+        typeTag.classList.remove("is-loading");
+      }
       if (!item?.ground_truth?.trim()) {
         showResult("Không thể áp dụng font: record chưa có ground truth.");
         return;
@@ -2817,8 +2852,10 @@
 
       button.disabled = true;
       try {
+        await showLoading("Đang chuẩn bị ảnh và gửi yêu cầu Qwen…");
         let chosenFontKey = fontChoice;
         if (fontChoice === "auto") {
+          await showLoading("Qwen đang nhận diện kiểu chữ từ ảnh…");
           const recommendation = await api("/api/qwen/select-font", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -2856,6 +2893,7 @@
         let qwenFontMap = {};
         let repairError = "";
         try {
+          await showLoading("Qwen đang kiểm tra từng chữ trong ảnh…");
           const mapping = await api("/api/qwen/select-font", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -2880,6 +2918,7 @@
         const resolveCharacters = async (groupKey, candidates) => {
           const info = fontRegistry[groupKey];
           if (!info || !candidates.size) return;
+          await showLoading(`Đang tải font ${info.label || groupKey} cho ${candidates.size} chữ…`);
           const fallback = info.fallback || CJK_FALLBACK;
           await document.fonts.load(`48px ${fallback}`, [...candidates].join(""));
           const previousDefaultStack = _currentDefaultStack;
@@ -2933,7 +2972,8 @@
           }
         }
 
-        renderRecommendedFont(cardElement, item, assignments);
+          await showLoading("Đang hoàn tất hiển thị câu…");
+          renderRecommendedFont(cardElement, item, assignments);
         const chosenStyle = fontRegistry[chosenFontKey]?.label || chosenFontKey;
         const usedGroups = [...new Set([...assignments.values()].map((family) => groupByFamily.get(family))
           .filter(Boolean))];

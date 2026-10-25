@@ -272,6 +272,7 @@ class TestQwenFontSelection:
 
         login(client)
         client.app.state.settings.qwen_api_key = "test-key"
+        calls = {}
 
         class FakeOpenAI:
             def __init__(self, **kwargs):
@@ -280,6 +281,7 @@ class TestQwenFontSelection:
                 )
 
             def create_completion(self, **kwargs):
+                calls.update(kwargs)
                 return SimpleNamespace(
                     choices=[SimpleNamespace(message=SimpleNamespace(
                         content='{"fonts":[{"char":"花","font_key":"thao"},{"char":"開","font_key":"trien"}],"reason":"best coverage"}',
