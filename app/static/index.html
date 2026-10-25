@@ -350,20 +350,21 @@
     }
 
     .lookup-font-row {
-      display: flex;
-      align-items: center;
-      gap: 0.45rem;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.3rem;
       min-width: 0;
     }
 
     .lookup-font-row select {
-      flex: 1;
+      width: 100%;
       min-width: 0;
     }
 
     .lookup-font-row #font-status {
       font-size: 0.7rem;
       overflow-wrap: anywhere;
+      min-height: 1em;
     }
 
     .muted {
@@ -1487,22 +1488,22 @@
       } catch { }
     }
 
+    const registeredFontFaces = new Map();
+
     function registerFontFaces(info) {
       if (!info) return [];
       const family = info.family || "Noto Serif CJK TC";
       const files = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
       const families = files.map((_, index) => `${family}-${index}`);
 
-      const id = `han-font-style-${family.replace(/[^a-z0-9_-]/gi, "-")}`;
-      if (!document.getElementById(id)) {
-        const style = document.createElement("style");
-        style.id = id;
-        style.textContent = files.map((file, index) => {
-          const url = `/static/fonts/${file.split("/").map(encodeURIComponent).join("/")}`;
-          return `@font-face { font-family: "${families[index]}"; src: url("${url}") format("truetype"); font-display: swap; }`;
-        }).join("\n");
-        document.head.appendChild(style);
-      }
+      files.forEach((file, index) => {
+        const fontFamily = families[index];
+        if (registeredFontFaces.has(fontFamily)) return;
+        const url = `/static/fonts/${file.split("/").map(encodeURIComponent).join("/")}`;
+        const fontFace = new FontFace(fontFamily, `url("${url}")`, { display: "swap" });
+        registeredFontFaces.set(fontFamily, fontFace);
+        document.fonts.add(fontFace);
+      });
       return families;
     }
 
@@ -1651,7 +1652,6 @@
       const selectedFamilies = isDefault ? defaultFamilies : registerFontFaces(info);
 
       const fallback = info.fallback || defaultInfo.fallback || CJK_FALLBACK;
-
       const composeFontFamily = (currentStack) => {
         const list = [];
         if (currentStack) list.push(currentStack);
@@ -1681,7 +1681,7 @@
         refreshVisibleCardsProgressively();
         return;
       }
-      if (!document.fonts?.load) {
+      if (!document.fonts?.add || typeof FontFace !== "function") {
         _usingCustomFont = false;
         _currentSelectedStack = "";
         _currentDefaultStack = "";
@@ -1717,12 +1717,18 @@
           if (token !== fontApplyToken) return;
           const batch = selectedFamilies.slice(start, start + batchSize);
           const results = await Promise.allSettled(
-            batch.map((fontFamily) => document.fonts.load(`16px "${fontFamily}"`)),
+            batch.map((fontFamily) => {
+              const fontFace = registeredFontFaces.get(fontFamily);
+              if (!fontFace) {
+                return Promise.reject(new Error(`Font chưa được đăng ký: ${fontFamily}`));
+              }
+              return fontFace.load();
+            }),
           );
           if (token !== fontApplyToken) return;
 
           results.forEach((result, index) => {
-            if (result.status === "fulfilled" && result.value?.length) {
+            if (result.status === "fulfilled") {
               successfulFamilies.push(batch[index]);
             } else {
               failedFiles.push(files[start + index]);
