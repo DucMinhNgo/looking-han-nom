@@ -6,8 +6,8 @@ import argparse
 # ============================================================
 # CẤU HÌNH ĐƯỜNG DẪN MẶC ĐỊNH
 # ============================================================
-DEFAULT_FONTS_DIR = "/Users/dustin/Desktop/looking-han-nom/app/static/fonts"
-DEFAULT_OUTPUT_JSON = "/Users/dustin/Desktop/looking-han-nom/app/static/fonts/fonts.json"
+DEFAULT_FONTS_DIR = "/home/khtn/crawling/labs/group2/han-nom-app/app/static/fonts"
+DEFAULT_OUTPUT_JSON = "/home/khtn/crawling/labs/group2/han-nom-app/app/static/fonts/fonts.json"
 
 ALLOWED_EXT = (".ttf", ".otf", ".woff", ".woff2")
 
