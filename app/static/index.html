@@ -652,6 +652,11 @@
       white-space: normal;
     }
 
+    .qwen-font-tools select {
+      min-width: 0;
+      max-width: 100%;
+    }
+
     .qwen-font-type-tag {
       min-width: 0;
       max-width: 100%;
@@ -2752,6 +2757,14 @@
           : ""}
         </div>
         <div class="qwen-font-tools">
+          <select data-qwen-font-choice="${i}" aria-label="Chọn kiểu chữ cho record">
+            <option value="auto">Tự động nhận diện</option>
+            <option value="default">Khải</option>
+            <option value="hanh">Hành</option>
+            <option value="le">Lệ</option>
+            <option value="trien">Triện</option>
+            <option value="thao">Thảo</option>
+          </select>
           <button type="button" data-qwen-font="${i}">Apply font</button>
           <span class="qwen-font-type-tag" role="status" aria-live="polite" hidden></span>
         </div>
@@ -2762,6 +2775,7 @@
     async function recommendFontForRecord(index, button) {
       const item = state.items[index];
       const cardElement = button.closest(".item");
+      const fontChoice = cardElement?.querySelector("[data-qwen-font-choice]")?.value || "auto";
       const typeTag = cardElement?.querySelector(".qwen-font-type-tag");
       const showResult = (message, title = "") => {
         if (!typeTag) return;
@@ -2784,22 +2798,26 @@
 
       button.disabled = true;
       try {
-        const recommendation = await api("/api/qwen/select-font", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            index: item.index,
-            font_keys: candidateKeys,
-            per_character: false,
-            include_image: true,
-          }),
-        });
-        if (!recommendation.enabled) {
-          showResult(recommendation.message || "Qwen chưa được cấu hình.");
-          return;
+        let chosenFontKey = fontChoice;
+        if (fontChoice === "auto") {
+          const recommendation = await api("/api/qwen/select-font", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              index: item.index,
+              font_keys: candidateKeys,
+              per_character: false,
+              include_image: true,
+            }),
+          });
+          if (!recommendation.enabled) {
+            showResult(recommendation.message || "Qwen chưa được cấu hình.");
+            return;
+          }
+          chosenFontKey = recommendation.font_key;
         }
 
-        if (!fontRegistry[recommendation.font_key]) {
+        if (!candidateKeys.includes(chosenFontKey)) {
           throw new Error("Qwen chọn kiểu font không có trong registry.");
         }
         const textChars = [...new Set([...item.ground_truth].filter((char) => {
@@ -2812,7 +2830,7 @@
         const chars = textChars;
         const assignments = new Map();
         const groupByFamily = new Map();
-        const preferredGroups = [recommendation.font_key];
+        const preferredGroups = [chosenFontKey];
         const scanGroups = [...new Set([...preferredGroups, ...candidateKeys])];
         const failedFiles = new Set();
         const resolveCharacters = async (groupKey, candidates) => {
@@ -2870,6 +2888,7 @@
                 per_character: true,
                 characters: missingChars,
                 include_image: true,
+                preferred_font_key: chosenFontKey,
               }),
             });
             if (repair.enabled && repair.font_map) {
@@ -2895,14 +2914,14 @@
         }
 
         renderRecommendedFont(cardElement, item, assignments);
-        const chosenStyle = fontRegistry[recommendation.font_key]?.label || recommendation.font_key;
+        const chosenStyle = fontRegistry[chosenFontKey]?.label || chosenFontKey;
         const usedGroups = [...new Set([...assignments.values()].map((family) => groupByFamily.get(family))
           .filter(Boolean))];
         const labels = usedGroups.map((key) => fontRegistry[key]?.label || key);
         const complete = assignments.size === chars.length;
         const result = complete
           ? `Đã kiểm tra: đủ ${assignments.size}/${chars.length} chữ · ${labels.join(", ") || chosenStyle}`
-          : `Chưa đủ glyph: ${assignments.size}/${chars.length} chữ · kiểu Qwen: ${chosenStyle}`;
+          : `Chưa đủ glyph: ${assignments.size}/${chars.length} chữ · kiểu đã chọn: ${chosenStyle}`;
         const details = [
           repairError ? `Không dò được font bù bằng Qwen: ${repairError}` : "",
           failedFiles.size ? `Font không tải được:\n${[...failedFiles].join("\n")}` : "",

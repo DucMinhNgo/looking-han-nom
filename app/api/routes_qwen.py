@@ -188,6 +188,12 @@ async def select_font(request: Request, user: dict = Depends(current_user)):
             f"{resolved_image}:{image_path.stat().st_mtime_ns}:{image_path.stat().st_size}"
         )
     per_character = body.get("per_character") is True
+    preferred_font_key = body.get("preferred_font_key")
+    if preferred_font_key is not None and (
+        not isinstance(preferred_font_key, str)
+        or preferred_font_key not in {candidate["key"] for candidate in candidates}
+    ):
+        raise HTTPException(422, "preferred_font_key must be one of the selected font groups")
     han_chars: list[str] = []
     if per_character:
         text_han_chars = list(dict.fromkeys(
@@ -219,6 +225,7 @@ async def select_font(request: Request, user: dict = Depends(current_user)):
             "per_character": per_character,
             "characters": han_chars if per_character else [],
             "image": image_cache_identity,
+            "preferred_font_key": preferred_font_key,
         },
         ensure_ascii=False,
         sort_keys=True,
@@ -250,7 +257,10 @@ async def select_font(request: Request, user: dict = Depends(current_user)):
                 "requested Han character, choose the most suitable "
                 "font group that is likely to contain a visible Unicode glyph. "
                 "Use only supplied font keys and consider each group's font filenames. "
-                "Prefer the requested calligraphic style where possible; choose another "
+                f"Strongly prefer {preferred_font_key!r} for the original style; choose "
+                "another group only if the preferred font lacks a visible glyph. "
+                "If no preferred group was specified, choose the closest match to the image. "
+                "Choose another "
                 "group for a character if needed to avoid a missing glyph. "
                 "Do not rewrite, omit, or add characters. Return JSON only as "
                 '{"fonts":[{"char":"漢","font_key":"thao"}],"reason":"..."}. '

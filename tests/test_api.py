@@ -290,7 +290,12 @@ class TestQwenFontSelection:
         monkeypatch.setattr(openai, "OpenAI", FakeOpenAI)
         response = client.post(
             "/api/qwen/select-font",
-            json={"index": 0, "font_keys": ["thao", "trien"], "per_character": True},
+            json={
+                "index": 0,
+                "font_keys": ["thao", "trien"],
+                "per_character": True,
+                "preferred_font_key": "thao",
+            },
         )
 
         assert response.status_code == 200, response.text
