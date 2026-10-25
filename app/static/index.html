@@ -351,20 +351,37 @@
 
     .lookup-font-row {
       display: grid;
-      grid-template-columns: minmax(0, 1fr);
-      gap: 0.3rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.5rem 0.65rem;
       min-width: 0;
     }
 
-    .lookup-font-row select {
+    .lookup-font-field {
+      display: grid;
+      gap: 0.25rem;
+      min-width: 0;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--ink-2);
+    }
+
+    .lookup-font-field select {
       width: 100%;
       min-width: 0;
+      font-size: 0.84rem;
+      font-weight: 400;
+      text-overflow: ellipsis;
     }
 
     .lookup-font-row #font-status {
       font-size: 0.7rem;
       overflow-wrap: anywhere;
       min-height: 1em;
+      grid-column: 1 / -1;
+    }
+
+    .lookup-font-control {
+      grid-column: 1 / -1;
     }
 
     .muted {
@@ -1131,7 +1148,6 @@
       }
 
       .lookup-font-row {
-        display: grid;
         grid-template-columns: minmax(0, 1fr);
       }
 
@@ -1239,12 +1255,19 @@
               <option value="updated_asc">Ngày cập nhật · cũ nhất</option>
             </select>
           </label>
-          <div class="lookup-filter-control">
-            <label for="font-select">Font chữ Hán-Nôm</label>
+          <div class="lookup-filter-control lookup-font-control">
+            <span>Font chữ Hán-Nôm</span>
             <div class="lookup-font-row">
-              <select id="font-select" aria-label="Chọn font chữ Hán-Nôm">
-                <option value="default">Mặc định</option>
-              </select>
+              <label class="lookup-font-field" for="font-select">Font chính
+                <select id="font-select" aria-label="Chọn font chữ Hán-Nôm">
+                  <option value="default">Mặc định</option>
+                </select>
+              </label>
+              <label class="lookup-font-field" for="font-file-select">Font con
+                <select id="font-file-select" aria-label="Chọn font con">
+                  <option value="">Tất cả font con</option>
+                </select>
+              </label>
               <span class="muted" id="font-status" aria-live="polite"></span>
             </div>
           </div>
@@ -1458,7 +1481,7 @@
 
     const state = {
       me: null, query: "", field: "all", groups: [...DEFAULT_GROUP_NAMES], verifyFilter: "", hanSimilarityFilter: "", sortOrder: "display", offset: 0, limit: 20,
-      mode: "scroll", page: 1, loading: false, fontKey: "default",
+      mode: "scroll", page: 1, loading: false, fontKey: "default", fontFile: "",
       groupTags: {},
       items: [], total: 0, hasMore: false, missingOnly: false,
       current: null, orphanOffset: 0, renderToken: 0,
@@ -1466,7 +1489,7 @@
 
     try {
       const savedView = JSON.parse(localStorage.getItem("hannom.view") || "{}");
-      for (const key of ["query", "field", "verifyFilter", "hanSimilarityFilter", "sortOrder", "missingOnly", "mode", "limit", "page", "offset", "fontKey"])
+      for (const key of ["query", "field", "verifyFilter", "hanSimilarityFilter", "sortOrder", "missingOnly", "mode", "limit", "page", "offset", "fontKey", "fontFile"])
         if (savedView[key] !== undefined) state[key] = savedView[key];
       if (Array.isArray(savedView.groups)) {
         state.groups = savedView.groups;
@@ -1483,7 +1506,7 @@
           sortOrder: state.sortOrder,
           missingOnly: state.missingOnly,
           mode: state.mode, limit: state.limit, page: state.page, offset: state.offset,
-          fontKey: state.fontKey,
+          fontKey: state.fontKey, fontFile: state.fontFile,
         }));
       } catch { }
     }
@@ -1633,12 +1656,38 @@
         ? state.fontKey : "default";
       state.fontKey = chosen;
       select.value = chosen;
+      updateFontFileOptions(chosen);
       select.onchange = (event) => {
         state.fontKey = event.target.value;
+        state.fontFile = "";
+        updateFontFileOptions(state.fontKey);
+        persistView();
+        applySelectedFont(state.fontKey);
+      };
+      $("font-file-select").onchange = (event) => {
+        state.fontFile = event.target.value;
         persistView();
         applySelectedFont(state.fontKey);
       };
       applySelectedFont(chosen);
+    }
+
+    function updateFontFileOptions(key) {
+      const select = $("font-file-select");
+      if (!select) return;
+      const info = fontRegistry[key] || fontRegistry.default || {};
+      const files = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
+      const hasSavedFile = files.includes(state.fontFile);
+      if (!hasSavedFile) state.fontFile = "";
+
+      select.innerHTML = `<option value="">Tất cả font con (${files.length})</option>` +
+        files.map((file) => {
+          const label = file.split("/").pop().replace(/\.(ttf|otf|woff2?)$/i, "");
+          return `<option value="${esc(file)}">${esc(label)}</option>`;
+        }).join("");
+      select.value = state.fontFile;
+      select.disabled = files.length === 0;
+      select.title = state.fontFile || "Không chọn font con sẽ tải tất cả font trong mục này";
     }
 
     function applySelectedFont(key) {
@@ -1649,7 +1698,13 @@
 
       const info = fontRegistry[key] || defaultInfo;
       const isDefault = key === "default" || info === defaultInfo;
-      const selectedFamilies = isDefault ? defaultFamilies : registerFontFaces(info);
+      const allFamilies = isDefault ? defaultFamilies : registerFontFaces(info);
+      const allFiles = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
+      const selectedIndexes = state.fontFile
+        ? [allFiles.indexOf(state.fontFile)].filter((index) => index >= 0)
+        : allFiles.map((_, index) => index);
+      const files = selectedIndexes.map((index) => allFiles[index]);
+      const selectedFamilies = selectedIndexes.map((index) => allFamilies[index]);
 
       const fallback = info.fallback || defaultInfo.fallback || CJK_FALLBACK;
       const composeFontFamily = (currentStack) => {
@@ -1671,7 +1726,6 @@
       fbStyle.textContent = `.font-fb { font-family: ${defaultFontFamily} !important; }`;
 
       const status = $("font-status");
-      const files = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
       if (!files.length) {
         _usingCustomFont = false;
         _currentSelectedStack = "";
