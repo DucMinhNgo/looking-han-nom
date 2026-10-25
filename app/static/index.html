@@ -1357,7 +1357,7 @@
                   <summary id="font-file-summary">Tất cả font con</summary>
                   <div class="font-file-options" id="font-file-options"></div>
                 </details>
-                <small class="font-file-hint">Chọn từ 2 font con trở lên để tự dò từng chữ trong các font đã chọn.</small>
+                <small class="font-file-hint">Một font: dùng trực tiếp. Từ 2 font: tự dò từng chữ trong các font đã chọn. Auto: dò tất cả font con.</small>
               </div>
               <span class="muted" id="font-status" aria-live="polite"></span>
             </div>
@@ -2263,7 +2263,6 @@
         (state.missingOnly ? " · chỉ dòng thiếu ảnh" : "");
       $("page-number").value = state.page;
       updateLoadControls();
-      if (shouldAutoMatchFontFiles()) applySelectedFont(state.fontKey);
       if (shouldAutoMatchFontFiles()) applySelectedFont(state.fontKey);
     }
 
