@@ -1625,13 +1625,21 @@
 
       files.forEach((file, index) => {
         const fontFamily = families[index];
-        if (registeredFontFaces.has(fontFamily)) return;
+        const existingFace = registeredFontFaces.get(fontFamily);
+        if (existingFace && existingFace.status !== "error") return;
+        if (existingFace) document.fonts.delete(existingFace);
         const url = `/static/fonts/${file.split("/").map(encodeURIComponent).join("/")}`;
         const fontFace = new FontFace(fontFamily, `url("${url}")`, { display: "swap" });
         registeredFontFaces.set(fontFamily, fontFace);
         document.fonts.add(fontFace);
       });
       return families;
+    }
+
+    function discardFailedFontFace(fontFamily, fontFace) {
+      if (registeredFontFaces.get(fontFamily) !== fontFace) return;
+      registeredFontFaces.delete(fontFamily);
+      document.fonts.delete(fontFace);
     }
 
     /* ---- Canvas-based glyph detection ----
@@ -2038,6 +2046,7 @@
               : `Font này không hỗ trợ ${uncoveredChars.size} chữ còn thiếu`;
           }
         } catch (error) {
+          discardFailedFontFace(family, fontFace);
           if (token === fontApplyToken && status) {
             status.textContent = `Không thể tải font ${file.split("/").pop()}: ${error.message}`;
           }
@@ -2188,6 +2197,9 @@
                 _activeFontFamilies.push(fontFamily);
               }
             } else {
+              const fontFamily = batch[index];
+              const fontFace = registeredFontFaces.get(fontFamily);
+              if (fontFace) discardFailedFontFace(fontFamily, fontFace);
               failedFiles.push(files[start + index]);
             }
           });
@@ -2596,6 +2608,9 @@
       grid.querySelectorAll("[data-delete]").forEach((el) => {
         el.onclick = () => deletePost(state.items[+el.dataset.delete]);
       });
+      grid.querySelectorAll("[data-qwen-font]").forEach((button) => {
+        button.onclick = () => recommendFontForRecord(+button.dataset.qwenFont, button);
+      });
     }
 
     function renderVisibleCards() {
@@ -2696,6 +2711,8 @@
           <span>#${item.index + 1}</span>
           ${groupTag}
           <span class="spacer"></span>
+          <button type="button" data-qwen-font="${i}">Qwen chọn font</button>
+          <span class="muted qwen-font-status" aria-live="polite"></span>
           ${item.post_url
           ? `<a class="postlink" href="${esc(item.post_url)}" target="_blank"
                   rel="noopener" title="${esc(item.post_url)}">Bài post ↗</a>`
@@ -2707,6 +2724,114 @@
         </div>
       </div>
     </div>`;
+    }
+
+    async function recommendFontForRecord(index, button) {
+      const item = state.items[index];
+      const cardElement = button.closest(".item");
+      const status = cardElement?.querySelector(".qwen-font-status");
+      if (!item?.ground_truth?.trim()) {
+        if (status) status.textContent = "Record chưa có ground truth.";
+        return;
+      }
+      if (!state.fontKeys.length) {
+        if (status) status.textContent = "Chọn ít nhất một font chính.";
+        return;
+      }
+
+      button.disabled = true;
+      if (status) status.textContent = "Đang hỏi Qwen chọn kiểu…";
+      try {
+        const recommendation = await api("/api/qwen/select-font", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ index: item.index, font_keys: state.fontKeys }),
+        });
+        if (!recommendation.enabled) {
+          if (status) status.textContent = recommendation.message;
+          return;
+        }
+
+        const info = fontRegistry[recommendation.font_key];
+        if (!info) throw new Error("Qwen chọn kiểu font không có trong registry.");
+        const entries = getSelectedFontEntries().filter(
+          (entry) => entry.key === recommendation.font_key,
+        );
+        const fallback = info.fallback || CJK_FALLBACK;
+        const chars = [...new Set([...item.ground_truth].filter((char) => {
+          const cp = char.codePointAt(0);
+          return (cp >= 0x2E80 && cp <= 0x9FFF)
+            || (cp >= 0xF900 && cp <= 0xFAFF)
+            || (cp >= 0x3400 && cp <= 0x4DBF)
+            || (cp >= 0x20000 && cp <= 0x3134F);
+        }))];
+        const assignments = new Map();
+        const unassigned = new Set(chars);
+        const previousDefaultStack = _currentDefaultStack;
+        await document.fonts.load(`48px ${fallback}`, chars.join(""));
+        _currentDefaultStack = fallback;
+        try {
+          for (const entry of entries) {
+            if (!unassigned.size) break;
+            const fontFace = registeredFontFaces.get(entry.family);
+            if (!fontFace) continue;
+            try {
+              await fontFace.load();
+            } catch {
+              discardFailedFontFace(entry.family, fontFace);
+              continue;
+            }
+            _glyphCache.clear();
+            for (const char of [...unassigned]) {
+              if (_hasVisibleGlyph(`"${entry.family}", ${fallback}`, char)) {
+                assignments.set(char, entry.family);
+                unassigned.delete(char);
+              }
+            }
+          }
+        } finally {
+          _currentDefaultStack = previousDefaultStack;
+          _glyphCache.clear();
+        }
+
+        renderRecommendedFont(cardElement, item, assignments, fallback);
+        const tokenUsage = recommendation.usage
+          ? ` · ${recommendation.usage.input_tokens ?? "?"}+${recommendation.usage.output_tokens ?? "?"} tokens`
+          : "";
+        const note = recommendation.reason ? ` — ${recommendation.reason}` : "";
+        if (status) {
+          status.textContent = `Font ${recommendation.font_label}: ${assignments.size}/${chars.length} chữ có glyph${tokenUsage}${note}`;
+        }
+      } catch (error) {
+        if (status) status.textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    function renderRecommendedFont(cardElement, item, assignments, fallback) {
+      const groundTruth = cardElement?.querySelector(".gt");
+      if (!groundTruth) return;
+      groundTruth.innerHTML = highlight(item.ground_truth, state.query);
+      const walker = document.createTreeWalker(groundTruth, NodeFilter.SHOW_TEXT);
+      const textNodes = [];
+      while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+      for (const textNode of textNodes) {
+        const fragment = document.createDocumentFragment();
+        for (const char of textNode.textContent || "") {
+          const family = assignments.get(char);
+          if (!family) {
+            fragment.appendChild(document.createTextNode(char));
+            continue;
+          }
+          const span = document.createElement("span");
+          span.style.fontFamily = `"${family}", ${fallback}`;
+          span.textContent = char;
+          fragment.appendChild(span);
+        }
+        textNode.replaceWith(fragment);
+      }
     }
 
     function renderHanSimilarity(caption, groundTruth) {

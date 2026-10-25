@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import re
+import time
 from html import unescape
 from pathlib import Path
 from urllib.parse import parse_qs, quote, quote_plus, unquote, urlparse
@@ -18,6 +20,7 @@ router = APIRouter(prefix="/api/qwen")
 IMAGE_TYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
                ".webp": "image/webp", ".gif": "image/gif", ".bmp": "image/bmp"}
 _redis = None
+_font_choice_cache: dict[str, tuple[float, dict]] = {}
 
 
 async def _qwen_cache(request: Request, key: str, value: dict | None = None):
@@ -125,6 +128,124 @@ def _reference_search(
 async def status(request: Request, user: dict = Depends(current_user)):
     settings = request.app.state.settings
     return {"enabled": bool(settings.qwen_api_key), "model": settings.qwen_model}
+
+
+@router.post("/select-font")
+async def select_font(request: Request, user: dict = Depends(current_user)):
+    settings = request.app.state.settings
+    if not settings.qwen_api_key:
+        return {"enabled": False, "message": "Chưa thêm QWEN_API_KEY vào .env."}
+
+    body = await request.json()
+    try:
+        index = int(body.get("index", -1))
+    except (TypeError, ValueError):
+        raise HTTPException(422, "index must be an integer") from None
+    item = request.app.state.runtime.dataset.get(index)
+    if item is None:
+        raise HTTPException(404, "row not found")
+
+    requested_keys = body.get("font_keys")
+    if not isinstance(requested_keys, list) or not requested_keys:
+        raise HTTPException(422, "Select at least one main font")
+    if len(requested_keys) > 16 or not all(isinstance(key, str) for key in requested_keys):
+        raise HTTPException(422, "font_keys must be a list of at most 16 strings")
+
+    registry_path = Path(__file__).resolve().parents[1] / "static" / "fonts" / "han-fonts.json"
+    try:
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise HTTPException(500, f"Font registry unavailable: {exc}") from exc
+    candidates = [
+        {
+            "key": key,
+            "label": str(registry[key].get("label", key)),
+            "fonts": [
+                Path(font).stem
+                for font in registry[key].get("files", [])
+                if isinstance(font, str)
+            ][:12],
+        }
+        for key in dict.fromkeys(requested_keys)
+        if key in registry and registry[key].get("files")
+    ]
+    if not candidates:
+        raise HTTPException(422, "No valid font choices were provided")
+
+    text = (item.ground_truth or "").strip()[:1000]
+    caption = (item.caption or "").strip()[:500]
+    if not text:
+        raise HTTPException(422, "Record has no ground-truth text")
+    payload = json.dumps(
+        {
+            "model": settings.qwen_model,
+            "text": text,
+            "caption": caption,
+            "candidates": candidates,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    cache_key = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    cached = _font_choice_cache.get(cache_key)
+    if cached and cached[0] > time.monotonic():
+        return {**cached[1], "cached": True}
+    _font_choice_cache.pop(cache_key, None)
+    redis_cached = await _qwen_cache(request, "font-choice:" + cache_key)
+    if redis_cached:
+        _font_choice_cache[cache_key] = (time.monotonic() + 86400, redis_cached)
+        return {**redis_cached, "cached": True}
+
+    try:
+        from openai import OpenAI
+
+        prompt = (
+            "Choose the best calligraphic font style for displaying the supplied "
+            "Han-Nom text. Use only one candidate key. Consider readability and "
+            "the style implied by the candidate label and font filenames. Do not "
+            "rewrite the text. Return JSON only with keys font_key, reason. "
+            f"Text: {text}\nCaption/context: {caption}\n"
+            f"Allowed font candidates: {json.dumps(candidates, ensure_ascii=False)}"
+        )
+        client = OpenAI(api_key=settings.qwen_api_key, base_url=settings.qwen_base_url)
+        response = client.chat.completions.create(
+            model=settings.qwen_model,
+            temperature=0,
+            response_format={"type": "json_object"},
+            messages=[{"role": "user", "content": prompt}],
+        )
+        result_data = json.loads(
+            (response.choices[0].message.content or "{}")
+            .strip()
+            .removeprefix("```json")
+            .removesuffix("```")
+            .strip()
+        )
+        font_key = result_data.get("font_key")
+        allowed = {candidate["key"] for candidate in candidates}
+        if font_key not in allowed:
+            raise ValueError("Qwen returned a font outside the allowed candidates")
+        result = {
+            "enabled": True,
+            "font_key": font_key,
+            "font_label": next(
+                candidate["label"] for candidate in candidates if candidate["key"] == font_key
+            ),
+            "reason": str(result_data.get("reason", ""))[:240],
+            "model": settings.qwen_model,
+            "usage": {
+                "input_tokens": getattr(response.usage, "prompt_tokens", None),
+                "output_tokens": getattr(response.usage, "completion_tokens", None),
+            } if response.usage else None,
+        }
+        _font_choice_cache[cache_key] = (time.monotonic() + 86400, result)
+        if len(_font_choice_cache) > 256:
+            oldest_key = min(_font_choice_cache, key=lambda key: _font_choice_cache[key][0])
+            _font_choice_cache.pop(oldest_key, None)
+        await _qwen_cache(request, "font-choice:" + cache_key, result)
+        return result
+    except Exception as exc:
+        raise HTTPException(502, f"Qwen font selection failed: {exc}") from exc
 
 
 @router.post("/analyze")
