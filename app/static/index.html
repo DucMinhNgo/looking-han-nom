@@ -1694,6 +1694,7 @@
     let _usingCustomFont = false;
     let fontApplyToken = 0;
     let fontRenderToken = 0;
+    let _activeFontFamilies = [];
 
     /**
      * Wrap từng ký tự Hán/Nôm: nếu font mới không render được thì bọc trong
@@ -1809,6 +1810,7 @@
       options.onchange = (event) => {
         const target = event.target;
         if (!(target instanceof HTMLInputElement)) return;
+        const previousKeys = [...state.fontKeys];
         if (target.value === "__all__") {
           state.fontKeys = target.checked ? order.map(([key]) => key) : [];
         } else {
@@ -1833,7 +1835,14 @@
         updateFontMainOptions();
         updateFontFileOptions(state.fontKey);
         persistView();
-        applySelectedFont(state.fontKey);
+        const addedKeys = state.fontKeys.filter((fontKey) => !previousKeys.includes(fontKey));
+        const onlyAddedOneKey = addedKeys.length === 1
+          && previousKeys.every((fontKey) => state.fontKeys.includes(fontKey));
+        if (onlyAddedOneKey && state.fontKeys.length > 1) {
+          applyAdditionalFontGroup(addedKeys[0]);
+        } else {
+          applySelectedFont(state.fontKey);
+        }
       };
       $("font-file-options").onchange = (event) => {
         const target = event.target;
@@ -1968,6 +1977,90 @@
       return state.fontMode === "manual" && state.fontFiles.length > 1;
     }
 
+    function applyAdditionalFontGroup(key) {
+      const token = ++fontApplyToken;
+      const entries = getSelectedFontEntries().filter((entry) => entry.key === key);
+      const info = fontRegistry[key] || fontRegistry.default || {};
+      const defaultInfo = fontRegistry.default || {};
+      const fallback = info.fallback || defaultInfo.fallback || CJK_FALLBACK;
+      const chars = collectVisibleHanChars();
+      const status = $("font-status");
+
+      if (!chars.size || !entries.length || !document.fonts?.add || typeof FontFace !== "function") {
+        applySelectedFont(state.fontKey);
+        return;
+      }
+
+      if (status) status.textContent = `Đang dò font ${info.label || key} cho chữ chưa được font trước hiển thị…`;
+      void (async () => {
+        const failedFiles = [];
+        try {
+          await document.fonts.load(`48px ${fallback}`, [...chars].join(""));
+          if (token !== fontApplyToken) return;
+
+          for (const char of chars) {
+            if (_glyphAssignments.has(char)) continue;
+            const existingFamily = _activeFontFamilies.find((family) =>
+              _hasVisibleGlyph(`"${family}", ${fallback}`, char),
+            );
+            if (existingFamily) _glyphAssignments.set(char, existingFamily);
+          }
+
+          for (const entry of entries) {
+            if (token !== fontApplyToken) return;
+            const uncoveredChars = [...chars].filter((char) => !_glyphAssignments.has(char));
+            if (!uncoveredChars.length) break;
+            const fontFace = registeredFontFaces.get(entry.family);
+            if (!fontFace) {
+              failedFiles.push(entry.file);
+              continue;
+            }
+
+            try {
+              await fontFace.load();
+            } catch {
+              failedFiles.push(entry.file);
+              continue;
+            }
+            if (token !== fontApplyToken) return;
+
+            _glyphCache.clear();
+            const addedChars = uncoveredChars.filter((char) =>
+              _hasVisibleGlyph(`"${entry.family}", ${fallback}`, char),
+            );
+            if (!addedChars.length) continue;
+
+            addedChars.forEach((char) => _glyphAssignments.set(char, entry.family));
+            if (!_activeFontFamilies.includes(entry.family)) {
+              _activeFontFamilies.push(entry.family);
+            }
+            _currentSelectedStack = _activeFontFamilies.map((family) => `"${family}"`).join(", ");
+            _usingCustomFont = true;
+
+            const defaultStack = registerFontFaces(defaultInfo)
+              .map((family) => `"${family}"`).join(", ");
+            const stack = [_currentSelectedStack];
+            if (getSelectedFontKeys().some((fontKey) => fontKey !== "default") && defaultStack) {
+              stack.push(defaultStack);
+            }
+            if (fallback) stack.push(fallback);
+            document.documentElement.style.setProperty("--han-font-family", stack.join(", "));
+            refreshVisibleCardsProgressively();
+          }
+
+          if (status) {
+            const remaining = [...chars].filter((char) => !_glyphAssignments.has(char)).length;
+            status.textContent = `${entries.length} font con đã kiểm tra · ${remaining} chữ dùng font dự phòng`;
+            status.title = failedFiles.join("\n");
+          }
+        } catch (error) {
+          if (token === fontApplyToken && status) {
+            status.textContent = `Không thể dò font ${info.label || key}: ${error.message}`;
+          }
+        }
+      })();
+    }
+
     function applyAdditionalFont(key, file) {
       const token = ++fontApplyToken;
       const entry = getSelectedFontEntries().find((font) => font.file === file);
@@ -2024,6 +2117,7 @@
             if (!isDefault && defaultFamilies) stack.push(defaultFamilies);
             if (fallback) stack.push(fallback);
             _currentSelectedStack = selectedFamilies;
+            if (!_activeFontFamilies.includes(family)) _activeFontFamilies.push(family);
             _usingCustomFont = true;
             _glyphCache.clear();
             document.documentElement.style.setProperty("--han-font-family", stack.join(", "));
@@ -2109,6 +2203,7 @@
       _usingCustomFont = false;
       _currentSelectedStack = "";
       _currentDefaultStack = fallback;
+      _activeFontFamilies = [];
       _glyphAssignments.clear();
       _glyphCache.clear();
       if (status) {
@@ -2173,6 +2268,9 @@
                   }
                 }
                 if (coversCharacter) successfulFamilies.push(fontFamily);
+              }
+              if (!_activeFontFamilies.includes(fontFamily)) {
+                _activeFontFamilies.push(fontFamily);
               }
             } else {
               failedFiles.push(files[start + index]);
