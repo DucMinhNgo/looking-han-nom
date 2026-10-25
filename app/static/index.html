@@ -639,35 +639,53 @@
     }
 
     .qwen-font-tools {
-      display: grid;
-      grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
-      align-items: start;
-      gap: 0.35rem 0.55rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.45rem;
       min-width: 0;
       margin-top: 0.25rem;
     }
 
     .qwen-font-tools button {
-      max-width: 100%;
+      flex: 0 0 auto;
       white-space: normal;
     }
 
     .qwen-font-tools select {
+      flex: 1 1 10rem;
       min-width: 0;
       max-width: 100%;
+      min-height: 2.25rem;
+      padding: 0.4rem 2rem 0.4rem 0.65rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--plane);
+      color: var(--ink);
+      font: inherit;
+      font-size: 0.78rem;
+      cursor: pointer;
     }
 
     .qwen-font-type-tag {
+      flex: 1 0 100%;
       min-width: 0;
-      max-width: 100%;
-      padding: 0.2rem 0.5rem;
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      background: var(--plane);
+      padding: 0.4rem 0.6rem;
+      border: 1px solid color-mix(in srgb, var(--series-1) 24%, var(--border));
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--series-1) 7%, var(--plane));
       color: var(--ink-2);
       font-size: 0.68rem;
       line-height: 1.35;
       overflow-wrap: anywhere;
+    }
+
+    .qwen-font-type-tag[hidden] {
+      display: none;
+    }
+
+    .han-font-glyph {
+      font-size-adjust: cap-height 0.72;
     }
 
     .foot>span:not(.spacer),
@@ -1295,7 +1313,12 @@
       }
 
       .qwen-font-tools {
-        grid-template-columns: minmax(0, 1fr);
+        align-items: stretch;
+      }
+
+      .qwen-font-tools select,
+      .qwen-font-tools button {
+        flex: 1 1 100%;
       }
     }
   </style>
@@ -2808,6 +2831,7 @@
               font_keys: candidateKeys,
               per_character: false,
               include_image: true,
+              force_refresh: true,
             }),
           });
           if (!recommendation.enabled) {
@@ -2833,6 +2857,30 @@
         const preferredGroups = [chosenFontKey];
         const scanGroups = [...new Set([...preferredGroups, ...candidateKeys])];
         const failedFiles = new Set();
+        let qwenFontMap = {};
+        let repairError = "";
+        try {
+          const mapping = await api("/api/qwen/select-font", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              index: item.index,
+              font_keys: candidateKeys,
+              per_character: true,
+              characters: chars,
+              include_image: true,
+              preferred_font_key: chosenFontKey,
+              force_refresh: true,
+            }),
+          });
+          if (mapping.enabled) {
+            qwenFontMap = mapping.font_map || {};
+          } else {
+            repairError = mapping.message || "Qwen chưa được cấu hình để dò font.";
+          }
+        } catch (error) {
+          repairError = error.message;
+        }
         const resolveCharacters = async (groupKey, candidates) => {
           const info = fontRegistry[groupKey];
           if (!info || !candidates.size) return;
@@ -2871,40 +2919,16 @@
           }
         };
 
-        for (const groupKey of preferredGroups) {
-          await resolveCharacters(groupKey, new Set(chars));
-        }
-
+        await resolveCharacters(chosenFontKey, new Set(chars));
         let missingChars = chars.filter((char) => !assignments.has(char));
-        let repairError = "";
         if (missingChars.length) {
-          try {
-            const repair = await api("/api/qwen/select-font", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                index: item.index,
-                font_keys: candidateKeys,
-                per_character: true,
-                characters: missingChars,
-                include_image: true,
-                preferred_font_key: chosenFontKey,
-              }),
-            });
-            if (repair.enabled && repair.font_map) {
-              const repairGroups = [...new Set(missingChars.map((char) => repair.font_map[char])
-                .filter((key) => candidateKeys.includes(key)))];
-              for (const groupKey of repairGroups) {
-                const preferredChars = new Set(missingChars.filter(
-                  (char) => repair.font_map[char] === groupKey,
-                ));
-                await resolveCharacters(groupKey, preferredChars);
-              }
-            } else if (!repair.enabled) {
-              repairError = repair.message || "Qwen chưa được cấu hình để dò font bổ sung.";
-            }
-          } catch (error) {
-            repairError = error.message;
+          const repairGroups = [...new Set(missingChars.map((char) => qwenFontMap[char])
+            .filter((key) => candidateKeys.includes(key) && key !== chosenFontKey))];
+          for (const groupKey of repairGroups) {
+            const preferredChars = new Set(missingChars.filter(
+              (char) => qwenFontMap[char] === groupKey,
+            ));
+            await resolveCharacters(groupKey, preferredChars);
           }
           for (const groupKey of scanGroups) {
             missingChars = chars.filter((char) => !assignments.has(char));
@@ -2924,6 +2948,7 @@
           : `Chưa đủ glyph: ${assignments.size}/${chars.length} chữ · kiểu đã chọn: ${chosenStyle}`;
         const details = [
           repairError ? `Không dò được font bù bằng Qwen: ${repairError}` : "",
+          Object.keys(qwenFontMap).length ? "Qwen đã kiểm tra phân font theo từng chữ." : "",
           failedFiles.size ? `Font không tải được:\n${[...failedFiles].join("\n")}` : "",
         ].filter(Boolean);
         showResult(result, details.join("\n"));

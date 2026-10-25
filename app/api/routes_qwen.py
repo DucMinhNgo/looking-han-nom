@@ -188,6 +188,7 @@ async def select_font(request: Request, user: dict = Depends(current_user)):
             f"{resolved_image}:{image_path.stat().st_mtime_ns}:{image_path.stat().st_size}"
         )
     per_character = body.get("per_character") is True
+    force_refresh = body.get("force_refresh") is True
     preferred_font_key = body.get("preferred_font_key")
     if preferred_font_key is not None and (
         not isinstance(preferred_font_key, str)
@@ -231,14 +232,15 @@ async def select_font(request: Request, user: dict = Depends(current_user)):
         sort_keys=True,
     )
     cache_key = hashlib.sha256(payload.encode("utf-8")).hexdigest()
-    cached = _font_choice_cache.get(cache_key)
-    if cached and cached[0] > time.monotonic():
-        return {**cached[1], "cached": True}
-    _font_choice_cache.pop(cache_key, None)
-    redis_cached = await _qwen_cache(request, "font-choice:" + cache_key)
-    if redis_cached:
-        _font_choice_cache[cache_key] = (time.monotonic() + 86400, redis_cached)
-        return {**redis_cached, "cached": True}
+    if not force_refresh:
+        cached = _font_choice_cache.get(cache_key)
+        if cached and cached[0] > time.monotonic():
+            return {**cached[1], "cached": True}
+        _font_choice_cache.pop(cache_key, None)
+        redis_cached = await _qwen_cache(request, "font-choice:" + cache_key)
+        if redis_cached:
+            _font_choice_cache[cache_key] = (time.monotonic() + 86400, redis_cached)
+            return {**redis_cached, "cached": True}
 
     try:
         from openai import OpenAI
