@@ -2688,6 +2688,10 @@
       grid.querySelectorAll("[data-qwen-font]").forEach((button) => {
         button.onclick = () => recommendFontForRecord(+button.dataset.qwenFont, button);
       });
+      grid.querySelectorAll("[data-qwen-font-choice]").forEach((select) => {
+        select.onchange = () => updateRecordFontFileOptions(select.closest(".item"));
+        updateRecordFontFileOptions(select.closest(".item"));
+      });
     }
 
     function renderVisibleCards() {
@@ -2806,6 +2810,9 @@
             <option value="trien">Triện</option>
             <option value="thao">Thảo</option>
           </select>
+          <select data-qwen-font-file="${i}" aria-label="Chọn font con từ danh sách">
+            <option value="auto">Tự động chọn font con</option>
+          </select>
           <button type="button" data-qwen-font="${i}">Apply font</button>
           <span class="qwen-font-type-tag" role="status" aria-live="polite" hidden></span>
         </div>
@@ -2817,6 +2824,7 @@
       const item = state.items[index];
       const cardElement = button.closest(".item");
       const fontChoice = cardElement?.querySelector("[data-qwen-font-choice]")?.value || "auto";
+      const fontFileChoice = cardElement?.querySelector("[data-qwen-font-file]")?.value || "auto";
       const typeTag = cardElement?.querySelector(".qwen-font-type-tag");
       const showResult = (message, title = "") => {
         if (!typeTag) return;
@@ -2865,6 +2873,7 @@
               per_character: false,
               include_image: true,
               force_refresh: true,
+              preferred_font_file: fontFileChoice === "auto" ? null : fontFileChoice,
             }),
           });
           if (!recommendation.enabled) {
@@ -2903,6 +2912,7 @@
               characters: chars,
               include_image: true,
               preferred_font_key: chosenFontKey,
+              preferred_font_file: fontFileChoice === "auto" ? null : fontFileChoice,
               force_refresh: true,
             }),
           });
@@ -2923,7 +2933,13 @@
           const previousDefaultStack = _currentDefaultStack;
           _currentDefaultStack = fallback;
           try {
-            for (const entry of getFontEntriesForKey(groupKey)) {
+            const entries = getFontEntriesForKey(groupKey);
+            if (groupKey === chosenFontKey && fontFileChoice !== "auto") {
+              entries.sort((left, right) =>
+                Number(right.file === fontFileChoice) - Number(left.file === fontFileChoice),
+              );
+            }
+            for (const entry of entries) {
               groupByFamily.set(entry.family, groupKey);
               const unresolved = [...candidates].filter((char) => !assignments.has(char));
               if (!unresolved.length) break;
@@ -2994,6 +3010,24 @@
       const files = Array.isArray(info.files) ? info.files : info.file ? [info.file] : [];
       const families = registerFontFaces(info);
       return files.map((file, index) => ({ file, family: families[index] }));
+    }
+
+    function updateRecordFontFileOptions(cardElement) {
+      const groupSelect = cardElement?.querySelector("[data-qwen-font-choice]");
+      const fileSelect = cardElement?.querySelector("[data-qwen-font-file]");
+      if (!groupSelect || !fileSelect) return;
+      const selectedGroup = groupSelect.value;
+      const previousFile = fileSelect.value;
+      const files = selectedGroup === "auto"
+        ? []
+        : fontRegistry[selectedGroup]?.files || [];
+      fileSelect.innerHTML = `<option value="auto">${selectedGroup === "auto"
+        ? "Tự động chọn font con"
+        : "Tự động chọn font con"}</option>${files.map((file) =>
+        `<option value="${esc(file)}">${esc(file.split("/").pop().replace(/\.(ttf|otf|woff2?)$/i, ""))}</option>`
+      ).join("")}`;
+      fileSelect.value = files.includes(previousFile) ? previousFile : "auto";
+      fileSelect.disabled = selectedGroup === "auto" || files.length === 0;
     }
 
     function renderRecommendedFont(cardElement, item, assignments) {
