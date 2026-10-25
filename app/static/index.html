@@ -2791,6 +2791,7 @@
             index: item.index,
             font_keys: candidateKeys,
             per_character: false,
+            include_image: true,
           }),
         });
         if (!recommendation.enabled) {
@@ -2857,26 +2858,34 @@
         }
 
         let missingChars = chars.filter((char) => !assignments.has(char));
+        let repairError = "";
         if (missingChars.length) {
-          const repair = await api("/api/qwen/select-font", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              index: item.index,
-              font_keys: candidateKeys,
-              per_character: true,
-              characters: missingChars,
-            }),
-          });
-          if (repair.enabled && repair.font_map) {
-            const repairGroups = [...new Set(missingChars.map((char) => repair.font_map[char])
-              .filter((key) => candidateKeys.includes(key)))];
-            for (const groupKey of repairGroups) {
-              const preferredChars = new Set(missingChars.filter(
-                (char) => repair.font_map[char] === groupKey,
-              ));
-              await resolveCharacters(groupKey, preferredChars);
+          try {
+            const repair = await api("/api/qwen/select-font", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                index: item.index,
+                font_keys: candidateKeys,
+                per_character: true,
+                characters: missingChars,
+                include_image: true,
+              }),
+            });
+            if (repair.enabled && repair.font_map) {
+              const repairGroups = [...new Set(missingChars.map((char) => repair.font_map[char])
+                .filter((key) => candidateKeys.includes(key)))];
+              for (const groupKey of repairGroups) {
+                const preferredChars = new Set(missingChars.filter(
+                  (char) => repair.font_map[char] === groupKey,
+                ));
+                await resolveCharacters(groupKey, preferredChars);
+              }
+            } else if (!repair.enabled) {
+              repairError = repair.message || "Qwen chưa được cấu hình để dò font bổ sung.";
             }
+          } catch (error) {
+            repairError = error.message;
           }
           for (const groupKey of scanGroups) {
             missingChars = chars.filter((char) => !assignments.has(char));
@@ -2894,7 +2903,11 @@
         const result = complete
           ? `Đã kiểm tra: đủ ${assignments.size}/${chars.length} chữ · ${labels.join(", ") || chosenStyle}`
           : `Chưa đủ glyph: ${assignments.size}/${chars.length} chữ · kiểu Qwen: ${chosenStyle}`;
-        showResult(result, failedFiles.size ? `Font không tải được:\n${[...failedFiles].join("\n")}` : "");
+        const details = [
+          repairError ? `Không dò được font bù bằng Qwen: ${repairError}` : "",
+          failedFiles.size ? `Font không tải được:\n${[...failedFiles].join("\n")}` : "",
+        ].filter(Boolean);
+        showResult(result, details.join("\n"));
       } catch (error) {
         showResult(`Không thể áp dụng font: ${error.message}`);
       } finally {

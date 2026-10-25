@@ -176,6 +176,17 @@ async def select_font(request: Request, user: dict = Depends(current_user)):
     caption = (item.caption or "").strip()[:500]
     if not text:
         raise HTTPException(422, "Record has no ground-truth text")
+    include_image = body.get("include_image") is True
+    image_path = None
+    image_cache_identity = ""
+    if include_image:
+        resolved_image = request.app.state.runtime.images.resolve(item.image)
+        image_path = request.app.state.runtime.images.path_for(resolved_image or "")
+        if image_path is None:
+            raise HTTPException(404, "Record image not found")
+        image_cache_identity = (
+            f"{resolved_image}:{image_path.stat().st_mtime_ns}:{image_path.stat().st_size}"
+        )
     per_character = body.get("per_character") is True
     han_chars: list[str] = []
     if per_character:
@@ -207,6 +218,7 @@ async def select_font(request: Request, user: dict = Depends(current_user)):
             "candidates": candidates,
             "per_character": per_character,
             "characters": han_chars if per_character else [],
+            "image": image_cache_identity,
         },
         ensure_ascii=False,
         sort_keys=True,
@@ -224,9 +236,18 @@ async def select_font(request: Request, user: dict = Depends(current_user)):
     try:
         from openai import OpenAI
 
+        image_content = []
+        if image_path is not None:
+            image_data = base64.b64encode(image_path.read_bytes()).decode("ascii")
+            image_content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:{_mime(image_path)};base64,{image_data}"},
+            })
         if per_character:
             prompt = (
-                "For every requested Han character, choose the most suitable "
+                "The attached image is the visual reference for the original writing. "
+                "Match its calligraphic appearance as closely as possible. For every "
+                "requested Han character, choose the most suitable "
                 "font group that is likely to contain a visible Unicode glyph. "
                 "Use only supplied font keys and consider each group's font filenames. "
                 "Prefer the requested calligraphic style where possible; choose another "
@@ -239,19 +260,21 @@ async def select_font(request: Request, user: dict = Depends(current_user)):
             )
         else:
             prompt = (
-                "Choose the best calligraphic font style for displaying the supplied "
-                "Han-Nom text. Use only one candidate key. Consider readability and "
-                "the style implied by the candidate label and font filenames. Do not "
-                "rewrite the text. Return JSON only with keys font_key, reason. "
+                "Inspect the attached image and the supplied Han-Nom text. Identify "
+                "the closest of the available calligraphic font groups to the writing "
+                "in the image, and choose exactly one group. Consider stroke shape, "
+                "brush character, layout, and readability. Do not rewrite the text. "
+                "Return JSON only with keys font_key, reason. "
                 f"Text: {text}\nCaption/context: {caption}\n"
                 f"Allowed font candidates: {json.dumps(candidates, ensure_ascii=False)}"
             )
+        message_content = [{"type": "text", "text": prompt}, *image_content]
         client = OpenAI(api_key=settings.qwen_api_key, base_url=settings.qwen_base_url)
         response = client.chat.completions.create(
             model=settings.qwen_model,
             temperature=0,
             response_format={"type": "json_object"},
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "user", "content": message_content}],
         )
         result_data = json.loads(
             (response.choices[0].message.content or "{}")
