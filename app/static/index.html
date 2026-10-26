@@ -2716,6 +2716,14 @@
         select.onchange = () => updateRecordFontFileOptions(select.closest(".item"));
         updateRecordFontFileOptions(select.closest(".item"));
       });
+      grid.querySelectorAll("[data-qwen-font-file]").forEach((select) => {
+        select.onchange = () => {
+          if (select.value === "auto") return;
+          const cardElement = select.closest(".item");
+          const button = cardElement?.querySelector("[data-qwen-font]");
+          if (button) recommendFontForRecord(Number(button.dataset.qwenFont), button);
+        };
+      });
     }
 
     function renderVisibleCards() {
