@@ -1403,6 +1403,14 @@
               <option value="unverified">Chưa verify</option>
             </select>
           </label>
+          <label class="lookup-filter-control" for="font-status-filter">
+            <span>Trạng thái font</span>
+            <select id="font-status-filter" aria-label="Lọc record đã có kiểu chữ">
+              <option value="">Tất cả record</option>
+              <option value="ready">Đã có font</option>
+              <option value="missing">Chưa có font</option>
+            </select>
+          </label>
           <label class="lookup-filter-control" for="han-similarity-filter">
             <span>Độ giống caption</span>
             <select id="han-similarity-filter" aria-label="Lọc caption theo độ tương đồng chữ Hán">
@@ -1652,7 +1660,7 @@
     }
 
     const state = {
-      me: null, query: "", field: "all", groups: [...DEFAULT_GROUP_NAMES], verifyFilter: "", hanSimilarityFilter: "", sortOrder: "display", offset: 0, limit: 20,
+      me: null, query: "", field: "all", groups: [...DEFAULT_GROUP_NAMES], verifyFilter: "", fontStatusFilter: "", hanSimilarityFilter: "", sortOrder: "display", offset: 0, limit: 20,
       mode: "scroll", page: 1, loading: false, fontKey: "default", fontKeys: ["default"],
       fontMode: "manual", fontFiles: [],
       groupTags: {},
@@ -1664,7 +1672,7 @@
     try {
       const savedView = JSON.parse(localStorage.getItem("hannom.view") || "{}");
       hasSavedFontPreferences = savedView.fontMode !== undefined || Array.isArray(savedView.fontFiles);
-      for (const key of ["query", "field", "verifyFilter", "hanSimilarityFilter", "sortOrder", "missingOnly", "mode", "limit", "page", "offset", "fontKey", "fontKeys", "fontMode", "fontFiles"])
+      for (const key of ["query", "field", "verifyFilter", "fontStatusFilter", "hanSimilarityFilter", "sortOrder", "missingOnly", "mode", "limit", "page", "offset", "fontKey", "fontKeys", "fontMode", "fontFiles"])
         if (savedView[key] !== undefined) state[key] = savedView[key];
       if (!Array.isArray(savedView.fontKeys) && savedView.fontKey) {
         state.fontKeys = [savedView.fontKey];
@@ -1683,6 +1691,7 @@
       try {
         localStorage.setItem("hannom.view", JSON.stringify({
           query: state.query, field: state.field, groups: state.groups, verifyFilter: state.verifyFilter,
+          fontStatusFilter: state.fontStatusFilter,
           hanSimilarityFilter: state.hanSimilarityFilter,
           sortOrder: state.sortOrder,
           missingOnly: state.missingOnly,
@@ -2414,7 +2423,8 @@
       return JSON.stringify({
         q: state.query, field: state.field,
         groups: (state.groups || []).slice().sort(),
-        verified: state.verifyFilter, hanSimilarity: state.hanSimilarityFilter,
+        verified: state.verifyFilter, fontStatus: state.fontStatusFilter,
+        hanSimilarity: state.hanSimilarityFilter,
         sort: state.sortOrder, missing: state.missingOnly,
         offset, limit: state.limit,
       });
@@ -2663,6 +2673,7 @@
       }
       const params = new URLSearchParams({
         q: state.query, field: state.field, verified: state.verifyFilter,
+        font_status: state.fontStatusFilter,
         sort: state.sortOrder, offset: requestOffset, limit: state.limit,
       });
       if (state.groups) {
@@ -2967,7 +2978,11 @@
         const savedFontStyle = candidateKeys.includes(item.font_style) ? item.font_style : "";
         let chosenFontKey = selectedFileGroup
           || (fontChoice !== "auto" ? fontChoice : savedFontStyle);
-        const useQwen = fontFileChoice === "auto";
+        const hasSavedFontStyle = Boolean(savedFontStyle && chosenFontKey === savedFontStyle);
+        const maxFontFiles = Number.isFinite(options.maxFontFiles)
+          ? options.maxFontFiles
+          : hasSavedFontStyle ? AUTO_FONT_FILE_LIMIT : Infinity;
+        const useQwen = fontFileChoice === "auto" && !hasSavedFontStyle;
         if (fontChoice === "auto" && !selectedFileGroup && !savedFontStyle) {
           await showLoading("Qwen đang nhận diện kiểu chữ từ ảnh…");
           const recommendation = await api("/api/qwen/select-font", {
@@ -2997,10 +3012,16 @@
         if (!candidateKeys.includes(chosenFontKey)) {
           throw new Error("Qwen chọn kiểu font không có trong registry.");
         }
+        if (hasSavedFontStyle) {
+          const savedStyleLabel = fontRegistry[chosenFontKey]?.label || chosenFontKey;
+          await showLoading(`Đã có kiểu chữ ${savedStyleLabel}; đang tải tối đa 5 font đầu tiên…`);
+        }
         const chars = textChars;
         const assignments = new Map();
         const groupByFamily = new Map();
-        const scanGroups = [...new Set([chosenFontKey, ...candidateKeys])];
+        const scanGroups = hasSavedFontStyle
+          ? [chosenFontKey]
+          : [...new Set([chosenFontKey, ...candidateKeys])];
         const failedFiles = new Set();
         const attemptedFontFiles = new Set();
         let qwenFontMap = {};
@@ -3047,12 +3068,12 @@
               ];
             }
             entries = entries.filter((entry) => !attemptedFontFiles.has(entry.file));
-            if (Number.isFinite(options.maxFontFiles)) {
-              entries = entries.slice(0, Math.max(0, options.maxFontFiles - attemptedFontFiles.size));
+            if (Number.isFinite(maxFontFiles)) {
+              entries = entries.slice(0, Math.max(0, maxFontFiles - attemptedFontFiles.size));
             }
             for (const entry of entries) {
-              if (Number.isFinite(options.maxFontFiles)
-                && attemptedFontFiles.size >= options.maxFontFiles) break;
+              if (Number.isFinite(maxFontFiles)
+                && attemptedFontFiles.size >= maxFontFiles) break;
               attemptedFontFiles.add(entry.file);
               groupByFamily.set(entry.family, groupKey);
               const unresolved = [...candidates].filter((char) => !assignments.has(char));
@@ -3110,8 +3131,8 @@
         const details = [
           repairError ? `Không dò được font bù bằng Qwen: ${repairError}` : "",
           Object.keys(qwenFontMap).length ? "Qwen đã kiểm tra phân font theo từng chữ." : "",
-          Number.isFinite(options.maxFontFiles)
-            ? `Đã thử ${attemptedFontFiles.size}/${options.maxFontFiles} font con đầu tiên.`
+          Number.isFinite(maxFontFiles)
+            ? `Đã thử ${attemptedFontFiles.size}/${maxFontFiles} font con đầu tiên.`
             : "",
           failedFiles.size ? `Font không tải được:\n${[...failedFiles].join("\n")}` : "",
         ].filter(Boolean);
@@ -3951,6 +3972,11 @@
     };
 
     $("verify-filter").onchange = (e) => { state.verifyFilter = e.target.value; persistView(); resetResults(); };
+    $("font-status-filter").onchange = (e) => {
+      state.fontStatusFilter = e.target.value;
+      persistView();
+      resetResults();
+    };
     $("han-similarity-filter").onchange = (e) => {
       state.hanSimilarityFilter = e.target.value;
       persistView();
@@ -3967,11 +3993,13 @@
       state.groups = getDefaultGroups();
       updateGroupFilter();
       $("verify-filter").value = "";
+      $("font-status-filter").value = "";
       $("han-similarity-filter").value = "";
       $("sort-filter").value = "display";
       state.query = "";
       state.field = "all";
       state.verifyFilter = "";
+      state.fontStatusFilter = "";
       state.hanSimilarityFilter = "";
       state.sortOrder = "display";
       state.missingOnly = false;
@@ -4074,6 +4102,7 @@
       $("field").value = state.field;
       updateGroupFilter();
       $("verify-filter").value = state.verifyFilter;
+      $("font-status-filter").value = state.fontStatusFilter;
       $("han-similarity-filter").value = state.hanSimilarityFilter;
       $("sort-filter").value = state.sortOrder;
       $("btn-missing").textContent = state.missingOnly ? "Bỏ lọc" : "Chỉ xem nhóm này";

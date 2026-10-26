@@ -35,6 +35,29 @@ class TestSearch:
         assert body["total"] == 10
         assert len(body["items"]) == 10
 
+    def test_font_status_filter_applies_before_pagination(self, client):
+        login(client)
+        path = client.app.state.runtime.dataset.path
+        rows = [
+            {"image": "a.jpg", "ground_truth": "甲", "font_style": "thao"},
+            {"image": "b.jpg", "ground_truth": "乙", "font_style": ""},
+            {"image": "c.jpg", "ground_truth": "丙", "font_style": "hanh"},
+        ]
+        path.write_text(
+            "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows),
+            encoding="utf-8",
+        )
+
+        ready = client.get("/api/lookup", params={
+            "font_status": "ready", "offset": 1, "limit": 1,
+        }).json()
+        missing = client.get("/api/lookup", params={"font_status": "missing"}).json()
+
+        assert ready["total"] == 2
+        assert ready["items"][0]["image"] == "c.jpg"
+        assert missing["total"] == 1
+        assert missing["items"][0]["image"] == "b.jpg"
+
     def test_by_caption(self, client):
         login(client)
         assert client.get("/api/lookup", params={"q": "Chú thích số 3"}).json()["total"] == 1

@@ -44,6 +44,7 @@ async def lookup(
     group: str = Query(""),
     groups: str = Query(""),
     verified: str = Query(""),
+    font_status: Literal["", "ready", "missing"] = Query(""),
     min_han_similarity: int = Query(0, ge=0, le=100),
     sort: Literal[
         "display", "created_desc", "created_asc", "updated_desc", "updated_asc",
@@ -79,6 +80,10 @@ async def lookup(
         rows = [item for item in rows if item.extra.get("verified") is True]
     elif verified == "unverified":
         rows = [item for item in rows if item.extra.get("verified") is not True]
+    if font_status == "ready":
+        rows = [item for item in rows if item.font_style]
+    elif font_status == "missing":
+        rows = [item for item in rows if not item.font_style]
     raw_groups = request.query_params.getlist("group") + request.query_params.getlist("groups")
     selected_groups = {part.strip() for g in raw_groups for part in g.split(",") if part.strip()}
     if selected_groups:
