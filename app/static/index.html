@@ -3057,50 +3057,43 @@
           await showLoading(`Đang tải font ${info.label || groupKey} cho ${candidates.size} chữ…`);
           const fallback = info.fallback || CJK_FALLBACK;
           await document.fonts.load(`48px ${fallback}`, [...candidates].join(""));
-          const previousDefaultStack = _currentDefaultStack;
-          _currentDefaultStack = fallback;
-          try {
-            let entries = getFontEntriesForKey(groupKey);
-            if (groupKey === selectedFileGroup) {
-              entries = [
-                ...entries.filter((entry) => entry.file === fontFileChoice),
-                ...entries.filter((entry) => entry.file !== fontFileChoice),
-              ];
+          let entries = getFontEntriesForKey(groupKey);
+          if (groupKey === selectedFileGroup) {
+            entries = [
+              ...entries.filter((entry) => entry.file === fontFileChoice),
+              ...entries.filter((entry) => entry.file !== fontFileChoice),
+            ];
+          }
+          entries = entries.filter((entry) => !attemptedFontFiles.has(entry.file));
+          if (!includeRemainingFonts && Number.isFinite(maxFontFiles)) {
+            entries = entries.slice(0, Math.max(0, maxFontFiles - attemptedFontFiles.size));
+          }
+          for (const entry of entries) {
+            if (!includeRemainingFonts && Number.isFinite(maxFontFiles)
+              && attemptedFontFiles.size >= maxFontFiles) break;
+            attemptedFontFiles.add(entry.file);
+            groupByFamily.set(entry.family, groupKey);
+            const unresolved = [...candidates].filter((char) => !assignments.has(char));
+            if (!unresolved.length) break;
+            const fontFace = registeredFontFaces.get(entry.family);
+            if (!fontFace) {
+              failedFiles.add(entry.file);
+              continue;
             }
-            entries = entries.filter((entry) => !attemptedFontFiles.has(entry.file));
-            if (!includeRemainingFonts && Number.isFinite(maxFontFiles)) {
-              entries = entries.slice(0, Math.max(0, maxFontFiles - attemptedFontFiles.size));
+            try {
+              await fontFace.load();
+            } catch {
+              discardFailedFontFace(entry.family, fontFace);
+              failedFiles.add(entry.file);
+              continue;
             }
-            for (const entry of entries) {
-              if (!includeRemainingFonts && Number.isFinite(maxFontFiles)
-                && attemptedFontFiles.size >= maxFontFiles) break;
-              attemptedFontFiles.add(entry.file);
-              groupByFamily.set(entry.family, groupKey);
-              const unresolved = [...candidates].filter((char) => !assignments.has(char));
-              if (!unresolved.length) break;
-              const fontFace = registeredFontFaces.get(entry.family);
-              if (!fontFace) {
-                failedFiles.add(entry.file);
-                continue;
-              }
-              try {
-                await fontFace.load();
-              } catch {
-                discardFailedFontFace(entry.family, fontFace);
-                failedFiles.add(entry.file);
-                continue;
-              }
-              _glyphCache.clear();
-              for (const char of unresolved) {
-                if (checkFontSupportsChar(entry.family, char)) {
-                  assignments.set(char, entry.family);
-                }
-              }
-              renderRecommendedFont(cardElement, item, assignments);
-            }
-          } finally {
-            _currentDefaultStack = previousDefaultStack;
             _glyphCache.clear();
+            for (const char of unresolved) {
+              if (checkFontSupportsChar(entry.family, char)) {
+                assignments.set(char, entry.family);
+              }
+            }
+            renderRecommendedFont(cardElement, item, assignments);
           }
         };
 
