@@ -3014,7 +3014,7 @@
         }
         if (hasSavedFontStyle) {
           const savedStyleLabel = fontRegistry[chosenFontKey]?.label || chosenFontKey;
-          await showLoading(`Đã có kiểu chữ ${savedStyleLabel}; đang tải tối đa 5 font đầu tiên…`);
+          await showLoading(`Đã có kiểu chữ ${savedStyleLabel}; ưu tiên tải 5 font đầu tiên…`);
         }
         const chars = textChars;
         const assignments = new Map();
@@ -3051,7 +3051,7 @@
         } catch (error) {
           repairError = error.message;
         }
-        const resolveCharacters = async (groupKey, candidates) => {
+        const resolveCharacters = async (groupKey, candidates, includeRemainingFonts = false) => {
           const info = fontRegistry[groupKey];
           if (!info || !candidates.size) return;
           await showLoading(`Đang tải font ${info.label || groupKey} cho ${candidates.size} chữ…`);
@@ -3068,11 +3068,11 @@
               ];
             }
             entries = entries.filter((entry) => !attemptedFontFiles.has(entry.file));
-            if (Number.isFinite(maxFontFiles)) {
+            if (!includeRemainingFonts && Number.isFinite(maxFontFiles)) {
               entries = entries.slice(0, Math.max(0, maxFontFiles - attemptedFontFiles.size));
             }
             for (const entry of entries) {
-              if (Number.isFinite(maxFontFiles)
+              if (!includeRemainingFonts && Number.isFinite(maxFontFiles)
                 && attemptedFontFiles.size >= maxFontFiles) break;
               attemptedFontFiles.add(entry.file);
               groupByFamily.set(entry.family, groupKey);
@@ -3106,6 +3106,10 @@
 
         await resolveCharacters(chosenFontKey, new Set(chars));
         let missingChars = chars.filter((char) => !assignments.has(char));
+        if (hasSavedFontStyle && missingChars.length) {
+          await resolveCharacters(chosenFontKey, new Set(missingChars), true);
+          missingChars = chars.filter((char) => !assignments.has(char));
+        }
         const qwenGroups = [...new Set(missingChars.map((char) => qwenFontMap[char])
           .filter((key) => candidateKeys.includes(key) && key !== chosenFontKey))];
         for (const groupKey of qwenGroups) {
@@ -3132,7 +3136,7 @@
           repairError ? `Không dò được font bù bằng Qwen: ${repairError}` : "",
           Object.keys(qwenFontMap).length ? "Qwen đã kiểm tra phân font theo từng chữ." : "",
           Number.isFinite(maxFontFiles)
-            ? `Đã thử ${attemptedFontFiles.size}/${maxFontFiles} font con đầu tiên.`
+            ? `Đã thử ${attemptedFontFiles.size} font con; ưu tiên 5 font đầu tiên.`
             : "",
           failedFiles.size ? `Font không tải được:\n${[...failedFiles].join("\n")}` : "",
         ].filter(Boolean);
