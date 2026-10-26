@@ -26,7 +26,7 @@ log = logging.getLogger(__name__)
 # ─── SQL ──────────────────────────────────────────────────────────────────────
 
 _SQL_LOAD = """
-SELECT id, image, post_id, post_link, caption, ground_truth, phonetic, extra,
+SELECT id, image, post_id, post_link, caption, ground_truth, phonetic, font_style, extra,
        created_at, updated_at
     FROM dataset_items
  ORDER BY display_index NULLS LAST, id
@@ -36,8 +36,8 @@ _SQL_SIGNATURE = "SELECT MAX(updated_at) FROM dataset_items"
 
 _SQL_UPSERT_IMAGE = """
 INSERT INTO dataset_items
-    (image, post_id, post_link, caption, ground_truth, phonetic, extra, display_index)
-VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+    (image, post_id, post_link, caption, ground_truth, phonetic, font_style, extra, display_index)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
 ON CONFLICT (image) WHERE image <> ''
 DO UPDATE SET
     post_id       = EXCLUDED.post_id,
@@ -45,6 +45,7 @@ DO UPDATE SET
     caption       = EXCLUDED.caption,
     ground_truth  = EXCLUDED.ground_truth,
     phonetic      = EXCLUDED.phonetic,
+    font_style    = EXCLUDED.font_style,
     extra         = EXCLUDED.extra,
     display_index = EXCLUDED.display_index,
     updated_at    = NOW()
@@ -54,6 +55,7 @@ WHERE
     dataset_items.caption       IS DISTINCT FROM EXCLUDED.caption       OR
     dataset_items.ground_truth  IS DISTINCT FROM EXCLUDED.ground_truth  OR
     dataset_items.phonetic      IS DISTINCT FROM EXCLUDED.phonetic      OR
+    dataset_items.font_style    IS DISTINCT FROM EXCLUDED.font_style    OR
     dataset_items.extra         IS DISTINCT FROM EXCLUDED.extra         OR
     dataset_items.display_index IS DISTINCT FROM EXCLUDED.display_index
 RETURNING id
@@ -61,14 +63,15 @@ RETURNING id
 
 _SQL_UPSERT_NO_IMAGE = """
 INSERT INTO dataset_items
-    (image, post_id, post_link, caption, ground_truth, phonetic, extra, display_index)
-VALUES ('', %s, %s, %s, %s, %s, %s, %s)
+    (image, post_id, post_link, caption, ground_truth, phonetic, font_style, extra, display_index)
+VALUES ('', %s, %s, %s, %s, %s, %s, %s, %s)
 ON CONFLICT (post_id) WHERE image = '' AND post_id <> ''
 DO UPDATE SET
     post_link     = EXCLUDED.post_link,
     caption       = EXCLUDED.caption,
     ground_truth  = EXCLUDED.ground_truth,
     phonetic      = EXCLUDED.phonetic,
+    font_style    = EXCLUDED.font_style,
     extra         = EXCLUDED.extra,
     display_index = EXCLUDED.display_index,
     updated_at    = NOW()
@@ -77,8 +80,8 @@ RETURNING id
 
 _SQL_INSERT_NO_KEY = """
 INSERT INTO dataset_items
-    (image, post_id, post_link, caption, ground_truth, phonetic, extra, display_index)
-VALUES ('', '', %s, %s, %s, %s, %s, %s)
+    (image, post_id, post_link, caption, ground_truth, phonetic, font_style, extra, display_index)
+VALUES ('', '', %s, %s, %s, %s, %s, %s, %s)
 RETURNING id
 """
 
@@ -92,6 +95,12 @@ _SQL_UPDATE_PHONETIC = """
 UPDATE dataset_items
      SET phonetic = %s, updated_at = NOW()
  WHERE id = %s
+"""
+
+_SQL_UPDATE_FONT_STYLE = """
+UPDATE dataset_items
+   SET font_style = %s, updated_at = NOW()
+ WHERE id = %s AND font_style = ''
 """
 
 _SQL_UPDATE_EXTRA = """
@@ -145,6 +154,16 @@ class PgDataset:
         self._lock = threading.Lock()
         self._conn = None
         self._driver: str = ""
+        self._schema_ready = False
+
+    def _ensure_schema(self) -> None:
+        if self._schema_ready:
+            return
+        self._execute(
+            "ALTER TABLE dataset_items "
+            "ADD COLUMN IF NOT EXISTS font_style TEXT NOT NULL DEFAULT ''"
+        )
+        self._schema_ready = True
 
     # ─── Connection management ─────────────────────────────────────────────────
 
@@ -224,6 +243,7 @@ class PgDataset:
         return {}
 
     def load(self, force: bool = False) -> list[Item]:
+        self._ensure_schema()
         sig = self._db_signature()
         with self._lock:
             if not force and self._items and sig == self._signature:
@@ -237,7 +257,7 @@ class PgDataset:
             items: list[Item] = []
             db_ids: list[int] = []
             for i, (db_id, image, post_id, post_link, caption, ground_truth,
-                    phonetic, extra, created_at, updated_at) in enumerate(rows):
+                    phonetic, font_style, extra, created_at, updated_at) in enumerate(rows):
                 items.append(Item(
                     index=i,
                     image=image or "",
@@ -246,6 +266,7 @@ class PgDataset:
                     caption=caption or "",
                     ground_truth=ground_truth or "",
                     phonetic=phonetic or "",
+                    font_style=font_style or "",
                     extra=self._parse_extra(extra),
                     created_at=created_at,
                     updated_at=updated_at,
@@ -350,18 +371,22 @@ class PgDataset:
         caption = _pick(row, "caption")
         ground_truth = _pick(row, "ground_truth")
         phonetic = _pick(row, "phonetic")
+        font_style = _pick(row, "font_style")
         extra = {k: v for k, v in row.items() if k not in _consumed(row)}
         ep = self._json_param(extra)
 
         if image:
             cur.execute(_SQL_UPSERT_IMAGE,
-                        (image, post_id, post_link, caption, ground_truth, phonetic, ep, display_idx))
+                        (image, post_id, post_link, caption, ground_truth, phonetic,
+                         font_style, ep, display_idx))
         elif post_id:
             cur.execute(_SQL_UPSERT_NO_IMAGE,
-                        (post_id, post_link, caption, ground_truth, phonetic, ep, display_idx))
+                        (post_id, post_link, caption, ground_truth, phonetic,
+                         font_style, ep, display_idx))
         else:
             cur.execute(_SQL_INSERT_NO_KEY,
-                        (post_link, caption, ground_truth, phonetic, ep, display_idx))
+                        (post_link, caption, ground_truth, phonetic,
+                         font_style, ep, display_idx))
 
     def update_ground_truth(
         self, index: int, ground_truth: str
@@ -400,6 +425,20 @@ class PgDataset:
         with self._lock:
             if index < len(self._items):
                 self._items[index].phonetic = phonetic
+
+    def update_font_style(self, index: int, font_style: str) -> None:
+        """Persist a classification only when this record has no saved style."""
+        with self._lock:
+            if not 0 <= index < len(self._items):
+                raise IndexError(index)
+            db_id = self._db_ids[index]
+
+        updated = self._execute(_SQL_UPDATE_FONT_STYLE, (font_style, db_id))
+
+        if updated:
+            with self._lock:
+                if index < len(self._items):
+                    self._items[index].font_style = font_style
 
     def update_verify(
         self, index: int, verified: bool, username: str
@@ -456,6 +495,7 @@ class PgDataset:
                 "caption": item.caption,
                 "ground_truth": item.ground_truth,
                 "phonetic": getattr(item, "phonetic", ""),
+                "font_style": item.font_style,
             }
             for item in self.items
         ]

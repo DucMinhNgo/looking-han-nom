@@ -79,6 +79,8 @@ ALTER TABLE dataset_items
 -- Add phonetic column for phonetic transcription / bản dịch âm
 ALTER TABLE dataset_items
     ADD COLUMN IF NOT EXISTS phonetic TEXT NOT NULL DEFAULT '';
+ALTER TABLE dataset_items
+    ADD COLUMN IF NOT EXISTS font_style TEXT NOT NULL DEFAULT '';
 
 -- ─── Users table ──────────────────────────────────────────────────────────────
 -- Lưu tài khoản reviewer và admin.

@@ -437,3 +437,7 @@ docker compose exec -T postgres psql -U hannom -d hannom \
 docker compose exec -T postgres psql -U hannom -d hannom \
   -c "TRUNCATE TABLE dataset_items RESTART IDENTITY CASCADE;"
 ```
+
+python -m app.cli --classify-fonts
+python -m app.cli --classify-fonts --max-font-records 10
+docker compose exec lookup python -m app.cli --classify-fonts

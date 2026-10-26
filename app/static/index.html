@@ -2763,7 +2763,12 @@
         button.onclick = () => recommendFontForRecord(+button.dataset.qwenFont, button);
       });
       grid.querySelectorAll("[data-qwen-font-choice]").forEach((select) => {
-        select.onchange = () => updateRecordFontFileOptions(select.closest(".item"));
+        select.onchange = () => {
+          const cardElement = select.closest(".item");
+          updateRecordFontFileOptions(cardElement);
+          const button = cardElement?.querySelector("[data-qwen-font]");
+          if (button) recommendFontForRecord(Number(button.dataset.qwenFont), button);
+        };
         updateRecordFontFileOptions(select.closest(".item"));
       });
       grid.querySelectorAll("[data-qwen-font-file]").forEach((select) => {
@@ -2886,11 +2891,11 @@
         <div class="qwen-font-tools">
           <select data-qwen-font-choice="${i}" aria-label="Chọn kiểu chữ cho record">
             <option value="auto">Tự động nhận diện</option>
-            <option value="default">Khải</option>
-            <option value="hanh">Hành</option>
-            <option value="le">Lệ</option>
-            <option value="trien">Triện</option>
-            <option value="thao">Thảo</option>
+            <option value="default" ${item.font_style === "default" ? "selected" : ""}>Khải</option>
+            <option value="hanh" ${item.font_style === "hanh" ? "selected" : ""}>Hành</option>
+            <option value="le" ${item.font_style === "le" ? "selected" : ""}>Lệ</option>
+            <option value="trien" ${item.font_style === "trien" ? "selected" : ""}>Triện</option>
+            <option value="thao" ${item.font_style === "thao" ? "selected" : ""}>Thảo</option>
           </select>
           <select data-qwen-font-file="${i}" aria-label="Chọn font con từ danh sách">
             <option value="auto">Tự động chọn font con</option>
@@ -2908,7 +2913,9 @@
       const fontChoice = cardElement?.querySelector("[data-qwen-font-choice]")?.value || "auto";
       const fontFileChoice = cardElement?.querySelector("[data-qwen-font-file]")?.value || "auto";
       const typeTag = cardElement?.querySelector(".qwen-font-type-tag");
-      if (options.automatic && (fontChoice !== "auto" || fontFileChoice !== "auto")) return;
+      if (options.automatic
+        && ((fontChoice !== "auto" && fontChoice !== item.font_style)
+          || fontFileChoice !== "auto")) return;
       const showResult = (message, title = "") => {
         if (!typeTag) return;
         typeTag.classList.remove("is-loading");
@@ -2957,9 +2964,11 @@
           throw new Error("Không tìm thấy font con đã chọn trong han-fonts.json.");
         }
 
-        let chosenFontKey = selectedFileGroup || fontChoice;
+        const savedFontStyle = candidateKeys.includes(item.font_style) ? item.font_style : "";
+        let chosenFontKey = selectedFileGroup
+          || (fontChoice !== "auto" ? fontChoice : savedFontStyle);
         const useQwen = fontFileChoice === "auto";
-        if (fontChoice === "auto" && !selectedFileGroup) {
+        if (fontChoice === "auto" && !selectedFileGroup && !savedFontStyle) {
           await showLoading("Qwen đang nhận diện kiểu chữ từ ảnh…");
           const recommendation = await api("/api/qwen/select-font", {
             method: "POST",
@@ -2977,6 +2986,12 @@
             return;
           }
           chosenFontKey = recommendation.font_key;
+          item.font_style = chosenFontKey;
+          const groupSelect = cardElement?.querySelector("[data-qwen-font-choice]");
+          if (groupSelect) {
+            groupSelect.value = chosenFontKey;
+            updateRecordFontFileOptions(cardElement);
+          }
         }
 
         if (!candidateKeys.includes(chosenFontKey)) {

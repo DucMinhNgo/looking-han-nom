@@ -37,6 +37,7 @@ _ALIASES = {
     "caption": ("caption", "fb_caption", "fb caption", "sub_caption"),
     "ground_truth": ("ground_truth", "groundtruth", "ground truth", "gt", "label"),
     "phonetic": ("phonetic", "phien_am", "phienam", "phiên âm", "pinyin"),
+    "font_style": ("font_style",),
 }
 
 
@@ -186,6 +187,7 @@ class Dataset:
                         caption=_pick(row, "caption"),
                         ground_truth=_pick(row, "ground_truth"),
                         phonetic=_pick(row, "phonetic"),
+                        font_style=_pick(row, "font_style"),
                         post_link=_pick_url(row),
                         # Anything the file carries that was not read into one
                         # of the four fields is kept rather than dropped — it

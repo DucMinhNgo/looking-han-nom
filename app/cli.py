@@ -8,6 +8,7 @@ importing every core module.
     python -m app.cli --check
     python -m app.cli --search "落又一"
     python -m app.cli --add-user mai --password '...'
+    python -m app.cli --classify-fonts
 """
 
 from __future__ import annotations
@@ -212,6 +213,112 @@ def cmd_stats() -> int:
     return 0
 
 
+def cmd_classify_fonts(max_records: int) -> int:
+    """Classify records that do not yet have a saved Qwen font style."""
+    import base64
+    import mimetypes
+
+    from app.core.localimages import ImageLibrary
+    from app.core.pg_dataset import PgDataset
+
+    settings = _settings()
+    if not settings.database_url:
+        print("--classify-fonts requires DATABASE_URL (PostgreSQL).", file=sys.stderr)
+        return 2
+    if not settings.qwen_api_key:
+        print("--classify-fonts requires QWEN_API_KEY.", file=sys.stderr)
+        return 2
+    try:
+        from openai import OpenAI
+    except ImportError:
+        print("Install the project's OpenAI dependency before classifying fonts.", file=sys.stderr)
+        return 2
+
+    registry_path = Path(__file__).resolve().parent / "static" / "fonts" / "han-fonts.json"
+    try:
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"Could not read font registry: {exc}", file=sys.stderr)
+        return 2
+    candidates = [
+        {
+            "key": key,
+            "label": entry.get("label", key),
+            "fonts": [Path(name).stem for name in entry["files"][:5]],
+        }
+        for key, entry in registry.items()
+        if isinstance(entry, dict)
+        and isinstance(entry.get("files"), list)
+        and entry["files"]
+    ]
+    allowed = {candidate["key"] for candidate in candidates}
+    if not candidates:
+        print("Font registry contains no font groups.", file=sys.stderr)
+        return 2
+
+    dataset = PgDataset(settings.database_url)
+    items = dataset.items
+    images = ImageLibrary(
+        settings.images_dir,
+        ttl_s=settings.image_ttl_s,
+        public_fs_prefix=settings.public_fs_prefix,
+    )
+    images.scan()
+    client = OpenAI(api_key=settings.qwen_api_key, base_url=settings.qwen_base_url)
+    processed = failed = skipped = 0
+
+    for item in items:
+        if item.font_style:
+            continue
+        if max_records and processed + failed >= max_records:
+            break
+        resolved = images.resolve(item.image)
+        image_path = images.path_for(resolved or "")
+        if image_path is None:
+            skipped += 1
+            print(f"skip index={item.index}: image not found ({item.image})", file=sys.stderr)
+            continue
+        try:
+            image_data = base64.b64encode(image_path.read_bytes()).decode("ascii")
+            mime = mimetypes.guess_type(image_path.name)[0] or "image/jpeg"
+            prompt = (
+                "Identify the calligraphic style shown in this image. Choose exactly "
+                "one supplied font group: Khai, Hanh, Le, Trien, or Thao. Use the "
+                "font filenames only as hints. Return JSON only with keys font_key "
+                "and reason. "
+                f"Text: {(item.ground_truth or '')[:1000]}\n"
+                f"Caption: {(item.caption or '')[:500]}\n"
+                f"Allowed candidates: {json.dumps(candidates, ensure_ascii=False)}"
+            )
+            response = client.chat.completions.create(
+                model=settings.qwen_model,
+                temperature=0.1,
+                response_format={"type": "json_object"},
+                messages=[{"role": "user", "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {
+                        "url": f"data:{mime};base64,{image_data}",
+                    }},
+                ]}],
+            )
+            answer = json.loads(response.choices[0].message.content or "{}")
+            font_style = answer.get("font_key")
+            if font_style not in allowed:
+                raise ValueError(f"Qwen returned unsupported font key: {font_style!r}")
+            dataset.update_font_style(item.index, font_style)
+            processed += 1
+            print(f"classified index={item.index}: {font_style}")
+        except Exception as exc:
+            failed += 1
+            print(f"failed index={item.index}: {exc}", file=sys.stderr)
+
+    print(
+        f"Font classification complete: saved={processed}, failed={failed}, "
+        f"skipped_missing_image={skipped}"
+    )
+    return 1 if failed else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     from app.core.config import load_env_file
 
@@ -234,6 +341,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--hash-password", action="store_true",
                         help="print a bcrypt hash for APP_PASSWORD_HASH")
     parser.add_argument("--stats", action="store_true", help="print dataset/image counts")
+    parser.add_argument(
+        "--classify-fonts",
+        action="store_true",
+        help="classify records with no saved font_style using Qwen and their images",
+    )
+    parser.add_argument(
+        "--max-font-records",
+        type=int,
+        default=0,
+        help="optional cap for --classify-fonts (0 means all eligible records)",
+    )
     parser.add_argument("--mismatch", action="store_true",
                         help="list rows without an image, and images without a row")
     parser.add_argument("--search", metavar="QUERY", default="")
@@ -252,6 +370,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_check()
     if args.stats:
         return cmd_stats()
+    if args.classify_fonts:
+        if args.max_font_records < 0:
+            parser.error("--max-font-records must be zero or greater")
+        return cmd_classify_fonts(args.max_font_records)
     if args.mismatch:
         return cmd_mismatch(args.limit)
     if args.search:

@@ -56,6 +56,7 @@ def _rows_of(runtime) -> list[dict]:
             "image": item.image, "post_id": item.post_id,
             "caption": item.caption, "ground_truth": item.ground_truth,
             "phonetic": getattr(item, "phonetic", ""),
+            "font_style": item.font_style,
         }
         for item in runtime.dataset.items
     ]

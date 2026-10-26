@@ -100,8 +100,8 @@ class TestSearch:
         oldest = datetime(2025, 1, 1, tzinfo=timezone.utc)
         dataset._execute = lambda sql, params=(): (
             [(newest,)] if sql == "SELECT MAX(updated_at) FROM dataset_items" else [
-                (1, "db_oldest.jpg", "p1", "", "", "", "", {}, oldest, oldest),
-                (2, "db_newest.jpg", "p2", "", "", "", "", {}, newest, newest),
+                (1, "db_oldest.jpg", "p1", "", "", "", "", "", {}, oldest, oldest),
+                (2, "db_newest.jpg", "p2", "", "", "", "", "", {}, newest, newest),
             ]
         )
         runtime.dataset = dataset
@@ -111,6 +111,26 @@ class TestSearch:
         })
         assert response.status_code == 200
         assert response.json()["items"][0]["image"] == "db_newest.jpg"
+
+    def test_pg_dataset_migrates_and_serializes_font_style(self):
+        dataset = PgDataset("postgresql://unused")
+        calls = []
+        newest = datetime(2025, 1, 3, tzinfo=timezone.utc)
+
+        def execute(sql, params=()):
+            calls.append((sql, params))
+            if sql == "SELECT MAX(updated_at) FROM dataset_items":
+                return [(newest,)]
+            if sql.startswith("SELECT id, image"):
+                return [(1, "sample.jpg", "", "", "", "花", "", "thao", {}, newest, newest)]
+            if sql.startswith("UPDATE dataset_items"):
+                return [(1,)]
+            return []
+
+        dataset._execute = execute
+        assert dataset.items[0].to_json()["font_style"] == "thao"
+        migration = next(sql for sql, _ in calls if sql.startswith("ALTER TABLE"))
+        assert "ADD COLUMN IF NOT EXISTS font_style TEXT NOT NULL DEFAULT ''" in migration
 
     def test_paging(self, client):
         login(client)

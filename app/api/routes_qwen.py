@@ -340,10 +340,14 @@ async def select_font(request: Request, user: dict = Depends(current_user)):
             font_key = result_data.get("font_key")
             if font_key not in allowed:
                 raise ValueError("Qwen returned a font outside the allowed candidates")
+            save_font_style = getattr(request.app.state.runtime.dataset, "update_font_style", None)
+            if save_font_style is not None:
+                save_font_style(index, font_key)
         usage = getattr(response, "usage", None)
         result = {
             "enabled": True,
             "font_key": font_key,
+            "font_style": font_key if not per_character else item.font_style,
             "characters": han_chars if per_character else [],
             "font_label": next(
                 (candidate["label"] for candidate in candidates if candidate["key"] == font_key),
