@@ -2627,13 +2627,29 @@
             drainAutoFontRecognitionQueue();
             return;
           }
-          void recommendFontForRecord(job.listIndex, button, {
-            automatic: true,
-            maxFontFiles: AUTO_FONT_FILE_LIMIT,
-          }).finally(() => {
+          void (async () => {
+            try {
+              await recommendFontForRecord(job.listIndex, button, {
+                automatic: true,
+                maxFontFiles: AUTO_FONT_FILE_LIMIT,
+              });
+              const item = state.items[job.listIndex];
+              const groundTruth = button.closest(".item")?.querySelector(".gt");
+              if (button.isConnected && item?.font_style && groundTruth
+                && !groundTruth.querySelector(".han-font-glyph")) {
+                await new Promise((resolve) => setTimeout(resolve, 150));
+                if (button.isConnected && state.items[job.listIndex]?.index === job.itemIndex) {
+                  await recommendFontForRecord(job.listIndex, button, {
+                    automatic: true,
+                    maxFontFiles: AUTO_FONT_FILE_LIMIT,
+                  });
+                }
+              }
+            } finally {
             activeAutoFontRecognitions -= 1;
             drainAutoFontRecognitionQueue();
-          });
+            }
+          })();
         });
       }
     }
