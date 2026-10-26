@@ -168,6 +168,13 @@
     "fallback": "\"Noto Serif TC\", \"Noto Sans TC\", \"Noto Serif CJK TC\", \"Source Han Serif\", \"MS Mincho\", serif",
     "files": [
       "Trien/Font_chu_trien_北师大说文小篆.ttf",
+      "Trien/汉仪娃娃篆简.ttf",
+      "Trien/汉仪篆书繁.ttf",
+      "Trien/汉仪粗篆繁.ttf",
+      "Trien/白舟篆古印.ttf",
+      "Trien/篆书繁.ttf",
+      "Trien/金梅毛隸書.ttf",
+      "Trien/金梅浪漫空心體.ttf",
       "Trien/HDZB_2~2.TTF",
       "Trien/HDZB_2~3.TTF",
       "Trien/HDZB_2~4.TTF",
@@ -179,14 +186,7 @@
       "Trien/TT9.TTF",
       "Trien/simsunb.ttf",
       "Trien/中國龍淡古體.TTF",
-      "Trien/北师大说文小篆.ttf",
-      "Trien/汉仪娃娃篆简.ttf",
-      "Trien/汉仪篆书繁.ttf",
-      "Trien/汉仪粗篆繁.ttf",
-      "Trien/白舟篆古印.ttf",
-      "Trien/篆书繁.ttf",
-      "Trien/金梅毛隸書.ttf",
-      "Trien/金梅浪漫空心體.ttf"
+      "Trien/北师大说文小篆.ttf"
     ]
   }
 }
