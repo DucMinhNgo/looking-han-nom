@@ -2579,6 +2579,55 @@
       if (shouldAutoMatchFontFiles()) applySelectedFont(state.fontKey);
     }
 
+    const autoFontRecognitionQueue = [];
+    const autoFontRecognitionStarted = new Set();
+    let activeAutoFontRecognitions = 0;
+    const AUTO_FONT_RECOGNITION_CONCURRENCY = 2;
+    const AUTO_FONT_FILE_LIMIT = 5;
+
+    function queueAutoFontRecognition(items, startIndex) {
+      items.forEach((item, offset) => {
+        if (!item?.ground_truth?.trim()) return;
+        const key = `${item.index}:${item.ground_truth}:${item.image || ""}`;
+        if (autoFontRecognitionStarted.has(key)) return;
+        autoFontRecognitionStarted.add(key);
+        autoFontRecognitionQueue.push({
+          key,
+          itemIndex: item.index,
+          listIndex: startIndex + offset,
+        });
+      });
+      drainAutoFontRecognitionQueue();
+    }
+
+    function drainAutoFontRecognitionQueue() {
+      while (
+        activeAutoFontRecognitions < AUTO_FONT_RECOGNITION_CONCURRENCY
+        && autoFontRecognitionQueue.length
+      ) {
+        const job = autoFontRecognitionQueue.shift();
+        activeAutoFontRecognitions += 1;
+        requestAnimationFrame(() => {
+          const button = $("results")?.querySelector(
+            `[data-qwen-font="${job.listIndex}"]`,
+          );
+          if (!button || state.items[job.listIndex]?.index !== job.itemIndex) {
+            autoFontRecognitionStarted.delete(job.key);
+            activeAutoFontRecognitions -= 1;
+            drainAutoFontRecognitionQueue();
+            return;
+          }
+          void recommendFontForRecord(job.listIndex, button, {
+            automatic: true,
+            maxFontFiles: AUTO_FONT_FILE_LIMIT,
+          }).finally(() => {
+            activeAutoFontRecognitions -= 1;
+            drainAutoFontRecognitionQueue();
+          });
+        });
+      }
+    }
+
     function renderCardsProgressively(grid, items, append, startIndex) {
       const token = ++state.renderToken;
       if (!append) grid.innerHTML = "";
@@ -2591,6 +2640,7 @@
           grid.insertAdjacentHTML("beforeend", chunk.map((item, index) =>
             card(item, startIndex + cursor + index)).join(""));
           bindCards(grid);
+          queueAutoFontRecognition(chunk, startIndex + cursor);
           cursor += chunk.length;
           requestAnimationFrame(paint);
         }
@@ -2852,12 +2902,13 @@
     </div>`;
     }
 
-    async function recommendFontForRecord(index, button) {
+    async function recommendFontForRecord(index, button, options = {}) {
       const item = state.items[index];
       const cardElement = button.closest(".item");
       const fontChoice = cardElement?.querySelector("[data-qwen-font-choice]")?.value || "auto";
       const fontFileChoice = cardElement?.querySelector("[data-qwen-font-file]")?.value || "auto";
       const typeTag = cardElement?.querySelector(".qwen-font-type-tag");
+      if (options.automatic && (fontChoice !== "auto" || fontFileChoice !== "auto")) return;
       const showResult = (message, title = "") => {
         if (!typeTag) return;
         typeTag.classList.remove("is-loading");
@@ -2936,6 +2987,7 @@
         const groupByFamily = new Map();
         const scanGroups = [...new Set([chosenFontKey, ...candidateKeys])];
         const failedFiles = new Set();
+        const attemptedFontFiles = new Set();
         let qwenFontMap = {};
         let repairError = "";
         try {
@@ -2979,7 +3031,14 @@
                 ...entries.filter((entry) => entry.file !== fontFileChoice),
               ];
             }
+            entries = entries.filter((entry) => !attemptedFontFiles.has(entry.file));
+            if (Number.isFinite(options.maxFontFiles)) {
+              entries = entries.slice(0, Math.max(0, options.maxFontFiles - attemptedFontFiles.size));
+            }
             for (const entry of entries) {
+              if (Number.isFinite(options.maxFontFiles)
+                && attemptedFontFiles.size >= options.maxFontFiles) break;
+              attemptedFontFiles.add(entry.file);
               groupByFamily.set(entry.family, groupKey);
               const unresolved = [...candidates].filter((char) => !assignments.has(char));
               if (!unresolved.length) break;
@@ -3031,11 +3090,14 @@
         const labels = usedGroups.map((key) => fontRegistry[key]?.label || key);
         const complete = assignments.size === chars.length;
         const result = complete
-          ? `Đã kiểm tra: đủ ${assignments.size}/${chars.length} chữ · ${labels.join(", ") || chosenStyle}`
-          : `Chưa đủ glyph: ${assignments.size}/${chars.length} chữ · kiểu đã chọn: ${chosenStyle}`;
+          ? `Đã nhận diện ${chosenStyle}; đủ ${assignments.size}/${chars.length} chữ · ${labels.join(", ") || chosenStyle}`
+          : `Đã nhận diện ${chosenStyle}; hiển thị ${assignments.size}/${chars.length} chữ`;
         const details = [
           repairError ? `Không dò được font bù bằng Qwen: ${repairError}` : "",
           Object.keys(qwenFontMap).length ? "Qwen đã kiểm tra phân font theo từng chữ." : "",
+          Number.isFinite(options.maxFontFiles)
+            ? `Đã thử ${attemptedFontFiles.size}/${options.maxFontFiles} font con đầu tiên.`
+            : "",
           failedFiles.size ? `Font không tải được:\n${[...failedFiles].join("\n")}` : "",
         ].filter(Boolean);
         showResult(result, details.join("\n"));
