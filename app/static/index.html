@@ -2590,7 +2590,7 @@
     }
 
     const autoFontRecognitionQueue = [];
-    const autoFontRecognitionStarted = new Set();
+    const autoFontRecognitionStarted = new WeakSet();
     let activeAutoFontRecognitions = 0;
     const AUTO_FONT_RECOGNITION_CONCURRENCY = 2;
     const AUTO_FONT_FILE_LIMIT = 5;
@@ -2598,13 +2598,14 @@
     function queueAutoFontRecognition(items, startIndex) {
       items.forEach((item, offset) => {
         if (!item?.ground_truth?.trim()) return;
-        const key = `${item.index}:${item.ground_truth}:${item.image || ""}`;
-        if (autoFontRecognitionStarted.has(key)) return;
-        autoFontRecognitionStarted.add(key);
+        const listIndex = startIndex + offset;
+        const button = $("results")?.querySelector(`[data-qwen-font="${listIndex}"]`);
+        if (!button || autoFontRecognitionStarted.has(button)) return;
+        autoFontRecognitionStarted.add(button);
         autoFontRecognitionQueue.push({
-          key,
+          button,
           itemIndex: item.index,
-          listIndex: startIndex + offset,
+          listIndex,
         });
       });
       drainAutoFontRecognitionQueue();
@@ -2618,11 +2619,10 @@
         const job = autoFontRecognitionQueue.shift();
         activeAutoFontRecognitions += 1;
         requestAnimationFrame(() => {
-          const button = $("results")?.querySelector(
-            `[data-qwen-font="${job.listIndex}"]`,
-          );
-          if (!button || state.items[job.listIndex]?.index !== job.itemIndex) {
-            autoFontRecognitionStarted.delete(job.key);
+          const { button } = job;
+          if (!button || !button.isConnected
+            || state.items[job.listIndex]?.index !== job.itemIndex) {
+            if (button) autoFontRecognitionStarted.delete(button);
             activeAutoFontRecognitions -= 1;
             drainAutoFontRecognitionQueue();
             return;
@@ -2797,6 +2797,7 @@
       if (!grid || !state.items.length) return;
       grid.innerHTML = state.items.map((item, index) => card(item, index)).join("");
       bindCards(grid);
+      queueAutoFontRecognition(state.items, 0);
     }
 
     function updateLoadControls() {
