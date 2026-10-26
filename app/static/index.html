@@ -1639,6 +1639,7 @@
         file: "",
       },
     };
+    const FONT_GROUP_PRIORITY = ["default", "hanh", "le", "trien", "thao"];
     const CJK_FALLBACK = '"Noto Serif TC", "Noto Sans TC", "Noto Serif CJK TC", "Source Han Serif", "MS Mincho", serif';
 
     const DEFAULT_GROUP_NAMES = ["data1", "data2", "data2", "data3"];
@@ -1750,6 +1751,29 @@
       const hasPixels = selectedPixels.some((pixel, index) => index % 4 === 3 && pixel > 10);
       const result = hasPixels && (!_currentDefaultStack
         || !pixelsEqual(selectedPixels, renderGlyphPixels(ctx, _currentDefaultStack, char)));
+      _glyphCache.set(key, result);
+      return result;
+    }
+
+    function checkFontSupportsChar(fontFamilyName, char) {
+      const key = `support|${fontFamilyName}|${char}`;
+      const cached = _glyphCache.get(key);
+      if (cached !== undefined) return cached;
+
+      const ctx = _getGlyphCtx();
+      ctx.font = "32px monospace";
+      const defaultWidth = ctx.measureText(char).width;
+      const familyStack = `${JSON.stringify(fontFamilyName)}, monospace`;
+      ctx.font = `32px ${familyStack}`;
+      const customWidth = ctx.measureText(char).width;
+      const customPixels = renderGlyphPixels(ctx, familyStack, char);
+      const defaultPixels = renderGlyphPixels(ctx, "monospace", char);
+      const hasVisiblePixels = customPixels.some(
+        (pixel, index) => index % 4 === 3 && pixel > 10,
+      );
+      const result = hasVisiblePixels
+        && (Math.abs(defaultWidth - customWidth) > 0.1
+          || !pixelsEqual(customPixels, defaultPixels));
       _glyphCache.set(key, result);
       return result;
     }
@@ -2850,9 +2874,8 @@
         showResult("Không thể áp dụng font: record chưa có ground truth.");
         return;
       }
-      const candidateKeys = Object.keys(fontRegistry).filter((key) =>
-        Array.isArray(fontRegistry[key]?.files) && fontRegistry[key].files.length,
-      );
+      const candidateKeys = FONT_GROUP_PRIORITY.filter((key) =>
+        Array.isArray(fontRegistry[key]?.files) && fontRegistry[key].files.length);
       if (!candidateKeys.length) {
         showResult("Không thể áp dụng font: chưa tải được danh sách 5 kiểu chữ.");
         return;
@@ -2868,30 +2891,16 @@
             || (cp >= 0x3400 && cp <= 0x4DBF)
             || (cp >= 0x20000 && cp <= 0x3134F);
         }))];
-        if (fontFileChoice !== "auto") {
-          const selectedGroup = candidateKeys.find((key) =>
-            (fontRegistry[key]?.files || []).includes(fontFileChoice),
-          );
-          const selectedEntry = selectedGroup
-            ? getFontEntriesForKey(selectedGroup).find((entry) => entry.file === fontFileChoice)
-            : null;
-          const fontFace = selectedEntry && registeredFontFaces.get(selectedEntry.family);
-          if (!selectedEntry || !fontFace) {
-            throw new Error("Không tìm thấy font con đã chọn trong han-fonts.json.");
-          }
-          await showLoading(`Đang tải font con ${fontFileChoice.split("/").pop()}…`);
-          await fontFace.load();
-          const assignments = new Map(textChars.map((char) => [char, selectedEntry.family]));
-          renderRecommendedFont(cardElement, item, assignments);
-          const styleLabel = fontRegistry[selectedGroup]?.label || selectedGroup;
-          showResult(
-            `Đã áp dụng font con · ${styleLabel}: ${fontFileChoice.split("/").pop()}`,
-          );
-          return;
+        const selectedFileGroup = fontFileChoice === "auto" ? "" : candidateKeys.find((key) =>
+          (fontRegistry[key]?.files || []).includes(fontFileChoice),
+        );
+        if (fontFileChoice !== "auto" && !selectedFileGroup) {
+          throw new Error("Không tìm thấy font con đã chọn trong han-fonts.json.");
         }
 
-        let chosenFontKey = fontChoice;
-        if (fontChoice === "auto") {
+        let chosenFontKey = selectedFileGroup || fontChoice;
+        const useQwen = fontFileChoice === "auto";
+        if (fontChoice === "auto" && !selectedFileGroup) {
           await showLoading("Qwen đang nhận diện kiểu chữ từ ảnh…");
           const recommendation = await api("/api/qwen/select-font", {
             method: "POST",
@@ -2922,24 +2931,26 @@
         let qwenFontMap = {};
         let repairError = "";
         try {
-          await showLoading("Qwen đang kiểm tra từng chữ trong ảnh…");
-          const mapping = await api("/api/qwen/select-font", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              index: item.index,
-              font_keys: candidateKeys,
-              per_character: true,
-              characters: chars,
-              include_image: true,
-              preferred_font_key: chosenFontKey,
-              force_refresh: true,
-            }),
-          });
-          if (mapping.enabled) {
-            qwenFontMap = mapping.font_map || {};
-          } else {
-            repairError = mapping.message || "Qwen chưa được cấu hình để dò font.";
+          if (useQwen) {
+            await showLoading("Qwen đang kiểm tra từng chữ trong ảnh…");
+            const mapping = await api("/api/qwen/select-font", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                index: item.index,
+                font_keys: candidateKeys,
+                per_character: true,
+                characters: chars,
+                include_image: true,
+                preferred_font_key: chosenFontKey,
+                force_refresh: true,
+              }),
+            });
+            if (mapping.enabled) {
+              qwenFontMap = mapping.font_map || {};
+            } else {
+              repairError = mapping.message || "Qwen chưa được cấu hình để dò font.";
+            }
           }
         } catch (error) {
           repairError = error.message;
@@ -2953,11 +2964,12 @@
           const previousDefaultStack = _currentDefaultStack;
           _currentDefaultStack = fallback;
           try {
-            const entries = getFontEntriesForKey(groupKey);
-            if (groupKey === chosenFontKey && fontFileChoice !== "auto") {
-              entries.sort((left, right) =>
-                Number(right.file === fontFileChoice) - Number(left.file === fontFileChoice),
-              );
+            let entries = getFontEntriesForKey(groupKey);
+            if (groupKey === selectedFileGroup) {
+              entries = [
+                ...entries.filter((entry) => entry.file === fontFileChoice),
+                ...entries.filter((entry) => entry.file !== fontFileChoice),
+              ];
             }
             for (const entry of entries) {
               groupByFamily.set(entry.family, groupKey);
@@ -2977,7 +2989,7 @@
               }
               _glyphCache.clear();
               for (const char of unresolved) {
-                if (_hasVisibleGlyph(`"${entry.family}", ${fallback}`, char)) {
+                if (checkFontSupportsChar(entry.family, char)) {
                   assignments.set(char, entry.family);
                 }
               }
